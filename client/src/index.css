@@ -1,0 +1,38 @@
+/* Minimalist Luxury Theme */
+:root {
+  --gold: #D4AF37;
+  --black: #1a1a1a;
+  --white: #ffffff;
+}
+
+body {
+  font-family: 'Playfair Display', serif; /* Great for luxury brands */
+  background-color: var(--white);
+  color: var(--black);
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  padding: 2rem;
+}
+
+.card {
+  transition: transform 0.3s ease;
+  border: none;
+}
+
+.card:hover {
+  transform: translateY(-10px);
+}
+
+.add-btn {
+  background: var(--black);
+  color: white;
+  border: none;
+  padding: 12px;
+  width: 100%;
+  letter-spacing: 2px;
+  cursor: pointer;
+}
