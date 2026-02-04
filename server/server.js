@@ -7,7 +7,7 @@ const app = express();
 
 // 1. ADVANCED CORS CONFIGURATION
 const allowedOrigins = [
-  "http://localhost:5173",          // Local development
+  //"http://localhost:5173",          // Local development
   "https://oneelixer.vercel.app"    // YOUR LIVE VERCEL URL
 ];
 
