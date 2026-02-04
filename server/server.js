@@ -9,7 +9,7 @@ const app = express();
 app.use(cors({
   origin: [
     "http://localhost:5173",          // Local development
-    "https://your-project.vercel.app" 
+    "https://oneelixir.vercel.app" 
   ],
   credentials: true
 }));
