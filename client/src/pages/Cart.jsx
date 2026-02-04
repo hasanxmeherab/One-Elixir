@@ -27,7 +27,7 @@ const Cart = () => {
                   <img src={item.image} alt={item.name} style={cartThumbStyle} />
                   <div>
                     <h4 style={{ margin: '0 0 5px 0', letterSpacing: '1px' }}>{item.name}</h4>
-                    <p style={{ margin: 0, color: '#888', fontSize: '14px' }}>${item.price}</p>
+                    <p style={{ margin: 0, color: '#888', fontSize: '14px' }}>{item.price} Tk</p>
                   </div>
                 </div>
                 
@@ -46,7 +46,7 @@ const Cart = () => {
                   </div>
 
                   <span style={{ fontWeight: 'bold', marginBottom: '5px' }}>
-                    ${(item.price * item.quantity).toFixed(2)}
+                    {(item.price * item.quantity).toFixed(2)} Tk
                   </span>
                   <button onClick={() => removeFromCart(item._id)} style={removeBtnStyle}>
                     REMOVE
@@ -59,7 +59,7 @@ const Cart = () => {
           <div style={summaryStyle}>
             <div style={totalRowStyle}>
               <span>SUBTOTAL</span>
-              <span>${totalAmount.toFixed(2)}</span>
+              <span>{totalAmount.toFixed(2)} Tk</span>
             </div>
             <button onClick={() => navigate('/thank-you')} style={checkoutBtnStyle}>
               PROCEED TO CHECKOUT
