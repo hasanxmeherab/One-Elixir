@@ -5,14 +5,32 @@ require('dotenv').config();
 
 const app = express();
 
+// 1. ADVANCED CORS CONFIGURATION
+const allowedOrigins = [
+  "http://localhost:5173",          // Local development
+  "https://oneelixer.vercel.app"    // YOUR LIVE VERCEL URL
+];
 
 app.use(cors({
-  origin: [
-    "http://localhost:5173",          // Local development
-    "https://oneelixir.vercel.app" 
-  ],
-  credentials: true
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or Postman)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Explicitly allow methods
+  allowedHeaders: ['Content-Type', 'Authorization'],    // Explicitly allow headers
+  credentials: true,                                   // Allow cookies if needed
+  optionsSuccessStatus: 200                             // Fix for older browsers/preflight
 }));
+
+// 2. EXPLICIT PREFLIGHT HANDLING
+// This ensures that 'OPTIONS' requests are always handled correctly before the main request.
+app.options('*', cors());
 
 app.use(express.json());
 
