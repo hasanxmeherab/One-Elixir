@@ -7,6 +7,7 @@ import { useCart } from './context/CartContext';
 import Admin from './pages/Admin';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLogin from './pages/AdminLogin';
+import ThankYou from './pages/ThankYou';
 
 // Basic Navbar Component
 const Navbar = () => {
@@ -38,6 +39,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/cart" element={<Cart />} />
+          <Route path="/thank-you" element={<ThankYou />} />
           <Route 
             path="/admin" 
             element={

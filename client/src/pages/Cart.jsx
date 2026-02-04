@@ -1,11 +1,12 @@
 import React from 'react';
 import { useCart } from '../context/CartContext';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const Cart = () => {
-  const { cart, removeFromCart } = useCart();
+  const { cart, removeFromCart, updateQuantity } = useCart();
+  const navigate = useNavigate();
 
-  // Calculate the grand total of the entire cart
+  // Calculate the grand total dynamically
   const totalAmount = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 
   return (
@@ -26,18 +27,28 @@ const Cart = () => {
                   <img src={item.image} alt={item.name} style={cartThumbStyle} />
                   <div>
                     <h4 style={{ margin: '0 0 5px 0', letterSpacing: '1px' }}>{item.name}</h4>
-                    <p style={{ margin: 0, color: '#888', fontSize: '14px' }}>
-                      ${item.price} x {item.quantity}
-                    </p>
+                    <p style={{ margin: 0, color: '#888', fontSize: '14px' }}>${item.price}</p>
                   </div>
                 </div>
                 
                 <div style={itemActionStyle}>
-                  <span style={{ fontWeight: 'bold' }}>${(item.price * item.quantity).toFixed(2)}</span>
-                  <button 
-                    onClick={() => removeFromCart(item._id)} 
-                    style={removeBtnStyle}
-                  >
+                  {/* Quantity Selector UI */}
+                  <div style={quantityControlsStyle}>
+                    <button 
+                      onClick={() => updateQuantity(item._id, item.quantity - 1)}
+                      style={qtyBtnStyle}
+                    >−</button>
+                    <span style={{ padding: '0 15px', fontSize: '14px' }}>{item.quantity}</span>
+                    <button 
+                      onClick={() => updateQuantity(item._id, item.quantity + 1)}
+                      style={qtyBtnStyle}
+                    >+</button>
+                  </div>
+
+                  <span style={{ fontWeight: 'bold', marginBottom: '5px' }}>
+                    ${(item.price * item.quantity).toFixed(2)}
+                  </span>
+                  <button onClick={() => removeFromCart(item._id)} style={removeBtnStyle}>
                     REMOVE
                   </button>
                 </div>
@@ -50,8 +61,12 @@ const Cart = () => {
               <span>SUBTOTAL</span>
               <span>${totalAmount.toFixed(2)}</span>
             </div>
-            <p style={shippingNoteStyle}>Taxes and shipping calculated at checkout.</p>
-            <button style={checkoutBtnStyle}>PROCEED TO CHECKOUT</button>
+            <button onClick={() => navigate('/thank-you')} style={checkoutBtnStyle}>
+              PROCEED TO CHECKOUT
+            </button>
+            <div style={{ textAlign: 'center', marginTop: '20px' }}>
+              <Link to="/" style={continueShoppingStyle}>← CONTINUE SHOPPING</Link>
+            </div>
           </div>
         </>
       )}
@@ -59,41 +74,23 @@ const Cart = () => {
   );
 };
 
-// --- Styles for a Premium Experience ---
+// --- Styles ---
 const cartContainerStyle = { padding: '80px 15%', minHeight: '70vh' };
 const cartHeaderStyle = { letterSpacing: '4px', textAlign: 'center', marginBottom: '60px', borderBottom: '1px solid #eee', paddingBottom: '20px' };
 const cartListStyle = { marginBottom: '40px' };
-
-const cartItemStyle = { 
-  display: 'flex', 
-  justifyContent: 'space-between', 
-  alignItems: 'center', 
-  padding: '20px 0', 
-  borderBottom: '1px solid #f9f9f9' 
-};
-
+const cartItemStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 0', borderBottom: '1px solid #f9f9f9' };
 const itemInfoStyle = { display: 'flex', alignItems: 'center', gap: '20px' };
-const cartThumbStyle = { width: '80px', height: '100px', objectFit: 'cover', backgroundColor: '#f9f9f9' };
+const cartThumbStyle = { width: '80px', height: '100px', objectFit: 'cover' };
+const itemActionStyle = { textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' };
 
-const itemActionStyle = { textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '10px' };
+const quantityControlsStyle = { display: 'flex', alignItems: 'center', border: '1px solid #eee', marginBottom: '10px', width: 'fit-content' };
+const qtyBtnStyle = { border: 'none', background: 'none', padding: '5px 12px', cursor: 'pointer', fontSize: '16px' };
+
 const removeBtnStyle = { background: 'none', border: 'none', color: '#999', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' };
-
 const summaryStyle = { marginTop: '50px', borderTop: '2px solid #000', paddingTop: '30px', maxWidth: '400px', marginLeft: 'auto' };
-const totalRowStyle = { display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 'bold', letterSpacing: '2px' };
-const shippingNoteStyle = { fontSize: '12px', color: '#888', marginTop: '10px', fontStyle: 'italic' };
-
-const checkoutBtnStyle = { 
-  width: '100%', 
-  backgroundColor: '#000', 
-  color: '#fff', 
-  padding: '18px', 
-  border: 'none', 
-  marginTop: '25px', 
-  letterSpacing: '3px', 
-  fontWeight: 'bold', 
-  cursor: 'pointer' 
-};
-
-const shopLinkStyle = { display: 'inline-block', marginTop: '20px', color: '#000', fontWeight: 'bold', letterSpacing: '1px', textDecoration: 'none', borderBottom: '1px solid #000' };
+const totalRowStyle = { display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '20px' };
+const checkoutBtnStyle = { width: '100%', backgroundColor: '#000', color: '#fff', padding: '18px', border: 'none', cursor: 'pointer', fontWeight: 'bold', letterSpacing: '1px' };
+const continueShoppingStyle = { fontSize: '12px', color: '#000', textDecoration: 'none', fontWeight: 'bold', opacity: 0.7 };
+const shopLinkStyle = { display: 'inline-block', marginTop: '20px', color: '#000', fontWeight: 'bold', textDecoration: 'none', borderBottom: '1px solid #000' };
 
 export default Cart;
