@@ -19,6 +19,7 @@ app.use(express.json());
 // Routes
 app.use('/api/perfumes', require('./routes/perfumeRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
+app.use('/api/auth', require('./routes/authRoutes'));
 
 // Connect to MongoDB using env variable
 mongoose.connect(process.env.MONGO_URI)
