@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react'; // Added useState
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import Home from './pages/Home';
 import ProductDetails from './pages/ProductDetails';
@@ -13,9 +13,11 @@ import ThankYou from './pages/ThankYou';
 import SignIn from './pages/SignIn';
 import SignUp from './pages/SignUp';
 import Shop from './pages/Shop';
+import CartSidebar from './components/CartSidebar';
+import Checkout from './pages/Checkout';
 
-// Updated Navbar with User Auth Logic
-const Navbar = () => {
+// Updated Navbar with User Auth Logic & Cart Trigger
+const Navbar = ({ onCartClick }) => { 
   const { cart } = useCart();
   const { user, logout } = useUser();
   const navigate = useNavigate();
@@ -34,9 +36,10 @@ const Navbar = () => {
       <ul style={navLinksStyle}>
         <li><Link to="/shop" style={linkStyle}>Collection</Link></li>
         <li>
-          <Link to="/cart" style={linkStyle}>
+          {/* 3. Changed Cart link to a button/div to trigger sidebar */}
+          <div onClick={onCartClick} style={{...linkStyle, cursor: 'pointer'}}>
             Cart ({cart.reduce((total, item) => total + item.quantity, 0)})
-          </Link>
+          </div>
         </li>
         
         {user ? (
@@ -59,22 +62,26 @@ const Navbar = () => {
 
 // Wrapper component to handle conditional Navbar rendering
 const AppContent = () => {
+  const [isCartOpen, setIsCartOpen] = useState(false); // 4. Added Cart State
   const location = useLocation();
-  // Hide this navbar if the path is /admin or /admin-login
   const isHideNavbar = location.pathname.startsWith('/admin');
 
   return (
     <>
-      {!isHideNavbar && <Navbar />}
+      {/* 5. Passing state to Navbar and Sidebar */}
+      {!isHideNavbar && <Navbar onCartClick={() => setIsCartOpen(true)} />}
+      <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+      
       <div className="container" style={{ minHeight: '80vh' }}>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/product/:id" element={<ProductDetails />} />
+          <Route path="/product/:id" element={<ProductDetails openCart={() => setIsCartOpen(true)} />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/thank-you" element={<ThankYou />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/shop" element={<Shop />} />
+          <Route path="/checkout" element={<Checkout />} />
           
           <Route 
             path="/admin" 
@@ -103,7 +110,6 @@ function App() {
 }
 
 // --- Styles ---
-
 const navStyles = {
   display: 'flex',
   justifyContent: 'space-between',
