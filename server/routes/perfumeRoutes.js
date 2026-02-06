@@ -12,14 +12,32 @@ router.get('/', async (req, res) => {
     }
 });
 
-// GET a single perfume by ID (NEW)
+// RESTORE STOCK (New: Added for Archive functionality)
+// This adds quantity back to a perfume's stock when an order is deleted
+router.put('/restore-stock', async (req, res) => {
+    try {
+        const { id, quantity } = req.body;
+        const perfume = await Perfume.findById(id);
+        
+        if (!perfume) return res.status(404).json({ message: "Perfume not found" });
+
+        // Update the stock count
+        perfume.stock = (Number(perfume.stock) || 0) + Number(quantity);
+        await perfume.save();
+
+        res.json({ message: "Stock successfully restored", newStock: perfume.stock });
+    } catch (err) {
+        res.status(500).json({ message: "Error restoring stock", error: err.message });
+    }
+});
+
+// GET a single perfume by ID
 router.get('/:id', async (req, res) => {
     try {
         const perfume = await Perfume.findById(req.params.id);
         if (!perfume) return res.status(404).json({ message: "Elixir not found" });
         res.json(perfume);
     } catch (err) {
-        // This handles cases where the ID format is invalid
         res.status(500).json({ message: err.message });
     }
 });
@@ -31,7 +49,8 @@ router.post('/', async (req, res) => {
         price: req.body.price,
         description: req.body.description,
         scentProfile: req.body.scentProfile,
-        image: req.body.image
+        image: req.body.image,
+        stock: req.body.stock || 0 // Ensure stock is handled on creation
     });
 
     try {
@@ -58,7 +77,7 @@ router.put('/:id', async (req, res) => {
         const updatedPerfume = await Perfume.findByIdAndUpdate(
             req.params.id, 
             req.body, 
-            { new: true } // Returns the modified document rather than the original
+            { new: true }
         );
         res.json(updatedPerfume);
     } catch (err) {
