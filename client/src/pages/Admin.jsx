@@ -5,6 +5,8 @@ import AdminDashboard from './AdminDashboard'; // Renamed import
 import InventoryManager from './InventoryManager';
 import ManualOrder from './ManualOrder';
 import OrderList from './OrderList';
+import ExpenseManagement from './ExpenseManagement';
+import InvestmentTracker from './InvestmentTracker';
 
 const Admin = () => {
   const [activePage, setActivePage] = useState('dashboard');
@@ -48,8 +50,8 @@ const Admin = () => {
           {activePage === 'manual-order' && <ManualOrder perfumes={perfumes} fetchData={fetchData} />}
           {activePage === 'order-list' && <OrderList orders={orders} fetchData={fetchData} />}
           
-          {activePage === 'expenses' && <div>Expense Management Coming Soon...</div>}
-          {activePage === 'investment' && <div>Investment Tracker Coming Soon...</div>}
+          {activePage === 'expenses' && <ExpenseManagement />}
+          {activePage === 'investment' && <InvestmentTracker />}
         </div>
       </div>
     </div>
@@ -59,7 +61,7 @@ const Admin = () => {
 // --- Styles maintained from previous step ---
 const sidebarStyle = { width: '260px', backgroundColor: '#f9f9f9', borderRight: '1px solid #eee', padding: '30px 15px', display: 'flex', flexDirection: 'column', gap: '5px' };
 const sidebarLabel = { fontSize: '10px', letterSpacing: '2px', color: '#888', fontWeight: 'bold', marginBottom: '20px', paddingLeft: '10px' };
-const menuBtn = { textAlign: 'left', padding: '12px 15px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', letterSpacing: '1px', color: '#555', transition: '0.2s' };
+const menuBtn = { textAlign: 'left', padding: '12px 15px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', letterSpacing: '1px', color: '#555', transition: '0.2s' };
 const activeBtn = { ...menuBtn, backgroundColor: '#000', color: '#fff', borderRadius: '4px' };
 
 export default Admin;

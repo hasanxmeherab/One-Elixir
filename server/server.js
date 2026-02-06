@@ -20,6 +20,9 @@ app.use(express.json());
 app.use('/api/perfumes', require('./routes/perfumeRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/expenses', require('./routes/expenseRoutes'));
+app.use('/api/investments', require('./routes/investmentRoutes'));
+//app.use('/api/investments', require('./routes/investmentRoutes'));
 
 // Connect to MongoDB using env variable
 mongoose.connect(process.env.MONGO_URI)
