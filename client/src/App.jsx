@@ -12,6 +12,7 @@ import AdminLogin from './pages/AdminLogin';
 import ThankYou from './pages/ThankYou';
 import SignIn from './pages/SignIn';
 import SignUp from './pages/SignUp';
+import Shop from './pages/Shop';
 
 // Updated Navbar with User Auth Logic
 const Navbar = () => {
@@ -31,7 +32,7 @@ const Navbar = () => {
         <Link to="/" style={logoLinkStyle}>OneElixir</Link>
       </div>
       <ul style={navLinksStyle}>
-        <li><Link to="/" style={linkStyle}>Collection</Link></li>
+        <li><Link to="/shop" style={linkStyle}>Collection</Link></li>
         <li>
           <Link to="/cart" style={linkStyle}>
             Cart ({cart.reduce((total, item) => total + item.quantity, 0)})
@@ -73,6 +74,7 @@ const AppContent = () => {
           <Route path="/thank-you" element={<ThankYou />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />
+          <Route path="/shop" element={<Shop />} />
           
           <Route 
             path="/admin" 
