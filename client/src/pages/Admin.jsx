@@ -12,14 +12,17 @@ const Admin = () => {
   const [activePage, setActivePage] = useState('dashboard');
   const [perfumes, setPerfumes] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [investments, setInvestments] = useState([]);
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   const fetchData = async () => {
     try {
       const pRes = await axios.get(`${API_URL}/api/perfumes`);
       const oRes = await axios.get(`${API_URL}/api/orders`);
+      const iRes = await axios.get(`${API_URL}/api/investments`);
       setPerfumes(pRes.data);
       setOrders(oRes.data);
+      setInvestments(iRes.data);
     } catch (err) {
       console.error("Fetch failed", err);
     }
@@ -45,13 +48,20 @@ const Admin = () => {
 
         {/* MAIN CONTENT AREA */}
         <div style={{ flex: 1, padding: '40px', backgroundColor: '#fff' }}>
-          {activePage === 'dashboard' && <AdminDashboard perfumes={perfumes} orders={orders} />}
+          {activePage === 'dashboard' && (
+            <AdminDashboard 
+              perfumes={perfumes} 
+              orders={orders} 
+              investments={investments}
+              onNavigate={setActivePage}
+            />
+          )}          
           {activePage === 'inventory' && <InventoryManager perfumes={perfumes} fetchData={fetchData} />}
           {activePage === 'manual-order' && <ManualOrder perfumes={perfumes} fetchData={fetchData} />}
           {activePage === 'order-list' && <OrderList orders={orders} fetchData={fetchData} />}
           
           {activePage === 'expenses' && <ExpenseManagement />}
-          {activePage === 'investment' && <InvestmentTracker />}
+          {activePage === 'investment' && <InvestmentTracker investments={investments} />}
         </div>
       </div>
     </div>

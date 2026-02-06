@@ -5,6 +5,7 @@ const InventoryManager = ({ perfumes, fetchData }) => {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState(''); // Search state
   const [formData, setFormData] = useState({
     name: '', price: '', description: '', scentProfile: '', image: '', stock: 0
   });
@@ -12,6 +13,11 @@ const InventoryManager = ({ perfumes, fetchData }) => {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const CLOUD_NAME = "dluvmed0b";
   const UPLOAD_PRESET = "one_elixir_uploads";
+
+  // --- Search Filtering Logic ---
+  const filteredPerfumes = perfumes.filter(p => 
+    p.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleEditClick = (p) => {
     setEditId(p._id);
@@ -59,6 +65,8 @@ const InventoryManager = ({ perfumes, fetchData }) => {
   return (
     <section>
       <h3 style={{ letterSpacing: '2px', marginBottom: '20px' }}>INVENTORY MANAGEMENT</h3>
+      
+      {/* FORM SECTION */}
       <form onSubmit={handleSubmit} style={formStyle}>
         <input type="text" placeholder="Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required style={inputStyle}/>
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -74,6 +82,21 @@ const InventoryManager = ({ perfumes, fetchData }) => {
         </div>
       </form>
 
+      <hr style={{ border: 'none', borderTop: '1px solid #eee', margin: '40px 0' }} />
+
+      {/* SEARCH BAR BEFORE LIST */}
+      <div style={{ marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <span style={{ fontSize: '11px', fontWeight: 'bold', letterSpacing: '1px' }}>SEARCH PERFUME:</span>
+        <input 
+          type="text" 
+          placeholder="Type perfume name to search..." 
+          value={searchTerm} 
+          onChange={(e) => setSearchTerm(e.target.value)} 
+          style={searchBarStyle}
+        />
+      </div>
+
+      {/* INVENTORY LIST */}
       <table style={tableStyle}>
         <thead>
           <tr style={{ borderBottom: '2px solid #000' }}>
@@ -81,25 +104,32 @@ const InventoryManager = ({ perfumes, fetchData }) => {
           </tr>
         </thead>
         <tbody>
-          {perfumes.map(p => (
-            <tr key={p._id} style={{ borderBottom: '1px solid #eee' }}>
-              <td style={tdStyle}>{p.name}</td>
-              <td style={tdStyle}>{p.price} TK</td>
-              <td style={{...tdStyle, color: p.stock < 5 ? 'red' : 'black', fontWeight: 'bold'}}>{p.stock}</td>
-              <td style={tdStyle}>
-                <button onClick={() => handleEditClick(p)} style={actionBtn}>EDIT</button>
-                <button onClick={() => deletePerfume(p._id)} style={{...actionBtn, color: 'red'}}>DELETE</button>
-              </td>
+          {filteredPerfumes.length > 0 ? (
+            filteredPerfumes.map(p => (
+              <tr key={p._id} style={{ borderBottom: '1px solid #eee' }}>
+                <td style={tdStyle}>{p.name}</td>
+                <td style={tdStyle}>{p.price} TK</td>
+                <td style={{...tdStyle, color: p.stock < 5 ? 'red' : 'black', fontWeight: 'bold'}}>{p.stock}</td>
+                <td style={tdStyle}>
+                  <button onClick={() => handleEditClick(p)} style={actionBtn}>EDIT</button>
+                  <button onClick={() => deletePerfume(p._id)} style={{...actionBtn, color: 'red'}}>DELETE</button>
+                </td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan="4" style={{ padding: '20px', textAlign: 'center', color: '#888' }}>No perfumes found matching "{searchTerm}"</td>
             </tr>
-          ))}
+          )}
         </tbody>
       </table>
     </section>
   );
 };
 
-// Styles (Matching your OneElixir theme)
-const formStyle = { display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '40px' };
+// Styles
+const searchBarStyle = { padding: '10px 15px', border: '1px solid #000', outline: 'none', width: '300px', fontSize: '13px' };
+const formStyle = { display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '10px' };
 const inputStyle = { padding: '12px', border: '1px solid #ddd', outline: 'none' };
 const btnStyle = { padding: '15px', background: '#000', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold' };
 const cancelBtnStyle = { ...btnStyle, background: '#fff', color: '#000', border: '1px solid #000' };
