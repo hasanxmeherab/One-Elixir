@@ -1,4 +1,4 @@
-import React, { useState } from 'react'; // Added useState
+import React, { useState } from 'react'; 
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import Home from './pages/Home';
 import ProductDetails from './pages/ProductDetails';
@@ -15,8 +15,10 @@ import SignUp from './pages/SignUp';
 import Shop from './pages/Shop';
 import CartSidebar from './components/CartSidebar';
 import Checkout from './pages/Checkout';
+import Account from './pages/Account';
+import ManualOrder from './pages/ManualOrder';
 
-// Updated Navbar with User Auth Logic & Cart Trigger
+// --- Navbar Component ---
 const Navbar = ({ onCartClick }) => { 
   const { cart } = useCart();
   const { user, logout } = useUser();
@@ -36,7 +38,6 @@ const Navbar = ({ onCartClick }) => {
       <ul style={navLinksStyle}>
         <li><Link to="/shop" style={linkStyle}>Collection</Link></li>
         <li>
-          {/* 3. Changed Cart link to a button/div to trigger sidebar */}
           <div onClick={onCartClick} style={{...linkStyle, cursor: 'pointer'}}>
             Cart ({cart.reduce((total, item) => total + item.quantity, 0)})
           </div>
@@ -44,7 +45,12 @@ const Navbar = ({ onCartClick }) => {
         
         {user ? (
           <>
-            <li style={welcomeTextStyle}>HI, {user.name.toUpperCase()}</li>
+            {/* LINKED USERNAME: Navigates to the Account/Order History page */}
+            <li>
+              <Link to="/account" style={{ textDecoration: 'none' }}>
+                <span style={welcomeTextStyle}>HI, {user.name.toUpperCase()}</span>
+              </Link>
+            </li>
             <li>
               <button onClick={handleLogout} style={logoutButtonStyle}>LOGOUT</button>
             </li>
@@ -60,15 +66,14 @@ const Navbar = ({ onCartClick }) => {
   );
 };
 
-// Wrapper component to handle conditional Navbar rendering
+// --- Main App Content ---
 const AppContent = () => {
-  const [isCartOpen, setIsCartOpen] = useState(false); // 4. Added Cart State
+  const [isCartOpen, setIsCartOpen] = useState(false); 
   const location = useLocation();
   const isHideNavbar = location.pathname.startsWith('/admin');
 
   return (
     <>
-      {/* 5. Passing state to Navbar and Sidebar */}
       {!isHideNavbar && <Navbar onCartClick={() => setIsCartOpen(true)} />}
       <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
       
@@ -92,12 +97,15 @@ const AppContent = () => {
             } 
           />
           <Route path="/admin-login" element={<AdminLogin />} />
+          <Route path="/account" element={<Account />} />
+          <Route path="/manual-order" element={<ManualOrder />} />
         </Routes>
       </div>
     </>
   );
 };
 
+// --- App Root ---
 function App() {
   return (
     <Router>
@@ -109,7 +117,7 @@ function App() {
   );
 }
 
-// --- Styles ---
+// --- Styles (Maintained from your working version) ---
 const navStyles = {
   display: 'flex',
   justifyContent: 'space-between',
@@ -153,7 +161,8 @@ const welcomeTextStyle = {
   fontSize: '11px',
   color: '#999',
   letterSpacing: '1px',
-  fontWeight: 'bold'
+  fontWeight: 'bold',
+  cursor: 'pointer' // Makes the name look clickable
 };
 
 const logoutButtonStyle = {

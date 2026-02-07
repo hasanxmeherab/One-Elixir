@@ -41,7 +41,9 @@ const ManualOrder = ({ perfumes, fetchData }) => {
     }
 
     try {
-      await axios.post(`${API_URL}/api/orders`, { ...orderData, items: itemsToOrder, totalAmount: total });
+      // UPDATED: Changed endpoint to /api/orders/manual to set isManual: true
+      await axios.post(`${API_URL}/api/orders/manual`, { ...orderData, items: itemsToOrder, totalAmount: total });
+      
       for (const item of itemsToOrder) {
         const perfume = perfumes.find(p => p._id === item.perfumeId);
         await axios.put(`${API_URL}/api/perfumes/${item.perfumeId}`, { stock: perfume.stock - item.quantity });
@@ -70,7 +72,6 @@ const ManualOrder = ({ perfumes, fetchData }) => {
           const currentPerfume = perfumes.find(p => p._id === item.perfumeId);
           const lineTotal = currentPerfume ? currentPerfume.price * item.quantity : 0;
           
-          // Logic to filter out already selected perfumes
           const otherSelectedIds = selectedItems
             .filter((_, i) => i !== index)
             .map(si => si.perfumeId);
@@ -83,9 +84,8 @@ const ManualOrder = ({ perfumes, fetchData }) => {
                 required 
                 style={{ ...inputStyle, flex: 3 }}
               >
-                <option value=""selected disabled hidden>-- PICK PERFUME --</option>
+                <option value="" selected disabled hidden>-- PICK PERFUME --</option>
                 {perfumes.map(p => {
-                  // Hide if selected in another row
                   if (otherSelectedIds.includes(p._id)) return null; 
                   
                   return (
@@ -116,7 +116,7 @@ const ManualOrder = ({ perfumes, fetchData }) => {
   );
 };
 
-// --- Styles (Same as before) ---
+// --- Styles (Unchanged) ---
 const containerStyle = { maxWidth: '800px' };
 const formStyle = { display: 'flex', flexDirection: 'column', gap: '15px', backgroundColor: '#fcfcfc', padding: '30px', border: '1px solid #eee' };
 const row = { display: 'flex', gap: '10px' };

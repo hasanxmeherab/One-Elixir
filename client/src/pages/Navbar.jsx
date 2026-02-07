@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useUser } from '../context/UserContext';
 
-const Navbar = () => {
+const Navbar = ({ onCartClick }) => {
   const { user, logout } = useUser();
   const { cart } = useCart();
   const navigate = useNavigate();
@@ -25,24 +25,35 @@ const Navbar = () => {
       </div>
 
       <div style={linkGroupStyle}>
-        {/* CASE 1: ADMIN IS LOGGED IN OR ON ADMIN LOGIN PAGE */}
+        {/* CASE 1: ADMIN VIEW */}
         {isCurrentlyAdmin ? (
           <>
             <Link to="/" style={linkStyle}>EXIT TO SHOP</Link>
-            {/* We show nothing else here to keep the admin panel clean */}
           </>
         ) : (
-          /* CASE 2: CUSTOMER IS BROWSING (NORMAL VIEW) */
+          /* CASE 2: CUSTOMER VIEW */
           <>
-            <Link to="/" style={linkStyle}>SHOP</Link>
-            <Link to="/cart" style={linkStyle}>
+            <Link to="/shop" style={linkStyle}>SHOP</Link>
+            
+            {/* Cart Trigger */}
+            <div onClick={onCartClick} style={{ ...linkStyle, cursor: 'pointer' }}>
               CART ({cart.reduce((a, b) => a + b.quantity, 0)})
-            </Link>
+            </div>
 
             {/* --- CUSTOMER AUTH LOGIC --- */}
             {user ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                <span style={userNameStyle}>HELLO, {user.name.toUpperCase()}</span>
+                
+                {/* 1. Clickable wrapper that manually triggers navigation */}
+                <div 
+                  onClick={() => navigate('/account')} 
+                  style={accountWrapperStyle}
+                >
+                  <span style={userNameStyle}>
+                    HELLO, {user.name.toUpperCase()}
+                  </span>
+                </div>
+
                 <button onClick={handleLogout} style={logoutBtnStyle}>LOGOUT</button>
               </div>
             ) : (
@@ -58,7 +69,7 @@ const Navbar = () => {
   );
 };
 
-// --- Styles (Your Final Working Styles) ---
+// --- Styles maintained and optimized for clickability ---
 const navStyle = {
   display: 'flex',
   justifyContent: 'space-between',
@@ -71,10 +82,52 @@ const navStyle = {
   zIndex: 1000
 };
 
-const logoStyle = { fontSize: '24px', fontWeight: 'bold', letterSpacing: '4px' };
-const linkGroupStyle = { display: 'flex', gap: '30px', alignItems: 'center' };
-const linkStyle = { textDecoration: 'none', color: '#000', fontSize: '12px', fontWeight: 'bold', letterSpacing: '1px' };
-const userNameStyle = { fontSize: '11px', color: '#888', letterSpacing: '1px' };
-const logoutBtnStyle = { background: 'none', border: '1px solid #000', padding: '5px 12px', fontSize: '11px', cursor: 'pointer', fontWeight: 'bold' };
+const logoStyle = { 
+  fontSize: '24px', 
+  fontWeight: 'bold', 
+  letterSpacing: '4px' 
+};
+
+const linkGroupStyle = { 
+  display: 'flex', 
+  gap: '30px', 
+  alignItems: 'center' 
+};
+
+const linkStyle = { 
+  textDecoration: 'none', 
+  color: '#000', 
+  fontSize: '12px', 
+  fontWeight: 'bold', 
+  letterSpacing: '1px' 
+};
+
+const accountWrapperStyle = {
+  cursor: 'pointer',
+  padding: '8px 12px',
+  backgroundColor: '#f5f5f5', // Subtle background to confirm hit area
+  borderRadius: '2px',
+  display: 'flex',
+  alignItems: 'center',
+  transition: 'background 0.2s',
+  border: '1px solid transparent'
+};
+
+const userNameStyle = { 
+  fontSize: '11px', 
+  color: '#333', 
+  letterSpacing: '1px',
+  fontWeight: 'bold',
+  pointerEvents: 'none' // Ensures click registers on the wrapper
+};
+
+const logoutBtnStyle = { 
+  background: 'none', 
+  border: '1px solid #000', 
+  padding: '5px 12px', 
+  fontSize: '11px', 
+  cursor: 'pointer', 
+  fontWeight: 'bold' 
+};
 
 export default Navbar;
