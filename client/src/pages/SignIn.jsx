@@ -1,74 +1,63 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 
 const SignIn = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false); // New Loading State
-  const navigate = useNavigate();
   const { login } = useUser();
-
+  const navigate = useNavigate();
+  const location = useLocation();
+  
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const from = location.state?.from || '/';
 
-  const handleSignIn = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true); // Start loading
     try {
+      // UPDATED URL: Changed from /login to /signin to match your backend
       const res = await axios.post(`${API_URL}/api/auth/signin`, { email, password });
-      login(res.data); 
-      alert(`Welcome back, ${res.data.user.name}!`);
-      navigate('/cart'); 
+      
+      login(res.data);
+      navigate(from, { replace: true });
     } catch (err) {
-      alert(err.response?.data || "Invalid credentials. Please try again.");
-    } finally {
-      setLoading(false); // Stop loading regardless of success/fail
+      alert("Invalid email or password.");
     }
   };
 
   return (
-    <div style={authContainerStyle}>
-      <h2 style={authHeaderStyle}>SIGN IN</h2>
-      <form onSubmit={handleSignIn} style={authFormStyle}>
+    <div style={container}>
+      <form onSubmit={handleSubmit} style={loginBox}>
+        <h2 style={title}>SIGN IN</h2>
+        <p style={subtitle}>Welcome back to OneElixir.</p>
+        
         <input 
-          type="email" 
-          placeholder="Email Address" 
-          value={email} 
-          onChange={(e) => setEmail(e.target.value)} 
-          required 
-          disabled={loading} // Disable input while loading
-          style={authInputStyle}
+          type="email" placeholder="EMAIL" value={email} 
+          onChange={e => setEmail(e.target.value)} required style={inputStyle} 
         />
         <input 
-          type="password" 
-          placeholder="Password" 
-          value={password} 
-          onChange={(e) => setPassword(e.target.value)} 
-          required 
-          disabled={loading} // Disable input while loading
-          style={authInputStyle}
+          type="password" placeholder="PASSWORD" value={password} 
+          onChange={e => setPassword(e.target.value)} required style={inputStyle} 
         />
-        <button 
-          type="submit" 
-          style={{...authBtnStyle, opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer'}} 
-          disabled={loading}
-        >
-          {loading ? "AUTHENTICATING..." : "LOG IN"}
-        </button>
+        
+        <button type="submit" style={btnStyle}>LOGIN</button>
+        
+        <p style={footerText}>
+          Don't have an account? <span onClick={() => navigate('/signup', { state: { from } })} style={link}>Sign Up</span>
+        </p>
       </form>
-      <p style={{ marginTop: '20px', fontSize: '14px' }}>
-        New to OneElixir? <Link to="/signup" style={{ color: '#000', fontWeight: 'bold' }}>Create Account</Link>
-      </p>
     </div>
   );
 };
 
-// Shared Styles for Auth
-const authContainerStyle = { padding: '100px 15%', textAlign: 'center', minHeight: '60vh' };
-const authHeaderStyle = { letterSpacing: '3px', marginBottom: '40px' };
-const authFormStyle = { maxWidth: '400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '15px' };
-const authInputStyle = { padding: '15px', border: '1px solid #ddd', outline: 'none' };
-const authBtnStyle = { padding: '15px', backgroundColor: '#000', color: '#fff', border: 'none', fontWeight: 'bold' };
+const container = { height: '85vh', display: 'flex', justifyContent: 'center', alignItems: 'center' };
+const loginBox = { width: '350px', textAlign: 'center', padding: '40px', border: '1px solid #eee' };
+const title = { letterSpacing: '5px', fontWeight: '300', marginBottom: '10px' };
+const subtitle = { fontSize: '10px', color: '#888', marginBottom: '30px' };
+const inputStyle = { width: '100%', padding: '15px', marginBottom: '15px', border: '1px solid #ddd', outline: 'none' };
+const btnStyle = { width: '100%', padding: '15px', backgroundColor: '#000', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold', letterSpacing: '2px' };
+const footerText = { fontSize: '12px', marginTop: '20px', color: '#666' };
+const link = { textDecoration: 'underline', cursor: 'pointer', color: '#000' };
 
 export default SignIn;

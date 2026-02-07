@@ -1,85 +1,69 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { useNavigate, Link } from 'react-router-dom';
-import { useUser } from '../context/UserContext'; // MISSING IMPORT FIXED
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useUser } from '../context/UserContext';
 
 const SignUp = () => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
-  const [loading, setLoading] = useState(false);
+  const { login } = useUser();
   const navigate = useNavigate();
-  const { login } = useUser(); // Now this will work
+  const location = useLocation();
+  
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const from = location.state?.from || '/';
 
-  const handleSignUp = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     try {
+      // UPDATED URL: Changed from /register to /signup to match your backend
       const res = await axios.post(`${API_URL}/api/auth/signup`, formData);
       
-      // If your backend returns user data + token on signup:
-      if(res.data.token) {
-        login(res.data);
-        alert("Welcome to OneElixir!");
-        navigate('/'); // Go to shop
-      } else {
-        alert("Account created! Please sign in.");
-        navigate('/signin');
-      }
+      login(res.data);
+      navigate(from, { replace: true });
     } catch (err) {
-      alert(err.response?.data?.message || "Registration failed. Email might already exist.");
-    } finally {
-      setLoading(false);
+      alert(err.response?.data?.message || "Registration failed.");
     }
   };
 
   return (
-    <div style={authContainerStyle}>
-      <h2 style={authHeaderStyle}>CREATE ACCOUNT</h2>
-      <form onSubmit={handleSignUp} style={authFormStyle}>
+    <div style={container}>
+      <form onSubmit={handleSubmit} style={signUpBox}>
+        <h2 style={title}>CREATE ACCOUNT</h2>
+        <p style={subtitle}>Join the OneElixir inner circle</p>
+        
         <input 
-          type="text" 
-          placeholder="Full Name" 
-          disabled={loading}
-          value={formData.name}
-          onChange={(e) => setFormData({...formData, name: e.target.value})} 
-          required style={authInputStyle}
+          type="text" placeholder="FULL NAME" required
+          value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} 
+          style={inputStyle} 
         />
         <input 
-          type="email" 
-          placeholder="Email Address" 
-          disabled={loading}
-          value={formData.email}
-          onChange={(e) => setFormData({...formData, email: e.target.value})} 
-          required style={authInputStyle}
+          type="email" placeholder="EMAIL" required
+          value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} 
+          style={inputStyle} 
         />
         <input 
-          type="password" 
-          placeholder="Create Password" 
-          disabled={loading}
-          value={formData.password}
-          onChange={(e) => setFormData({...formData, password: e.target.value})} 
-          required style={authInputStyle}
+          type="password" placeholder="PASSWORD" required
+          value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} 
+          style={inputStyle} 
         />
-        <button 
-          type="submit" 
-          disabled={loading} 
-          style={{...authBtnStyle, opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer'}}
-        >
-          {loading ? "CREATING ACCOUNT..." : "JOIN ONEELIXIR"}
-        </button>
+        
+        <button type="submit" style={btnStyle}>REGISTER</button>
+        
+        <p style={footerText}>
+          Already have an account? <span onClick={() => navigate('/signin', { state: { from } })} style={link}>Sign In</span>
+        </p>
       </form>
-      <p style={{ marginTop: '20px', fontSize: '14px' }}>
-        Already have an account? <Link to="/signin" style={{ color: '#000', fontWeight: 'bold' }}>Sign In</Link>
-      </p>
     </div>
   );
 };
 
-// --- Styles (Identical to your provided code) ---
-const authContainerStyle = { padding: '100px 15%', textAlign: 'center', minHeight: '60vh' };
-const authHeaderStyle = { letterSpacing: '3px', marginBottom: '40px' };
-const authFormStyle = { maxWidth: '400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '15px' };
-const authInputStyle = { padding: '15px', border: '1px solid #ddd', outline: 'none' };
-const authBtnStyle = { padding: '15px', backgroundColor: '#000', color: '#fff', border: 'none', fontWeight: 'bold' };
+const container = { height: '90vh', display: 'flex', justifyContent: 'center', alignItems: 'center' };
+const signUpBox = { width: '380px', textAlign: 'center', padding: '50px', border: '1px solid #eee' };
+const title = { letterSpacing: '5px', fontWeight: '300', marginBottom: '10px' };
+const subtitle = { fontSize: '10px', color: '#888', marginBottom: '30px', letterSpacing: '1px' };
+const inputStyle = { width: '100%', padding: '15px', marginBottom: '15px', border: '1px solid #ddd', outline: 'none' };
+const btnStyle = { width: '100%', padding: '15px', backgroundColor: '#000', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold', letterSpacing: '2px' };
+const footerText = { fontSize: '12px', marginTop: '20px', color: '#666' };
+const link = { textDecoration: 'underline', cursor: 'pointer', color: '#000', fontWeight: 'bold' };
 
 export default SignUp;
