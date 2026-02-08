@@ -15,8 +15,13 @@ const SignUp = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // UPDATED URL: Changed from /register to /signup to match your backend
-      const res = await axios.post(`${API_URL}/api/auth/signup`, formData);
+      // Create a submission object with a lowercase email
+      const submissionData = {
+        ...formData,
+        email: formData.email.toLowerCase()
+      };
+
+      const res = await axios.post(`${API_URL}/api/auth/signup`, submissionData);
       
       login(res.data);
       navigate(from, { replace: true });
@@ -57,6 +62,7 @@ const SignUp = () => {
   );
 };
 
+// --- Styles (Maintained from your version) ---
 const container = { height: '90vh', display: 'flex', justifyContent: 'center', alignItems: 'center' };
 const signUpBox = { width: '380px', textAlign: 'center', padding: '50px', border: '1px solid #eee' };
 const title = { letterSpacing: '5px', fontWeight: '300', marginBottom: '10px' };

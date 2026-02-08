@@ -2,20 +2,22 @@ const express = require('express');
 const router = express.Router();
 const Order = require('../models/Order');
 
-// 1. GET orders for a specific customer (Filtered for Web Orders Only)
+// 1. GET orders for a specific customer (FIXED: Case-Insensitive Search)
 router.get('/customer/:email', async (req, res) => {
   try {
     const orders = await Order.find({ 
-      customerEmail: req.params.email,
-      isManual: false // This ensures manual admin entries don't show up here
+      // 'i' flag makes it ignore uppercase/lowercase differences
+      customerEmail: { $regex: new RegExp("^" + req.params.email + "$", "i") },
+      isManual: false 
     }).sort({ createdAt: -1 });
+    
     res.json(orders);
   } catch (err) {
     res.status(500).json({ message: "Error fetching customer history", error: err.message });
   }
 });
 
-// 2. GET all orders for the Admin list (Includes everything)
+// 2. GET all orders for the Admin list (Unchanged)
 router.get('/', async (req, res) => {
   try {
     const orders = await Order.find().sort({ createdAt: -1 });
@@ -29,7 +31,7 @@ router.get('/', async (req, res) => {
 router.post('/manual', async (req, res) => {
   const order = new Order({
     ...req.body,
-    isManual: true // Explicitly flagged as manual for business tracking
+    isManual: true 
   });
   try {
     const newOrder = await order.save();
@@ -41,7 +43,7 @@ router.post('/manual', async (req, res) => {
 
 // 4. POST a standard website order (Default isManual: false)
 router.post('/', async (req, res) => {
-  const order = new Order(req.body); // isManual defaults to false in Schema
+  const order = new Order(req.body); 
   try {
     const newOrder = await order.save();
     res.status(201).json(newOrder);
@@ -64,7 +66,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// 6. DELETE an order (Archive)
+// 6. DELETE an order
 router.delete('/:id', async (req, res) => {
   try {
     await Order.findByIdAndDelete(req.params.id);

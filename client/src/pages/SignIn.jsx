@@ -16,8 +16,11 @@ const SignIn = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // UPDATED URL: Changed from /login to /signin to match your backend
-      const res = await axios.post(`${API_URL}/api/auth/signin`, { email, password });
+      // Normalize email to lowercase before sending to backend
+      const res = await axios.post(`${API_URL}/api/auth/signin`, { 
+        email: email.toLowerCase(), 
+        password 
+      });
       
       login(res.data);
       navigate(from, { replace: true });
@@ -51,6 +54,7 @@ const SignIn = () => {
   );
 };
 
+// --- Styles (Maintained from your version) ---
 const container = { height: '85vh', display: 'flex', justifyContent: 'center', alignItems: 'center' };
 const loginBox = { width: '350px', textAlign: 'center', padding: '40px', border: '1px solid #eee' };
 const title = { letterSpacing: '5px', fontWeight: '300', marginBottom: '10px' };

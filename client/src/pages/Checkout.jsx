@@ -32,7 +32,7 @@ const Checkout = () => {
     setLoading(true);
     const orderData = {
       customerName: user.name,
-      customerEmail: user.email,
+      customerEmail: user.email.toLowerCase(),
       phone: formData.phone,
       address: `${formData.address}, ${formData.city}`,
       items: cart.map(item => ({

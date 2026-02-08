@@ -11,34 +11,38 @@ const Account = () => {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   useEffect(() => {
-    // 1. If no user is found after loading, redirect to signin
-    if (!user) {
-      const timer = setTimeout(() => {
-        if (!user) navigate('/signin');
-      }, 2000); // Give it a 2-second grace period to load context
-      return () => clearTimeout(timer);
-    }
+    // 1. Safety Timer: If after 3 seconds we still don't have a user, 
+    // stop the loading screen and redirect to sign-in.
+    const authTimer = setTimeout(() => {
+      if (!user) {
+        setLoading(false);
+        navigate('/signin');
+      }
+    }, 3000);
 
     const fetchOrderHistory = async () => {
+      // If user isn't loaded yet, don't run the fetch
+      if (!user || !user.email) return;
+
       try {
-        console.log("Fetching orders for:", user.email); // DEBUG: Check if email exists
+        // Clear the timer since we found a user
+        clearTimeout(authTimer);
         
-        // 2. Added .toLowerCase() to ensure match with database
-        const userEmail = user.email.toLowerCase();
-        const res = await axios.get(`${API_URL}/api/orders/customer/${userEmail}`);
+        console.log("Attempting to fetch orders for:", user.email.toLowerCase());
+        const res = await axios.get(`${API_URL}/api/orders/customer/${user.email.toLowerCase()}`);
         
-        console.log("Orders found:", res.data); // DEBUG: See what the backend returned
         setOrders(res.data);
       } catch (err) {
-        console.error("Order fetch failed", err);
+        console.error("API Error - check if backend is running:", err);
       } finally {
+        // 2. CRITICAL: This MUST run to remove the loading screen
         setLoading(false);
       }
     };
 
-    if (user?.email) {
-      fetchOrderHistory();
-    }
+    fetchOrderHistory();
+
+    return () => clearTimeout(authTimer);
   }, [user, navigate, API_URL]);
 
   if (loading) return <div style={centerMsg}>RETRIEVING YOUR COLLECTION...</div>;
@@ -53,9 +57,11 @@ const Account = () => {
       <section style={orderSection}>
         <h2 style={sectionTitle}>ORDER HISTORY</h2>
         {orders.length === 0 ? (
-          <div style={{ textAlign: 'center' }}>
+          <div style={{ textAlign: 'center', marginTop: '50px' }}>
             <p style={emptyMsg}>You haven't secured any Elixirs yet.</p>
-            <p style={{ fontSize: '10px', color: '#ccc' }}>Logged in as: {user?.email}</p>
+            <p style={{ fontSize: '10px', color: '#ccc', marginTop: '10px' }}>
+              Logged in as: {user?.email}
+            </p>
           </div>
         ) : (
           <table style={tableStyle}>
@@ -76,7 +82,7 @@ const Account = () => {
                   </td>
                   <td style={td}>{order.totalAmount} TK</td>
                   <td style={{ ...td, color: getStatusColor(order.status) }}>
-                    {order.status ? order.status.toUpperCase() : 'PENDING'}
+                    {(order.status || 'pending').toUpperCase()}
                   </td>
                 </tr>
               ))}
@@ -88,14 +94,15 @@ const Account = () => {
   );
 };
 
-// Helper for Status Coloring
+// Helper for Status Coloring (Matches your Schema defaults)
 const getStatusColor = (status) => {
-  if (status === 'Delivered') return '#27ae60';
-  if (status === 'Shipped') return '#f39c12';
+  const s = status?.toLowerCase();
+  if (s === 'delivered') return '#27ae60';
+  if (s === 'shipped') return '#f39c12';
   return '#888';
 };
 
-// --- Minimalist Styles ---
+// --- Styles (Maintained) ---
 const container = { padding: '80px 10%', minHeight: '80vh' };
 const header = { marginBottom: '50px', textAlign: 'center' };
 const title = { letterSpacing: '5px', fontSize: '2rem', fontWeight: 'bold' };
@@ -107,7 +114,7 @@ const thRow = { borderBottom: '2px solid #eee' };
 const th = { padding: '15px 10px', fontSize: '11px', color: '#999', fontWeight: 'bold' };
 const trStyle = { borderBottom: '1px solid #f9f9f9' };
 const td = { padding: '20px 10px', fontSize: '13px' };
-const centerMsg = { height: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: '2px' };
-const emptyMsg = { textAlign: 'center', color: '#888', marginTop: '50px', fontStyle: 'italic' };
+const centerMsg = { height: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: '2px', textAlign: 'center' };
+const emptyMsg = { textAlign: 'center', color: '#888', fontSize: '14px', fontStyle: 'italic' };
 
 export default Account;
