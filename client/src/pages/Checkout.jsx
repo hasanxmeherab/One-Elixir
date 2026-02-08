@@ -21,7 +21,7 @@ const Checkout = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // If not logged in, redirect to Sign In and save the current location
+    // Secondary safety check (though type="button" handles the UI logic)
     if (!user) {
       navigate('/signin', { state: { from: '/checkout' } });
       return;
@@ -62,15 +62,20 @@ const Checkout = () => {
         <div style={formSection}>
           <h2 style={sectionTitle}>SHIPPING DETAILS</h2>
           <input type="text" value={user ? user.email : "Sign in to continue"} readOnly style={inputDisabled} />
+          
+          {/* Note: 'required' only triggers on type="submit" */}
           <input type="tel" placeholder="Phone Number" required value={formData.phone} 
             onChange={e => setFormData({...formData, phone: e.target.value})} style={inputStyle} />
+          
           <textarea placeholder="Address" required value={formData.address} 
             onChange={e => setFormData({...formData, address: e.target.value})} style={{...inputStyle, minHeight: '100px'}} />
+          
           <select style={inputStyle} value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})}>
             <option value="Dhaka">Dhaka</option>
             <option value="Chittagong">Chittagong</option>
             <option value="Sylhet">Sylhet</option>
           </select>
+
           <h2 style={{...sectionTitle, marginTop: '40px'}}>PAYMENT</h2>
           <div style={paymentBox}>
             <input type="radio" checked readOnly /> <span style={{marginLeft: '10px'}}>Cash on Delivery</span>
@@ -87,7 +92,18 @@ const Checkout = () => {
           ))}
           <div style={totalDivider}></div>
           <div style={totalRow}><span>TOTAL</span><span>{cartTotal.toLocaleString()} TK</span></div>
-          <button type="submit" disabled={loading} style={user ? confirmBtn : signInBtn}>
+          
+          {/* FIX: If no user, type="button" bypasses validation.
+              If user exists, type="submit" runs the validation and handleSubmit.
+          */}
+          <button 
+            type={user ? "submit" : "button"} 
+            onClick={() => {
+              if (!user) navigate('/signin', { state: { from: '/checkout' } });
+            }}
+            disabled={loading} 
+            style={user ? confirmBtn : signInBtn}
+          >
             {loading ? 'PROCESSING...' : user ? 'CONFIRM ORDER' : 'SIGN IN TO ORDER'}
           </button>
         </div>
@@ -96,7 +112,7 @@ const Checkout = () => {
   );
 };
 
-// Styles
+// --- Styles ---
 const container = { padding: '120px 8%', maxWidth: '1200px', margin: '0 auto' };
 const checkoutGrid = { display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '60px' };
 const formSection = { display: 'flex', flexDirection: 'column', gap: '15px' };
