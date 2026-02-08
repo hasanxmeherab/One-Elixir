@@ -11,15 +11,23 @@ const Account = () => {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   useEffect(() => {
+    // 1. If no user is found after loading, redirect to signin
     if (!user) {
-      navigate('/signin');
-      return;
+      const timer = setTimeout(() => {
+        if (!user) navigate('/signin');
+      }, 2000); // Give it a 2-second grace period to load context
+      return () => clearTimeout(timer);
     }
 
     const fetchOrderHistory = async () => {
       try {
-        // This calls the specific route that filters out manual orders
-        const res = await axios.get(`${API_URL}/api/orders/customer/${user.email}`);
+        console.log("Fetching orders for:", user.email); // DEBUG: Check if email exists
+        
+        // 2. Added .toLowerCase() to ensure match with database
+        const userEmail = user.email.toLowerCase();
+        const res = await axios.get(`${API_URL}/api/orders/customer/${userEmail}`);
+        
+        console.log("Orders found:", res.data); // DEBUG: See what the backend returned
         setOrders(res.data);
       } catch (err) {
         console.error("Order fetch failed", err);
@@ -28,7 +36,9 @@ const Account = () => {
       }
     };
 
-    fetchOrderHistory();
+    if (user?.email) {
+      fetchOrderHistory();
+    }
   }, [user, navigate, API_URL]);
 
   if (loading) return <div style={centerMsg}>RETRIEVING YOUR COLLECTION...</div>;
@@ -36,14 +46,17 @@ const Account = () => {
   return (
     <div style={container}>
       <header style={header}>
-        <h1 style={title}>WELCOME, {user.name.toUpperCase()}</h1>
+        <h1 style={title}>WELCOME, {user?.name?.toUpperCase() || 'USER'}</h1>
         <p style={subtitle}>Manage your details and track your OneElixir orders.</p>
       </header>
 
       <section style={orderSection}>
         <h2 style={sectionTitle}>ORDER HISTORY</h2>
         {orders.length === 0 ? (
-          <p style={emptyMsg}>You haven't secured any Elixirs yet.</p>
+          <div style={{ textAlign: 'center' }}>
+            <p style={emptyMsg}>You haven't secured any Elixirs yet.</p>
+            <p style={{ fontSize: '10px', color: '#ccc' }}>Logged in as: {user?.email}</p>
+          </div>
         ) : (
           <table style={tableStyle}>
             <thead>
@@ -63,7 +76,7 @@ const Account = () => {
                   </td>
                   <td style={td}>{order.totalAmount} TK</td>
                   <td style={{ ...td, color: getStatusColor(order.status) }}>
-                    {order.status.toUpperCase()}
+                    {order.status ? order.status.toUpperCase() : 'PENDING'}
                   </td>
                 </tr>
               ))}
