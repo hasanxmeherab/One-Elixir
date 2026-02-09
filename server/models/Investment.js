@@ -9,7 +9,8 @@ const investmentSchema = new mongoose.Schema({
   },
   totalAmount: { 
     type: Number, 
-    default: 0 
+    default: 0,
+    required: true
   },
   transactions: [
     {

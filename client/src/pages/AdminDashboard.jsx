@@ -10,8 +10,10 @@ const AdminDashboard = ({ perfumes, orders, investments = [], onNavigate }) => {
   const totalStock = perfumes.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
   const totalValuation = perfumes.reduce((acc, p) => acc + (p.price * (Number(p.stock) || 0)), 0);
   const totalRevenue = orders.reduce((acc, o) => acc + o.totalAmount, 0);
-  const totalInvestment = investments.reduce((acc, inv) => acc + Number(inv.amount), 0);
-
+  const totalInvestment = (investments || []).reduce((acc, inv) => {
+    const val = parseFloat(inv.totalAmount); // Use totalAmount, not amount
+    return acc + (isNaN(val) ? 0 : val);
+  }, 0);
   return (
     <div>
       <h3 style={{ letterSpacing: '3px', marginBottom: '30px', fontWeight: 'bold' }}>DASHBOARD OVERVIEW</h3>

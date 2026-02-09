@@ -11,8 +11,10 @@ const InvestmentTracker = () => {
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-  const totalCapital = investments.reduce((acc, inv) => acc + Number(inv.totalAmount), 0);
-
+  const totalCapital = (investments || []).reduce((acc, inv) => {
+  const val = parseFloat(inv.totalAmount);
+  return acc + (isNaN(val) ? 0 : val);
+  }, 0);
   const fullHistory = investments
     .flatMap(inv => (inv.transactions || []).map(t => ({ 
       ...t, investorName: inv.investorName, investorId: inv._id 
