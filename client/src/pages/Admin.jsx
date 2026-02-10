@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import AdminNavbar from '../components/AdminNavbar';
-import AdminDashboard from './AdminDashboard'; // Renamed import
+import AdminDashboard from './AdminDashboard'; 
 import InventoryManager from './InventoryManager';
 import ManualOrder from './ManualOrder';
 import OrderList from './OrderList';
 import ExpenseManagement from './ExpenseManagement';
 import InvestmentTracker from './InvestmentTracker';
+import BannerManagement from './BannerManagement'; 
 
 const Admin = () => {
   const [activePage, setActivePage] = useState('dashboard');
@@ -44,6 +45,8 @@ const Admin = () => {
           <button onClick={() => setActivePage('order-list')} style={activePage === 'order-list' ? activeBtn : menuBtn}>ORDER LIST</button>
           <button onClick={() => setActivePage('expenses')} style={activePage === 'expenses' ? activeBtn : menuBtn}>EXPENSES</button>
           <button onClick={() => setActivePage('investment')} style={activePage === 'investment' ? activeBtn : menuBtn}>INVESTMENT</button>
+          {/* BANNER TAB */}
+          <button onClick={() => setActivePage('banners')} style={activePage === 'banners' ? activeBtn : menuBtn}>BANNER MANAGEMENT</button>
         </div>
 
         {/* MAIN CONTENT AREA */}
@@ -62,16 +65,19 @@ const Admin = () => {
           
           {activePage === 'expenses' && <ExpenseManagement />}
           {activePage === 'investment' && <InvestmentTracker investments={investments} />}
+          
+          {/* UPDATED: Pass isAdmin prop to show upload options only in Admin panel */}
+          {activePage === 'banners' && <BannerManagement isAdmin={true} />}
         </div>
       </div>
     </div>
   );
 };
 
-// --- Styles maintained from previous step ---
+// --- Styles ---
 const sidebarStyle = { width: '260px', backgroundColor: '#f9f9f9', borderRight: '1px solid #eee', padding: '30px 15px', display: 'flex', flexDirection: 'column', gap: '5px' };
 const sidebarLabel = { fontSize: '10px', letterSpacing: '2px', color: '#888', fontWeight: 'bold', marginBottom: '20px', paddingLeft: '10px' };
-const menuBtn = { textAlign: 'left', padding: '12px 15px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', letterSpacing: '1px', color: '#555', transition: '0.2s' };
+const menuBtn = { textAlign: 'left', padding: '12px 15px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', letterSpacing: '1px', color: '#555', transition: '0.2s' };
 const activeBtn = { ...menuBtn, backgroundColor: '#000', color: '#fff', borderRadius: '4px' };
 
 export default Admin;
