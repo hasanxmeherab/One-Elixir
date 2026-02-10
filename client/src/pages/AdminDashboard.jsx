@@ -9,7 +9,9 @@ const AdminDashboard = ({ perfumes, orders, investments = [], onNavigate }) => {
   
   const totalStock = perfumes.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
   const totalValuation = perfumes.reduce((acc, p) => acc + (p.price * (Number(p.stock) || 0)), 0);
-  const totalRevenue = orders.reduce((acc, o) => acc + o.totalAmount, 0);
+  const totalRevenue = orders
+  .filter(o => o.status?.toLowerCase() === 'delivered')
+  .reduce((acc, o) => acc + (Number(o.totalAmount) || 0), 0);
   const totalInvestment = (investments || []).reduce((acc, inv) => {
     const val = parseFloat(inv.totalAmount); // Use totalAmount, not amount
     return acc + (isNaN(val) ? 0 : val);
