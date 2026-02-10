@@ -73,17 +73,29 @@ router.put('/:id', async (req, res) => {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    // logic: Only decrement stock if moving TO 'Delivered' from something else
-    if (status?.toLowerCase() === 'delivered' && order.status.toLowerCase() !== 'delivered') {
-      
-      // Loop through the items in the order and subtract from perfume stock
+    const oldStatus = order.status.toLowerCase();
+    const newStatus = status?.toLowerCase();
+
+    // SCENARIO A: Moving TO 'Delivered' (Subtract from stock)
+    if (newStatus === 'delivered' && oldStatus !== 'delivered') {
       const updatePromises = order.items.map(item => 
         Perfume.findByIdAndUpdate(
           item.perfumeId, 
-          { $inc: { stock: -item.quantity } } // Decrement quantity
+          { $inc: { stock: -item.quantity } }
         )
       );
-      
+      await Promise.all(updatePromises);
+    }
+
+    // SCENARIO B: Moving AWAY FROM 'Delivered' (Add back to stock)
+    // Runs if admin reverts a Delivered order to Pending, Shipped, or Cancelled
+    else if (oldStatus === 'delivered' && newStatus !== 'delivered') {
+      const updatePromises = order.items.map(item => 
+        Perfume.findByIdAndUpdate(
+          item.perfumeId, 
+          { $inc: { stock: item.quantity } } // Incrementing quantity back
+        )
+      );
       await Promise.all(updatePromises);
     }
 
