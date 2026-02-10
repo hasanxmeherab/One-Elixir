@@ -3,30 +3,49 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
-  const [cart, setCart] = useState([]);
-
-  // Load cart from local storage on startup
-  useEffect(() => {
+  // 1. INITIALIZE directly from localStorage
+  // This function runs only once during the very first render.
+  const [cart, setCart] = useState(() => {
     const savedCart = localStorage.getItem('oneElixirCart');
-    if (savedCart) setCart(JSON.parse(savedCart));
-  }, []);
+    if (savedCart) {
+      try {
+        const parsed = JSON.parse(savedCart);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
 
-  // Save cart to local storage whenever it changes
+  // 2. SAVE to local storage whenever cart changes
   useEffect(() => {
     localStorage.setItem('oneElixirCart', JSON.stringify(cart));
   }, [cart]);
 
-  const addToCart = (product, quantity) => {
+  // FIX: Default quantity to 1 so math doesn't result in NaN
+  const addToCart = (product, quantity = 1) => {
     setCart(prevCart => {
       const existingItem = prevCart.find(item => item._id === product._id);
+      
       if (existingItem) {
         return prevCart.map(item =>
           item._id === product._id 
-            ? { ...item, quantity: Math.min(item.quantity + quantity, product.stock) } 
+            ? { 
+                ...item, 
+                // Ensure we are adding numbers, not undefined
+                quantity: Math.min((Number(item.quantity) || 0) + (Number(quantity) || 1), product.stock) 
+              } 
             : item
         );
       }
-      return [...prevCart, { ...product, quantity }];
+      
+      // Ensure the new item has a numeric quantity and price
+      return [...prevCart, { 
+        ...product, 
+        quantity: Number(quantity) || 1,
+        price: Number(product.price) || 0 
+      }];
     });
   };
 
@@ -36,8 +55,14 @@ export const CartProvider = ({ children }) => {
 
   const clearCart = () => setCart([]);
 
-  const cartTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
-  const cartCount = cart.reduce((count, item) => count + item.quantity, 0);
+  // Safety: Add fallback || 0 so the total never breaks
+  const cartTotal = (cart || []).reduce((total, item) => 
+    total + ((Number(item.price) || 0) * (Number(item.quantity) || 0)), 0
+  );
+
+  const cartCount = (cart || []).reduce((count, item) => 
+    count + (Number(item.quantity) || 0), 0
+  );
 
   return (
     <CartContext.Provider value={{ cart, addToCart, removeFromCart, clearCart, cartTotal, cartCount }}>

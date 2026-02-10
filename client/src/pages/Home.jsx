@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useCart } from '../context/CartContext';
 import { Link } from 'react-router-dom';
-import BannerManagement from './BannerManagement'; // Using your filename for the slider
+import BannerManagement from './BannerManagement'; 
 
 const Home = () => {
   const [perfumes, setPerfumes] = useState([]);
@@ -54,7 +54,11 @@ const Home = () => {
                 <h4 style={{ margin: '10px 0' }}>{p.name}</h4>
                 <p style={{ fontWeight: 'bold' }}>TK {p.price}</p>
                 <button 
-                  onClick={() => addToCart(p)} 
+                  // FIX: Explicitly pass price as a Number to prevent NaN in cart
+                  onClick={() => addToCart({
+                    ...p,
+                    price: Number(p.price) 
+                  })} 
                   disabled={p.stock === 0}
                   style={{ 
                     ...btnStyle, 
@@ -73,6 +77,7 @@ const Home = () => {
   );
 };
 
+// --- Styles maintained from your file ---
 const gridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '30px' };
 const cardStyle = { border: '1px solid #eee', position: 'relative', overflow: 'hidden' };
 const btnStyle = { width: '100%', color: '#fff', padding: '12px', border: 'none', marginTop: '10px', fontWeight: 'bold' };

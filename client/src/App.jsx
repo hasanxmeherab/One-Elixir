@@ -1,4 +1,4 @@
-import React, { useState } from 'react'; 
+import React from 'react'; 
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import Home from './pages/Home';
 import ProductDetails from './pages/ProductDetails';
@@ -13,13 +13,13 @@ import ThankYou from './pages/ThankYou';
 import SignIn from './pages/SignIn';
 import SignUp from './pages/SignUp';
 import Shop from './pages/Shop';
-import CartSidebar from './components/CartSidebar';
+// CartSidebar is no longer needed globally
 import Checkout from './pages/Checkout';
 import Account from './pages/Account';
 import ManualOrder from './pages/ManualOrder';
 
 // --- Navbar Component ---
-const Navbar = ({ onCartClick }) => { 
+const Navbar = () => { // Removed onCartClick prop
   const { cart } = useCart();
   const { user, logout } = useUser();
   const navigate = useNavigate();
@@ -38,14 +38,14 @@ const Navbar = ({ onCartClick }) => {
       <ul style={navLinksStyle}>
         <li><Link to="/shop" style={linkStyle}>Collection</Link></li>
         <li>
-          <div onClick={onCartClick} style={{...linkStyle, cursor: 'pointer'}}>
+          {/* Changed from a div to a Link to navigate to the Cart page */}
+          <Link to="/cart" style={linkStyle}>
             Cart ({cart.reduce((total, item) => total + item.quantity, 0)})
-          </div>
+          </Link>
         </li>
         
         {user ? (
           <>
-            {/* LINKED USERNAME: Navigates to the Account/Order History page */}
             <li>
               <Link to="/account" style={{ textDecoration: 'none' }}>
                 <span style={welcomeTextStyle}>HI, {user.name.toUpperCase()}</span>
@@ -68,19 +68,25 @@ const Navbar = ({ onCartClick }) => {
 
 // --- Main App Content ---
 const AppContent = () => {
-  const [isCartOpen, setIsCartOpen] = useState(false); 
   const location = useLocation();
   const isHideNavbar = location.pathname.startsWith('/admin');
 
   return (
     <>
-      {!isHideNavbar && <Navbar onCartClick={() => setIsCartOpen(true)} />}
-      <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+      {/* Navbar no longer needs to control a sidebar state */}
+      {!isHideNavbar && <Navbar />}
+      
+      {/* REMOVED: <CartSidebar />
+          By removing this, we prevent the sidebar from overlaying the screen.
+      */}
       
       <div className="container" style={{ minHeight: '80vh' }}>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/product/:id" element={<ProductDetails openCart={() => setIsCartOpen(true)} />} />
+          {/* ProductDetails should no longer trigger a sidebar; 
+              ensure that component also navigates to /cart instead of calling openCart.
+          */}
+          <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/thank-you" element={<ThankYou />} />
           <Route path="/signin" element={<SignIn />} />
@@ -117,7 +123,7 @@ function App() {
   );
 }
 
-// --- Styles (Maintained from your working version) ---
+// --- Styles maintained from your version ---
 const navStyles = {
   display: 'flex',
   justifyContent: 'space-between',
@@ -162,7 +168,7 @@ const welcomeTextStyle = {
   color: '#999',
   letterSpacing: '1px',
   fontWeight: 'bold',
-  cursor: 'pointer' // Makes the name look clickable
+  cursor: 'pointer' 
 };
 
 const logoutButtonStyle = {
