@@ -18,7 +18,7 @@ const Cart = () => {
     } else {
       setTimeout(() => {
         setLoading(false);
-        navigate('/thank-you');
+        navigate('/checkout');
       }, 800); 
     }
   };

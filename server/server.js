@@ -24,6 +24,7 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/expenses', require('./routes/expenseRoutes'));
 app.use('/api/investments', require('./routes/investmentRoutes'));
 app.use('/api/banners', require('./routes/bannerRoutes'));
+app.use('/api/coupons', require('./routes/couponRoutes'));
 // Connect to MongoDB using env variable
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("OneElixir Database Connected"))

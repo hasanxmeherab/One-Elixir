@@ -18,10 +18,41 @@ const Checkout = () => {
 
   const [loading, setLoading] = useState(false);
 
+  // --- FEATURE #54: COUPON STATES ---
+  const [couponCode, setCouponCode] = useState('');
+  const [discount, setDiscount] = useState(0); // Stores the discount amount
+  const [couponLoading, setCouponLoading] = useState(false);
+
+  // Calculate Final Amount
+  const finalAmount = cartTotal - discount;
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode) return;
+    setCouponLoading(true);
+    try {
+      // Sending request to your new backend route
+      const res = await axios.post(`${API_URL}/api/coupons/validate`, { code: couponCode });
+      
+      let discountAmount = 0;
+      if (res.data.discountType === 'percentage') {
+        discountAmount = (cartTotal * res.data.discountValue) / 100;
+      } else {
+        discountAmount = res.data.discountValue;
+      }
+
+      setDiscount(discountAmount);
+      alert(`Coupon Applied! You saved ${discountAmount.toLocaleString()} TK`);
+    } catch (err) {
+      alert(err.response?.data?.message || "Invalid or expired coupon code.");
+      setDiscount(0);
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Secondary safety check (though type="button" handles the UI logic)
     if (!user) {
       navigate('/signin', { state: { from: '/checkout' } });
       return;
@@ -41,7 +72,8 @@ const Checkout = () => {
         quantity: item.quantity,
         price: item.price
       })),
-      totalAmount: cartTotal,
+      totalAmount: finalAmount, // Updated to use discounted amount
+      discountApplied: discount,
       status: 'Pending'
     };
 
@@ -63,7 +95,6 @@ const Checkout = () => {
           <h2 style={sectionTitle}>SHIPPING DETAILS</h2>
           <input type="text" value={user ? user.email : "Sign in to continue"} readOnly style={inputDisabled} />
           
-          {/* Note: 'required' only triggers on type="submit" */}
           <input type="tel" placeholder="Phone Number" required value={formData.phone} 
             onChange={e => setFormData({...formData, phone: e.target.value})} style={inputStyle} />
           
@@ -75,6 +106,26 @@ const Checkout = () => {
             <option value="Chittagong">Chittagong</option>
             <option value="Sylhet">Sylhet</option>
           </select>
+
+          {/* FEATURE #54: COUPON INPUT SECTION */}
+          <h2 style={{...sectionTitle, marginTop: '40px'}}>HAVE A COUPON?</h2>
+          <div style={couponContainer}>
+            <input 
+              type="text" 
+              placeholder="Enter Code" 
+              value={couponCode} 
+              onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+              style={{...inputStyle, flex: 1}} 
+            />
+            <button 
+              type="button" 
+              onClick={handleApplyCoupon} 
+              disabled={couponLoading || !couponCode}
+              style={couponBtn}
+            >
+              {couponLoading ? '...' : 'APPLY'}
+            </button>
+          </div>
 
           <h2 style={{...sectionTitle, marginTop: '40px'}}>PAYMENT</h2>
           <div style={paymentBox}>
@@ -90,12 +141,27 @@ const Checkout = () => {
               <span>{(item.price * item.quantity).toLocaleString()} TK</span>
             </div>
           ))}
-          <div style={totalDivider}></div>
-          <div style={totalRow}><span>TOTAL</span><span>{cartTotal.toLocaleString()} TK</span></div>
           
-          {/* FIX: If no user, type="button" bypasses validation.
-              If user exists, type="submit" runs the validation and handleSubmit.
-          */}
+          <div style={totalDivider}></div>
+          
+          <div style={itemRow}>
+            <span>SUBTOTAL</span>
+            <span>{cartTotal.toLocaleString()} TK</span>
+          </div>
+
+          {discount > 0 && (
+            <div style={{...itemRow, color: '#e63946'}}>
+              <span>DISCOUNT</span>
+              <span>-{discount.toLocaleString()} TK</span>
+            </div>
+          )}
+
+          <div style={totalDivider}></div>
+          <div style={totalRow}>
+            <span>TOTAL</span>
+            <span>{finalAmount.toLocaleString()} TK</span>
+          </div>
+          
           <button 
             type={user ? "submit" : "button"} 
             onClick={() => {
@@ -112,7 +178,7 @@ const Checkout = () => {
   );
 };
 
-// --- Styles ---
+// --- Styles (Maintained & Added) ---
 const container = { padding: '120px 8%', maxWidth: '1200px', margin: '0 auto' };
 const checkoutGrid = { display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '60px' };
 const formSection = { display: 'flex', flexDirection: 'column', gap: '15px' };
@@ -126,5 +192,7 @@ const totalDivider = { height: '1px', backgroundColor: '#ddd', margin: '20px 0' 
 const totalRow = { display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '18px' };
 const confirmBtn = { width: '100%', padding: '20px', backgroundColor: '#000', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold', letterSpacing: '2px', marginTop: '30px' };
 const signInBtn = { ...confirmBtn, backgroundColor: '#444' };
+const couponContainer = { display: 'flex', gap: '10px' };
+const couponBtn = { padding: '0 25px', backgroundColor: '#000', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' };
 
 export default Checkout;
