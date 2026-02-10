@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Order = require('../models/Order');
+const Perfume = require('../models/Perfume');
 
 // 1. GET customer history (Web orders only, Case-Insensitive)
 router.get('/customer/:email', async (req, res) => {
@@ -67,20 +68,36 @@ router.put('/:id/cancel', async (req, res) => {
 
 // 6. PUT update status (Admin Action)
 router.put('/:id', async (req, res) => {
+  const { status } = req.body;
   try {
-    const updatedOrder = await Order.findByIdAndUpdate(
-      req.params.id, 
-      { status: req.body.status }, 
-      { new: true }
-    );
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    // logic: Only decrement stock if moving TO 'Delivered' from something else
+    if (status?.toLowerCase() === 'delivered' && order.status.toLowerCase() !== 'delivered') {
+      
+      // Loop through the items in the order and subtract from perfume stock
+      const updatePromises = order.items.map(item => 
+        Perfume.findByIdAndUpdate(
+          item.perfumeId, 
+          { $inc: { stock: -item.quantity } } // Decrement quantity
+        )
+      );
+      
+      await Promise.all(updatePromises);
+    }
+
+    // Update the order status as usual
+    order.status = status;
+    const updatedOrder = await order.save();
     res.json(updatedOrder);
+
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
 });
 
 // 7. DELETE (Admin Archive)
-// This no longer deletes; it marks as Cancelled so it stays in history
 router.delete('/:id', async (req, res) => {
   try {
     const updatedOrder = await Order.findByIdAndUpdate(
