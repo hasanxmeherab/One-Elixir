@@ -4,7 +4,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 
 const SignUp = () => {
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  // Added confirmPassword to the state object
+  const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '' });
   const { login } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
@@ -14,11 +15,24 @@ const SignUp = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // 1. Client-side Validation: Check if passwords match
+    if (formData.password !== formData.confirmPassword) {
+      alert("Passwords do not match! Please check again.");
+      return;
+    }
+
+    // 2. Client-side Validation: Minimum length (optional but recommended)
+    if (formData.password.length < 6) {
+      alert("Password should be at least 6 characters long.");
+      return;
+    }
+
     try {
-      // Create a submission object with a lowercase email
       const submissionData = {
-        ...formData,
-        email: formData.email.toLowerCase()
+        name: formData.name,
+        email: formData.email.toLowerCase(),
+        password: formData.password
       };
 
       const res = await axios.post(`${API_URL}/api/auth/signup`, submissionData);
@@ -46,9 +60,18 @@ const SignUp = () => {
           value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} 
           style={inputStyle} 
         />
+        
+        {/* Main Password Field */}
         <input 
           type="password" placeholder="PASSWORD" required
           value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} 
+          style={inputStyle} 
+        />
+
+        {/* NEW: Confirm Password Field */}
+        <input 
+          type="password" placeholder="CONFIRM PASSWORD" required
+          value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} 
           style={inputStyle} 
         />
         
@@ -64,11 +87,11 @@ const SignUp = () => {
 
 // --- Styles (Maintained from your version) ---
 const container = { height: '90vh', display: 'flex', justifyContent: 'center', alignItems: 'center' };
-const signUpBox = { width: '380px', textAlign: 'center', padding: '50px', border: '1px solid #eee' };
+const signUpBox = { width: '380px', textAlign: 'center', padding: '50px', border: '1px solid #eee', backgroundColor: '#fff' };
 const title = { letterSpacing: '5px', fontWeight: '300', marginBottom: '10px' };
 const subtitle = { fontSize: '10px', color: '#888', marginBottom: '30px', letterSpacing: '1px' };
-const inputStyle = { width: '100%', padding: '15px', marginBottom: '15px', border: '1px solid #ddd', outline: 'none' };
-const btnStyle = { width: '100%', padding: '15px', backgroundColor: '#000', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold', letterSpacing: '2px' };
+const inputStyle = { width: '100%', padding: '15px', marginBottom: '15px', border: '1px solid #ddd', outline: 'none', fontSize: '13px' };
+const btnStyle = { width: '100%', padding: '15px', backgroundColor: '#000', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold', letterSpacing: '2px', transition: '0.3s' };
 const footerText = { fontSize: '12px', marginTop: '20px', color: '#666' };
 const link = { textDecoration: 'underline', cursor: 'pointer', color: '#000', fontWeight: 'bold' };
 
