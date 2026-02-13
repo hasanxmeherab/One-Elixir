@@ -1,61 +1,75 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import { useUser } from './UserContext';
 
 const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
-  // 1. INITIALIZE directly from localStorage
-  // This function runs only once during the very first render.
-  const [cart, setCart] = useState(() => {
-    const savedCart = localStorage.getItem('oneElixirCart');
-    if (savedCart) {
-      try {
-        const parsed = JSON.parse(savedCart);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch (e) {
-        return [];
-      }
-    }
-    return [];
-  });
+  const { user } = useUser();
+  const [cart, setCart] = useState([]);
 
-  // 2. SAVE to local storage whenever cart changes
+  // Dynamic storage keys
+  const guestKey = 'oneElixirCart_guest';
+  const userKey = user ? `oneElixirCart_${user._id}` : null;
+  const currentKey = user ? userKey : guestKey;
+
+  // MERGE & LOAD LOGIC
   useEffect(() => {
-    localStorage.setItem('oneElixirCart', JSON.stringify(cart));
-  }, [cart]);
+    const savedUserCart = userKey ? JSON.parse(localStorage.getItem(userKey) || '[]') : [];
+    const savedGuestCart = JSON.parse(localStorage.getItem(guestKey) || '[]');
 
-  // FIX: Default quantity to 1 so math doesn't result in NaN
+    if (user && savedGuestCart.length > 0) {
+      // Merge guest items into user cart, avoiding duplicates by ID
+      const mergedCart = [...savedUserCart];
+      
+      savedGuestCart.forEach(guestItem => {
+        const existingIndex = mergedCart.findIndex(item => item._id === guestItem._id);
+        if (existingIndex > -1) {
+          // If item exists in both, sum the quantities (respecting stock)
+          mergedCart[existingIndex].quantity = Math.min(
+            mergedCart[existingIndex].quantity + guestItem.quantity, 
+            guestItem.stock
+          );
+        } else {
+          mergedCart.push(guestItem);
+        }
+      });
+
+      setCart(mergedCart);
+      localStorage.setItem(userKey, JSON.stringify(mergedCart)); // Save merged to user
+      localStorage.removeItem(guestKey); // Wipe guest cart after successful merge
+    } else {
+      // Standard load if no merge is needed
+      const savedCart = localStorage.getItem(currentKey);
+      setCart(savedCart ? JSON.parse(savedCart) : []);
+    }
+  }, [user, userKey]); // Runs whenever login state changes
+
+  // SAVE LOGIC
+  useEffect(() => {
+    localStorage.setItem(currentKey, JSON.stringify(cart));
+  }, [cart, currentKey]);
+
   const addToCart = (product, quantity = 1) => {
     setCart(prevCart => {
       const existingItem = prevCart.find(item => item._id === product._id);
-      
       if (existingItem) {
         return prevCart.map(item =>
           item._id === product._id 
-            ? { 
-                ...item, 
-                // Ensure we are adding numbers, not undefined
-                quantity: Math.min((Number(item.quantity) || 0) + (Number(quantity) || 1), product.stock) 
-              } 
+            ? { ...item, quantity: Math.min((Number(item.quantity) || 0) + (Number(quantity) || 1), product.stock) } 
             : item
         );
       }
-      
-      // Ensure the new item has a numeric quantity and price
-      return [...prevCart, { 
-        ...product, 
-        quantity: Number(quantity) || 1,
-        price: Number(product.price) || 0 
-      }];
+      return [...prevCart, { ...product, quantity: Number(quantity) || 1, price: Number(product.price) || 0 }];
     });
   };
 
-  const removeFromCart = (id) => {
-    setCart(prevCart => prevCart.filter(item => item._id !== id));
+  const removeFromCart = (id) => setCart(prevCart => prevCart.filter(item => item._id !== id));
+
+  const clearCart = () => {
+    setCart([]);
+    localStorage.removeItem(currentKey);
   };
 
-  const clearCart = () => setCart([]);
-
-  // Safety: Add fallback || 0 so the total never breaks
   const cartTotal = (cart || []).reduce((total, item) => 
     total + ((Number(item.price) || 0) * (Number(item.quantity) || 0)), 0
   );
