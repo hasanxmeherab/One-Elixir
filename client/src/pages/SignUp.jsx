@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import { Eye, EyeOff } from 'lucide-react'; 
+import { Eye, EyeOff, Check, X } from 'lucide-react'; 
 
 const SignUp = () => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '' });
@@ -33,9 +33,12 @@ const SignUp = () => {
     }
   }, [formData.password]);
 
+  // --- Match Indicator Logic ---
+  const passwordsMatch = formData.confirmPassword && formData.password === formData.confirmPassword;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (formData.password !== formData.confirmPassword) {
+    if (formData.confirmPassword && !passwordsMatch) {
       alert("Passwords do not match!");
       return;
     }
@@ -90,7 +93,7 @@ const SignUp = () => {
           </div>
         )}
 
-        {/* Confirm Password Group with its own icon toggle */}
+        {/* Confirm Password Group - CLEANED UP */}
         <div style={passwordWrapper}>
           <input 
             type={showPassword ? "text" : "password"} 
@@ -98,12 +101,25 @@ const SignUp = () => {
             value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} 
             style={passwordInput} 
           />
-          <div onClick={() => setShowPassword(!showPassword)} style={iconStyle}>
-            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+          <div style={indicatorGroup}>
+            {formData.confirmPassword && (
+              <span style={{ marginRight: '8px', display: 'flex', color: passwordsMatch ? '#27ae60' : '#ff4d4d' }}>
+                {passwordsMatch ? <Check size={16} /> : <X size={16} />}
+              </span>
+            )}
+            <div onClick={() => setShowPassword(!showPassword)} style={{ cursor: 'pointer', color: '#888', display: 'flex' }}>
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </div>
           </div>
         </div>
         
-        <button type="submit" style={btnStyle}>REGISTER</button>
+        <button 
+          type="submit" 
+          style={formData.confirmPassword && !passwordsMatch ? disabledBtn : btnStyle} 
+          disabled={formData.confirmPassword && !passwordsMatch}
+        >
+          REGISTER
+        </button>
         <p style={footerText}>
           Already have an account? <span onClick={() => navigate('/signin', { state: { from } })} style={link}>Sign In</span>
         </p>
@@ -112,7 +128,7 @@ const SignUp = () => {
   );
 };
 
-// --- Styles (Maintained) ---
+// --- Styles ---
 const container = { height: '90vh', display: 'flex', justifyContent: 'center', alignItems: 'center' };
 const signUpBox = { width: '400px', textAlign: 'center', padding: '50px', border: '1px solid #eee', backgroundColor: '#fff' };
 const title = { letterSpacing: '5px', fontWeight: '300', marginBottom: '10px' };
@@ -123,11 +139,15 @@ const passwordWrapper = { position: 'relative', width: '100%', marginBottom: '15
 const passwordInput = { ...inputStyle, marginBottom: '0' };
 const iconStyle = { position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: '#888', display: 'flex', alignItems: 'center' };
 
+// This group keeps both icons aligned on the right of the input
+const indicatorGroup = { position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: '5px' };
+
 const meterContainer = { width: '100%', height: '4px', backgroundColor: '#eee', marginBottom: '15px', position: 'relative', borderRadius: '2px' };
 const meterBar = { height: '100%', transition: 'all 0.4s ease', borderRadius: '2px' };
 const strengthText = { position: 'absolute', right: '0', top: '6px', fontSize: '9px', fontWeight: 'bold', letterSpacing: '1px' };
 
 const btnStyle = { width: '100%', padding: '15px', backgroundColor: '#000', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold', letterSpacing: '2px', marginTop: '10px' };
+const disabledBtn = { ...btnStyle, backgroundColor: '#888', cursor: 'not-allowed' };
 const footerText = { fontSize: '12px', marginTop: '20px', color: '#666' };
 const link = { textDecoration: 'underline', cursor: 'pointer', color: '#000', fontWeight: 'bold' };
 
