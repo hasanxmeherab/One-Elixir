@@ -12,6 +12,9 @@ import AdminLogin from './pages/AdminLogin';
 import ThankYou from './pages/ThankYou';
 import SignIn from './pages/SignIn';
 import SignUp from './pages/SignUp';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+
 import Shop from './pages/Shop';
 // CartSidebar is no longer needed globally
 import Checkout from './pages/Checkout';
@@ -93,7 +96,7 @@ const AppContent = () => {
           <Route path="/signup" element={<SignUp />} />
           <Route path="/shop" element={<Shop />} />
           <Route path="/checkout" element={<Checkout />} />
-          
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route 
             path="/admin" 
             element={
@@ -105,6 +108,8 @@ const AppContent = () => {
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/account" element={<Account />} />
           <Route path="/manual-order" element={<ManualOrder />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          
         </Routes>
       </div>
     </>

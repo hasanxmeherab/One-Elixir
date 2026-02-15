@@ -1,21 +1,18 @@
 import React, { useState, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useUser } from '../context/UserContext';
-import { Eye, EyeOff, Check, X } from 'lucide-react'; 
+import { Eye, EyeOff, Check, X } from 'lucide-react';
 
-const SignUp = () => {
-  const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '' });
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false); // Added for UX
-  const { login } = useUser();
+const ResetPassword = () => {
+  const { token } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
-  
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-  const from = location.state?.from || '/';
+  const [formData, setFormData] = useState({ password: '', confirmPassword: '' });
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // --- Password Strength Logic ---
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+  // --- Password Strength Logic (Identical to SignUp for consistency) ---
   const strength = useMemo(() => {
     const pw = formData.password;
     if (!pw) return { score: 0, label: '', color: '#ddd' };
@@ -34,30 +31,19 @@ const SignUp = () => {
     }
   }, [formData.password]);
 
-  // --- Match Indicator Logic ---
   const passwordsMatch = formData.confirmPassword && formData.password === formData.confirmPassword;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (formData.confirmPassword && !passwordsMatch) {
-      alert("Passwords do not match!");
-      return;
-    }
-    
+    if (!passwordsMatch) return alert("Passwords do not match!");
+
     setLoading(true);
     try {
-      const res = await axios.post(`${API_URL}/api/auth/signup`, {
-        name: formData.name,
-        email: formData.email.toLowerCase(),
-        password: formData.password
-      });
-      
-      // Verification Logic Change
-      alert("A verification link has been sent to your email. Please verify your account to sign in.");
-      navigate('/signin'); 
-      
+      await axios.post(`${API_URL}/api/auth/reset-password/${token}`, { password: formData.password });
+      alert("Password reset successful! You can now sign in with your new password.");
+      navigate('/signin');
     } catch (err) {
-      alert(err.response?.data?.message || "Registration failed.");
+      alert(err.response?.data?.message || "Reset failed. The link may have expired.");
     } finally {
       setLoading(false);
     }
@@ -65,25 +51,15 @@ const SignUp = () => {
 
   return (
     <div style={container}>
-      <form onSubmit={handleSubmit} style={signUpBox}>
-        <h2 style={title}>CREATE ACCOUNT</h2>
-        <p style={subtitle}>Join the OneElixir inner circle</p>
-        
-        <input 
-          type="text" placeholder="FULL NAME" required
-          value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} 
-          style={inputStyle} 
-        />
-        <input 
-          type="email" placeholder="EMAIL" required
-          value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} 
-          style={inputStyle} 
-        />
-        
+      <form onSubmit={handleSubmit} style={box}>
+        <h2 style={title}>NEW PASSWORD</h2>
+        <p style={subtitle}>Create a secure new password for your account</p>
+
+        {/* Main Password Input */}
         <div style={passwordWrapper}>
           <input 
             type={showPassword ? "text" : "password"} 
-            placeholder="PASSWORD" required
+            placeholder="NEW PASSWORD" required
             value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} 
             style={passwordInput} 
           />
@@ -92,6 +68,7 @@ const SignUp = () => {
           </div>
         </div>
 
+        {/* Strength Meter */}
         {formData.password && (
           <div style={meterContainer}>
             <div style={{ ...meterBar, width: `${strength.score}%`, backgroundColor: strength.color }}></div>
@@ -99,10 +76,11 @@ const SignUp = () => {
           </div>
         )}
 
+        {/* Confirm Password Input */}
         <div style={passwordWrapper}>
           <input 
             type={showPassword ? "text" : "password"} 
-            placeholder="CONFIRM PASSWORD" required
+            placeholder="CONFIRM NEW PASSWORD" required
             value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} 
             style={passwordInput} 
           />
@@ -117,28 +95,25 @@ const SignUp = () => {
             </div>
           </div>
         </div>
-        
+
         <button 
           type="submit" 
           style={formData.confirmPassword && !passwordsMatch ? disabledBtn : btnStyle} 
           disabled={(formData.confirmPassword && !passwordsMatch) || loading}
         >
-          {loading ? "SENDING EMAIL..." : "REGISTER"}
+          {loading ? "UPDATING..." : "UPDATE PASSWORD"}
         </button>
-        <p style={footerText}>
-          Already have an account? <span onClick={() => navigate('/signin', { state: { from } })} style={link}>Sign In</span>
-        </p>
       </form>
     </div>
   );
 };
 
-// --- Styles (Maintained) ---
-const container = { height: '90vh', display: 'flex', justifyContent: 'center', alignItems: 'center' };
-const signUpBox = { width: '400px', textAlign: 'center', padding: '50px', border: '1px solid #eee', backgroundColor: '#fff' };
+// --- Styles (Consistent with OneElixir Theme) ---
+const container = { height: '80vh', display: 'flex', justifyContent: 'center', alignItems: 'center' };
+const box = { width: '400px', textAlign: 'center', padding: '50px', border: '1px solid #eee', backgroundColor: '#fff' };
 const title = { letterSpacing: '5px', fontWeight: '300', marginBottom: '10px' };
 const subtitle = { fontSize: '10px', color: '#888', marginBottom: '30px', letterSpacing: '1px' };
-const inputStyle = { width: '100%', padding: '15px', marginBottom: '15px', border: '1px solid #ddd', outline: 'none', fontSize: '13px' };
+const inputStyle = { width: '100%', padding: '15px', marginBottom: '15px', border: '1px solid #ddd', outline: 'none', fontSize: '13px', boxSizing: 'border-box' };
 const passwordWrapper = { position: 'relative', width: '100%', marginBottom: '15px' };
 const passwordInput = { ...inputStyle, marginBottom: '0' };
 const iconStyle = { position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: '#888', display: 'flex', alignItems: 'center' };
@@ -148,7 +123,5 @@ const meterBar = { height: '100%', transition: 'all 0.4s ease', borderRadius: '2
 const strengthText = { position: 'absolute', right: '0', top: '6px', fontSize: '9px', fontWeight: 'bold', letterSpacing: '1px' };
 const btnStyle = { width: '100%', padding: '15px', backgroundColor: '#000', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold', letterSpacing: '2px', marginTop: '10px' };
 const disabledBtn = { ...btnStyle, backgroundColor: '#888', cursor: 'not-allowed' };
-const footerText = { fontSize: '12px', marginTop: '20px', color: '#666' };
-const link = { textDecoration: 'underline', cursor: 'pointer', color: '#000', fontWeight: 'bold' };
 
-export default SignUp;
+export default ResetPassword;
