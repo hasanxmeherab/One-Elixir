@@ -55,13 +55,6 @@ const SignIn = () => {
           </div>
         </div>
         
-        {/* Forgot Password Link */}
-        <div style={forgotPasswordContainer}>
-          <span onClick={() => navigate('/forgot-password')} style={forgotLink}>
-            Forgot Password?
-          </span>
-        </div>
-        
         <button type="submit" style={btnStyle}>LOGIN</button>
         
         <p style={footerText}>
