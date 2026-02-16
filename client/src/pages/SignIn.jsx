@@ -54,6 +54,12 @@ const SignIn = () => {
             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
           </div>
         </div>
+
+        <div style={forgotPasswordContainer}>
+        <span onClick={() => navigate('/forgot-password')} style={forgotLink}>
+          Forgot Password?
+        </span>
+      </div>
         
         <button type="submit" style={btnStyle}>LOGIN</button>
         
