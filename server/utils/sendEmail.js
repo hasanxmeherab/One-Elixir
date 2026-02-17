@@ -1,30 +1,24 @@
 const { Resend } = require('resend');
 
-// Initialize Resend with your API Key from Render Environment Variables
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const sendEmail = async (options) => {
+  // Initialize INSIDE the function to ensure the API key is loaded from process.env
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error("Missing RESEND_API_KEY in environment variables.");
+  }
+
   try {
-    const { data, error } = await resend.emails.send({
-      /* IMPORTANT: On the Resend Free Tier, you MUST use 'onboarding@resend.dev' 
-         as the 'from' address until you verify your own domain.
-      */
+    await resend.emails.send({
       from: 'OneElixir <onboarding@resend.dev>',
       to: options.email,
       subject: options.subject,
-      html: options.html, // This sends your luxury HTML template
-      text: options.message, // Plain text fallback
+      html: options.html,
     });
-
-    if (error) {
-      console.error("Resend API Error:", error);
-      throw new Error(error.message);
-    }
-
-    console.log("Email sent successfully! ID:", data.id);
-  } catch (err) {
-    console.error("Email Service Error:", err);
-    throw new Error("Failed to send email via API.");
+    console.log("Email sent successfully!");
+  } catch (error) {
+    console.error("Resend error:", error);
+    throw error;
   }
 };
 
