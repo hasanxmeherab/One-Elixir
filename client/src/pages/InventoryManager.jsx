@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { useOutletContext } from 'react-router-dom'; // Added for nested routing
 
-const InventoryManager = ({ perfumes, fetchData }) => {
+const InventoryManager = () => {
+  // --- REPLACED PROPS WITH OUTLET CONTEXT ---
+  const { perfumes = [], fetchData } = useOutletContext();
+  
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [editId, setEditId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState(''); // Search state
+  const [searchTerm, setSearchTerm] = useState(''); 
   const [formData, setFormData] = useState({
     name: '', price: '', description: '', scentProfile: '', image: '', stock: 0
   });
@@ -13,6 +17,11 @@ const InventoryManager = ({ perfumes, fetchData }) => {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const CLOUD_NAME = "dluvmed0b";
   const UPLOAD_PRESET = "one_elixir_uploads";
+
+  // --- SAFETY CHECK ---
+  if (!perfumes) {
+    return <div style={{ padding: '40px', textAlign: 'center' }}>Loading Inventory Data...</div>;
+  }
 
   // --- Search Filtering Logic ---
   const filteredPerfumes = perfumes.filter(p => 
@@ -47,12 +56,25 @@ const InventoryManager = ({ perfumes, fetchData }) => {
         const res = await axios.post(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, data);
         finalImageUrl = res.data.secure_url;
       }
-      const payload = { ...formData, image: finalImageUrl, scentProfile: formData.scentProfile.split(',').map(s => s.trim()) };
-      if (editId) { await axios.put(`${API_URL}/api/perfumes/${editId}`, payload); }
-      else { await axios.post(`${API_URL}/api/perfumes`, payload); }
+      const payload = { 
+        ...formData, 
+        image: finalImageUrl, 
+        scentProfile: formData.scentProfile.split(',').map(s => s.trim()) 
+      };
+      
+      if (editId) { 
+        await axios.put(`${API_URL}/api/perfumes/${editId}`, payload); 
+      } else { 
+        await axios.post(`${API_URL}/api/perfumes`, payload); 
+      }
+      
       cancelEdit(); 
       fetchData();
-    } catch (err) { alert('Operation failed'); } finally { setUploading(false); }
+    } catch (err) { 
+      alert('Operation failed'); 
+    } finally { 
+      setUploading(false); 
+    }
   };
 
   const deletePerfume = async (id) => {
@@ -100,7 +122,10 @@ const InventoryManager = ({ perfumes, fetchData }) => {
       <table style={tableStyle}>
         <thead>
           <tr style={{ borderBottom: '2px solid #000' }}>
-            <th style={thStyle}>NAME</th><th style={thStyle}>PRICE</th><th style={thStyle}>STOCK</th><th style={thStyle}>ACTIONS</th>
+            <th style={thStyle}>NAME</th>
+            <th style={thStyle}>PRICE</th>
+            <th style={thStyle}>STOCK</th>
+            <th style={thStyle}>ACTIONS</th>
           </tr>
         </thead>
         <tbody>
@@ -118,7 +143,9 @@ const InventoryManager = ({ perfumes, fetchData }) => {
             ))
           ) : (
             <tr>
-              <td colSpan="4" style={{ padding: '20px', textAlign: 'center', color: '#888' }}>No perfumes found matching "{searchTerm}"</td>
+              <td colSpan="4" style={{ padding: '20px', textAlign: 'center', color: '#888' }}>
+                No perfumes found matching "{searchTerm}"
+              </td>
             </tr>
           )}
         </tbody>
@@ -127,7 +154,7 @@ const InventoryManager = ({ perfumes, fetchData }) => {
   );
 };
 
-// Styles
+// Styles maintained
 const searchBarStyle = { padding: '10px 15px', border: '1px solid #000', outline: 'none', width: '300px', fontSize: '13px' };
 const formStyle = { display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '10px' };
 const inputStyle = { padding: '12px', border: '1px solid #ddd', outline: 'none' };

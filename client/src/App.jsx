@@ -16,13 +16,21 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 
 import Shop from './pages/Shop';
-// CartSidebar is no longer needed globally
 import Checkout from './pages/Checkout';
 import Account from './pages/Account';
+
+// --- IMPORT ADMIN SUB-COMPONENTS ---
+import AdminDashboard from './pages/AdminDashboard';
+import InventoryManager from './pages/InventoryManager';
 import ManualOrder from './pages/ManualOrder';
+import OrderList from './pages/OrderList';
+import ExpenseManagement from './pages/ExpenseManagement';
+import InvestmentTracker from './pages/InvestmentTracker';
+import CouponManagement from './pages/CouponManagement';
+import BannerManagement from './pages/BannerManagement';
 
 // --- Navbar Component ---
-const Navbar = () => { // Removed onCartClick prop
+const Navbar = () => { 
   const { cart } = useCart();
   const { user, logout } = useUser();
   const navigate = useNavigate();
@@ -41,7 +49,6 @@ const Navbar = () => { // Removed onCartClick prop
       <ul style={navLinksStyle}>
         <li><Link to="/shop" style={linkStyle}>Collection</Link></li>
         <li>
-          {/* Changed from a div to a Link to navigate to the Cart page */}
           <Link to="/cart" style={linkStyle}>
             Cart ({cart.reduce((total, item) => total + item.quantity, 0)})
           </Link>
@@ -76,19 +83,11 @@ const AppContent = () => {
 
   return (
     <>
-      {/* Navbar no longer needs to control a sidebar state */}
       {!isHideNavbar && <Navbar />}
-      
-      {/* REMOVED: <CartSidebar />
-          By removing this, we prevent the sidebar from overlaying the screen.
-      */}
       
       <div className="container" style={{ minHeight: '80vh' }}>
         <Routes>
           <Route path="/" element={<Home />} />
-          {/* ProductDetails should no longer trigger a sidebar; 
-              ensure that component also navigates to /cart instead of calling openCart.
-          */}
           <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/thank-you" element={<ThankYou />} />
@@ -98,6 +97,8 @@ const AppContent = () => {
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
+          
+          {/* --- UPDATED NESTED ADMIN ROUTES --- */}
           <Route 
             path="/admin" 
             element={
@@ -105,9 +106,22 @@ const AppContent = () => {
                 <Admin />
               </ProtectedRoute>
             } 
-          />
+          >
+            {/* The index route is what shows at /admin */}
+            <Route index element={<AdminDashboard />} />
+            <Route path="inventory" element={<InventoryManager />} />
+            <Route path="manual-order" element={<ManualOrder />} />
+            <Route path="order-list" element={<OrderList />} />
+            <Route path="expenses" element={<ExpenseManagement />} />
+            <Route path="investment" element={<InvestmentTracker />} />
+            <Route path="coupons" element={<CouponManagement />} />
+            <Route path="banners" element={<BannerManagement isAdmin={true} />} />
+          </Route>
+
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/account" element={<Account />} />
+          
+          {/* Kept this route just in case you use it outside the admin panel */}
           <Route path="/manual-order" element={<ManualOrder />} />
           
         </Routes>
@@ -128,7 +142,7 @@ function App() {
   );
 }
 
-// --- Styles maintained from your version ---
+// --- Styles maintained ---
 const navStyles = {
   display: 'flex',
   justifyContent: 'space-between',

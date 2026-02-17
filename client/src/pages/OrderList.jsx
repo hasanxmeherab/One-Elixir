@@ -1,117 +1,235 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { useOutletContext } from 'react-router-dom'; // Added for nested routing
 
-const OrderList = ({ orders, fetchData }) => {
+const OrderList = () => {
+  // --- REPLACED PROPS WITH OUTLET CONTEXT ---
+  const { orders = [], fetchData } = useOutletContext();
+  
+  const [showArchived, setShowArchived] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-  // --- Search Logic ---
-  const filteredOrders = orders.filter(order => 
-    order.phone.includes(searchTerm) || 
-    order.customerName.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // --- SAFETY CHECK ---
+  if (!orders) {
+    return <div style={{ padding: '40px', textAlign: 'center' }}>Loading Order Data...</div>;
+  }
 
-  const updateOrderStatus = async (id, status) => {
+  // --- PDF RECEIPT GENERATOR ---
+  const downloadReceipt = (order) => {
+    try {
+      const doc = new jsPDF();
+
+      // 1. BRANDING & LOGO
+      doc.setFontSize(22);
+      doc.setFont("helvetica", "bold");
+      doc.text("OneElixir Fragrances", 105, 20, { align: "center" });
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+
+      // 2. BUSINESS INFO
+      doc.setFontSize(9);
+      doc.setTextColor(100);
+      doc.text("Ashulia, Dhaka, Bangladesh", 105, 33, { align: "center" });
+      doc.text("Phone: +880 1690-272870", 105, 38, { align: "center" }); 
+      doc.line(20, 43, 190, 43);
+
+      // 3. CUSTOMER INFO
+      doc.setTextColor(0);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text("BILL TO:", 20, 53);
+      doc.setFont("helvetica", "normal");
+      doc.text(`${order.customerName}`, 20, 59);
+      doc.text(`Phone: ${order.phone}`, 20, 65);
+      if (order.address) doc.text(`Address: ${order.address}`, 20, 71);
+
+      doc.text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`, 140, 59);
+      doc.text(`Order ID: #${order._id.slice(-6).toUpperCase()}`, 140, 65);
+
+      // 4. ITEMS TABLE
+      const tableColumn = ["Item", "Qty", "Price", "Discount", "Total"];
+      const tableRows = order.items.map(item => {
+        const itemPrice = item.price || 0;
+        const qty = item.quantity || 1;
+        let discLabel = "0 TK";
+        
+        if (item.discountType === 'percentage') discLabel = `${item.discountValue}%`;
+        else if (item.discountType === 'fixed') discLabel = `${item.discountValue} TK`;
+
+        const finalPrice = item.finalItemPrice || (item.discountType === 'percentage' 
+          ? itemPrice - (itemPrice * item.discountValue / 100) 
+          : itemPrice - (item.discountValue || 0));
+
+        return [
+          item.name,
+          qty,
+          `${itemPrice.toLocaleString()} TK`,
+          discLabel,
+          `${(finalPrice * qty).toLocaleString()} TK`
+        ];
+      });
+
+      autoTable(doc, {
+        startY: 80,
+        head: [tableColumn],
+        body: tableRows,
+        theme: 'striped',
+        headStyles: { fillColor: [0, 0, 0] },
+        styles: { fontSize: 10, cellPadding: 5 }
+      });
+
+      // 5. TOTALS SECTION (FIXED OVERLAP)
+      const finalY = doc.lastAutoTable.finalY + 15;
+      doc.setFontSize(11);
+      
+      // Subtotal
+      const subtotal = order.items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+      doc.text("Subtotal:", 135, finalY);
+      doc.text(`${subtotal.toLocaleString()} TK`, 190, finalY, { align: "right" });
+
+      let currentY = finalY + 8;
+      
+      // Savings Calculation (Manual + Coupon)
+      const totalSavings = subtotal - order.totalAmount;
+      if (totalSavings > 0) {
+        doc.setTextColor(200, 0, 0);
+        doc.text("Total Discount:", 135, currentY);
+        doc.text(`-${totalSavings.toLocaleString()} TK`, 190, currentY, { align: "right" });
+        currentY += 8;
+      }
+
+      // Grand Total - Set different X for Label and Value
+      doc.setTextColor(0);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.text("GRAND TOTAL:", 120, currentY + 5); 
+      doc.text(`${order.totalAmount.toLocaleString()} TK`, 190, currentY + 5, { align: "right" });
+
+      // 6. FOOTER
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(150);
+      doc.text("Thank you for choosing OneElixir Fragrances.", 105, 285, { align: "center" });
+
+      doc.save(`OneElixir_Receipt_${order.customerName.replace(/\s+/g, '_')}.pdf`);
+    } catch (error) {
+      console.error("PDF Error:", error);
+      alert("Could not generate PDF. Please check the console.");
+    }
+  };
+
+  const updateStatus = async (id, status) => {
     try {
       await axios.put(`${API_URL}/api/orders/${id}`, { status });
       fetchData();
-    } catch (err) {
-      alert("Failed to update status");
-    }
+      alert(`Order updated to ${status}`);
+    } catch (err) { alert("Failed to update status"); }
   };
 
-  const deleteOrder = async (order) => {
-    if (window.confirm("Archive this order? This will restore stock to inventory.")) {
-      try {
-        for (const item of order.items) {
-          await axios.put(`${API_URL}/api/perfumes/restore-stock`, { 
-            id: item.perfumeId, 
-            quantity: Number(item.quantity) 
-          });
-        }
-        await axios.delete(`${API_URL}/api/orders/${order._id}`);
-        fetchData();
-        alert("Order archived and stock restored!");
-      } catch (err) {
-        alert("Archive failed.");
-      }
-    }
-  };
+  const baseFiltered = orders.filter(order => 
+    showArchived ? order.status === 'Canceled' : order.status !== 'Canceled'
+  );
+
+  const displayedOrders = baseFiltered.filter(order => {
+    const search = searchTerm.toLowerCase();
+    return order.customerName.toLowerCase().includes(search) || order.phone.includes(search);
+  });
 
   return (
-    <div>
-      <div style={headerStyle}>
-        <h3 style={{ letterSpacing: '2px', margin: 0 }}>ORDER ARCHIVE</h3>
-        <input 
-          type="text" 
-          placeholder="Search Name or Phone..." 
-          value={searchTerm} 
-          onChange={e => setSearchTerm(e.target.value)}
-          style={searchStyle}
-        />
+    <div style={containerStyle}>
+      <div style={headerRow}>
+        <h3 style={{ letterSpacing: '2px', margin: 0 }}>
+          {showArchived ? 'ARCHIVED ORDERS' : 'ACTIVE ORDERS'}
+        </h3>
+        <div style={{ display: 'flex', gap: '15px' }}>
+          <input 
+            type="text" placeholder="Search..." value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)} style={searchStyle}
+          />
+          <button 
+            onClick={() => { setShowArchived(!showArchived); setSearchTerm(''); }} 
+            style={showArchived ? activeToggleBtn : toggleBtn}
+          >
+            {showArchived ? '← BACK TO ACTIVE' : 'VIEW ARCHIVED'}
+          </button>
+        </div>
       </div>
 
       <table style={tableStyle}>
         <thead>
-          <tr style={thRow}>
-            <th style={thStyle}>CUSTOMER</th>
-            <th style={thStyle}>DETAILS</th>
-            <th style={thStyle}>TOTAL</th>
-            <th style={thStyle}>STATUS</th>
-            <th style={thStyle}>ACTION</th>
+          <tr style={headerStyle}>
+            <th>DATE</th>
+            <th>CUSTOMER</th>
+            <th>ITEMS</th>
+            <th>TOTAL</th>
+            <th>STATUS</th>
+            <th>ACTIONS</th>
+            <th>RECEIPT</th>
           </tr>
         </thead>
         <tbody>
-          {filteredOrders.map(order => (
-            <tr key={order._id} style={tdRow}>
-              <td style={tdStyle}>
-                <strong>{order.customerName}</strong><br/>
-                <span style={{ fontSize: '11px', color: '#888' }}>{order.phone}</span>
+          {displayedOrders.length > 0 ? displayedOrders.map(order => (
+            <tr key={order._id} style={rowStyle}>
+              <td>{new Date(order.createdAt).toLocaleDateString()}</td>
+              <td>
+                <div style={{ fontWeight: 'bold' }}>{order.customerName}</div>
+                <div style={{ fontSize: '11px', color: '#666' }}>{order.phone}</div>
               </td>
-              <td style={tdStyle}>
-                {order.items.map((item, i) => (
-                  <div key={i} style={{ fontSize: '12px' }}>{item.quantity}x {item.name}</div>
-                ))}
+              <td>
+                <div style={{ fontSize: '11px' }}>
+                  {order.items.map((item, i) => <div key={i}>{item.quantity}x {item.name}</div>)}
+                </div>
               </td>
-              <td style={{ ...tdStyle, fontWeight: 'bold' }}>{order.totalAmount.toLocaleString()} TK</td>
-              <td style={{ 
-                ...tdStyle, 
-                color: order.status === 'Delivered' ? 'green' : 
-                       order.status === 'Processing' ? '#3498db' : 'orange', 
-                fontWeight: 'bold' 
-              }}>
-                {order.status.toUpperCase()}
+              <td style={{ fontWeight: 'bold' }}>{order.totalAmount.toLocaleString()} TK</td>
+              <td><span style={getStatusStyle(order.status)}>{order.status.toUpperCase()}</span></td>
+              <td>
+                {order.status !== 'Canceled' ? (
+                  <select onChange={(e) => updateStatus(order._id, e.target.value)} value={order.status} style={selectStyle}>
+                    <option value="Pending">Pending</option>
+                    <option value="Processing">Processing</option>
+                    <option value="Delivered">Delivered</option>
+                    <option value="Canceled">Cancel Order</option>
+                  </select>
+                ) : (
+                  <button onClick={() => updateStatus(order._id, 'Pending')} style={restoreBtn}>RESTORE</button>
+                )}
               </td>
-              <td style={tdStyle}>
-                <select 
-                  onChange={(e) => updateOrderStatus(order._id, e.target.value)} 
-                  style={selectStyle}
-                  value={order.status} 
-                >
-                  <option value="Pending">Pending</option>
-                  <option value="Processing">Processing</option> {/* New option added */}
-                  <option value="Shipped">Shipped</option>
-                  <option value="Delivered">Delivered</option>
-                </select>
-                <button onClick={() => deleteOrder(order)} style={deleteBtn}>ARCHIVE</button>
+              <td>
+                <button onClick={() => downloadReceipt(order)} style={downloadBtn}>PDF 📄</button>
               </td>
             </tr>
-          ))}
+          )) : (
+            <tr><td colSpan="7" style={{ textAlign: 'center', padding: '50px', color: '#999' }}>No orders found.</td></tr>
+          )}
         </tbody>
       </table>
     </div>
   );
 };
 
-// --- Styles ---
-const headerStyle = { display: 'flex', justifyContent: 'space-between', marginBottom: '30px' };
-const searchStyle = { padding: '10px', border: '1px solid #eee', width: '250px' };
-const tableStyle = { width: '100%', borderCollapse: 'collapse' };
-const thRow = { borderBottom: '2px solid #000', textAlign: 'left' };
-const thStyle = { padding: '15px 10px', fontSize: '11px', color: '#888' };
-const tdRow = { borderBottom: '1px solid #eee' };
-const tdStyle = { padding: '15px 10px', fontSize: '13px' };
-const selectStyle = { padding: '5px', fontSize: '11px', marginRight: '10px' };
-const deleteBtn = { color: 'red', border: 'none', background: 'none', cursor: 'pointer', fontWeight: 'bold', textDecoration: 'underline', fontSize: '11px' };
+// --- Styles maintained from your version ---
+const containerStyle = { width: '100%' };
+const headerRow = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' };
+const searchStyle = { padding: '8px 15px', border: '1px solid #ddd', fontSize: '12px', width: '250px', outline: 'none' };
+const tableStyle = { width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' };
+const headerStyle = { borderBottom: '2px solid #000', padding: '10px' };
+const rowStyle = { borderBottom: '1px solid #eee' };
+const selectStyle = { padding: '5px', fontSize: '11px', border: '1px solid #ddd' };
+const toggleBtn = { backgroundColor: '#f0f0f0', border: '1px solid #ddd', padding: '8px 15px', cursor: 'pointer', fontSize: '10px', fontWeight: 'bold', letterSpacing: '1px' };
+const activeToggleBtn = { ...toggleBtn, backgroundColor: '#000', color: '#fff' };
+const restoreBtn = { backgroundColor: '#222', color: '#fff', border: 'none', padding: '5px 12px', cursor: 'pointer', fontSize: '10px' };
+const downloadBtn = { backgroundColor: '#fff', border: '1px solid #000', padding: '5px 10px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' };
+
+const getStatusStyle = (status) => {
+  const base = { padding: '3px 8px', borderRadius: '2px', fontSize: '10px', fontWeight: 'bold' };
+  if (status === 'Delivered') return { ...base, backgroundColor: '#d1fae5', color: '#065f46' };
+  if (status === 'Canceled') return { ...base, backgroundColor: '#fee2e2', color: '#991b1b' };
+  if (status === 'Processing') return { ...base, backgroundColor: '#dbeafe', color: '#1e40af' };
+  return { ...base, backgroundColor: '#fef3c7', color: '#92400e' };
+};
 
 export default OrderList;

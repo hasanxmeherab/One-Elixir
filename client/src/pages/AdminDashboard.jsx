@@ -1,7 +1,17 @@
 import React, { useState } from 'react';
+import { useOutletContext, useNavigate } from 'react-router-dom'; // Added useNavigate for restock logic
 
-const AdminDashboard = ({ perfumes, orders, investments = [], onNavigate }) => {
+const AdminDashboard = () => {
+  // --- REPLACED PROPS WITH OUTLET CONTEXT ---
+  const { perfumes = [], orders = [], investments = [] } = useOutletContext();
+  const navigate = useNavigate();
   const [filterType, setFilterType] = useState(null);
+
+  // --- SAFETY CHECK ---
+  // If context is still loading or undefined, show a placeholder to prevent crashes
+  if (!perfumes || !orders) {
+    return <div style={{ padding: '40px', textAlign: 'center' }}>Loading Dashboard Data...</div>;
+  }
 
   // --- Inventory Logic ---
   const lowStockItems = perfumes.filter(p => p.stock > 0 && p.stock <= 5);
@@ -13,9 +23,10 @@ const AdminDashboard = ({ perfumes, orders, investments = [], onNavigate }) => {
   .filter(o => o.status?.toLowerCase() === 'delivered')
   .reduce((acc, o) => acc + (Number(o.totalAmount) || 0), 0);
   const totalInvestment = (investments || []).reduce((acc, inv) => {
-    const val = parseFloat(inv.totalAmount); // Use totalAmount, not amount
+    const val = parseFloat(inv.totalAmount); 
     return acc + (isNaN(val) ? 0 : val);
   }, 0);
+
   return (
     <div>
       <h3 style={{ letterSpacing: '3px', marginBottom: '30px', fontWeight: 'bold' }}>DASHBOARD OVERVIEW</h3>
@@ -79,9 +90,9 @@ const AdminDashboard = ({ perfumes, orders, investments = [], onNavigate }) => {
                     Current Stock: {item.stock}
                   </span>
                 </div>
-                {/* Navigation Shortcut Button */}
+                {/* Navigation Shortcut Button updated for Routing */}
                 <button 
-                  onClick={() => onNavigate('inventory')} 
+                  onClick={() => navigate('/admin/inventory')} 
                   style={restockBtn}
                 >
                   RESTOCK →

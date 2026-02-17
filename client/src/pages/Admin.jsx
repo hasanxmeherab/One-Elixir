@@ -1,20 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Link, Outlet, useLocation } from 'react-router-dom'; // Added for routing
 import AdminNavbar from '../components/AdminNavbar';
-import AdminDashboard from './AdminDashboard'; 
-import InventoryManager from './InventoryManager';
-import ManualOrder from './ManualOrder';
-import OrderList from './OrderList';
-import ExpenseManagement from './ExpenseManagement';
-import InvestmentTracker from './InvestmentTracker';
-import BannerManagement from './BannerManagement'; 
-import CouponManagement from './CouponManagement'; // Import the new Coupon component
 
 const Admin = () => {
-  const [activePage, setActivePage] = useState('dashboard');
   const [perfumes, setPerfumes] = useState([]);
   const [orders, setOrders] = useState([]);
   const [investments, setInvestments] = useState([]);
+  const location = useLocation(); // To track which link is active
+  
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   const fetchData = async () => {
@@ -32,58 +26,101 @@ const Admin = () => {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Helper to check if a link is active for styling
+  const isActive = (path) => location.pathname === path;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <AdminNavbar />
       
       <div style={{ display: 'flex', flex: 1 }}>
-        {/* SIDEBAR */}
+        {/* SIDEBAR WITH DEDICATED LINKS */}
         <div style={sidebarStyle}>
           <p style={sidebarLabel}>COMMAND CENTER</p>
-          <button onClick={() => setActivePage('dashboard')} style={activePage === 'dashboard' ? activeBtn : menuBtn}>DASHBOARD</button>
-          <button onClick={() => setActivePage('inventory')} style={activePage === 'inventory' ? activeBtn : menuBtn}>INVENTORY</button>
-          <button onClick={() => setActivePage('manual-order')} style={activePage === 'manual-order' ? activeBtn : menuBtn}>MANUAL ORDER</button>
-          <button onClick={() => setActivePage('order-list')} style={activePage === 'order-list' ? activeBtn : menuBtn}>ORDER LIST</button>
-          <button onClick={() => setActivePage('expenses')} style={activePage === 'expenses' ? activeBtn : menuBtn}>EXPENSES</button>
-          <button onClick={() => setActivePage('investment')} style={activePage === 'investment' ? activeBtn : menuBtn}>INVESTMENT</button>
           
-          {/* FEATURE #54: COUPONS TAB */}
-          <button onClick={() => setActivePage('coupons')} style={activePage === 'coupons' ? activeBtn : menuBtn}>COUPONS</button>
+          <Link to="/admin" style={isActive('/admin') ? activeBtn : menuBtn}>
+            DASHBOARD
+          </Link>
           
-          <button onClick={() => setActivePage('banners')} style={activePage === 'banners' ? activeBtn : menuBtn}>BANNER MANAGEMENT</button>
+          <Link to="/admin/inventory" style={isActive('/admin/inventory') ? activeBtn : menuBtn}>
+            INVENTORY
+          </Link>
+          
+          <Link to="/admin/manual-order" style={isActive('/admin/manual-order') ? activeBtn : menuBtn}>
+            MANUAL ORDER
+          </Link>
+          
+          <Link to="/admin/order-list" style={isActive('/admin/order-list') ? activeBtn : menuBtn}>
+            ORDER LIST
+          </Link>
+          
+          <Link to="/admin/expenses" style={isActive('/admin/expenses') ? activeBtn : menuBtn}>
+            EXPENSES
+          </Link>
+          
+          <Link to="/admin/investment" style={isActive('/admin/investment') ? activeBtn : menuBtn}>
+            INVESTMENT
+          </Link>
+          
+          <Link to="/admin/coupons" style={isActive('/admin/coupons') ? activeBtn : menuBtn}>
+            COUPONS
+          </Link>
+          
+          <Link to="/admin/banners" style={isActive('/admin/banners') ? activeBtn : menuBtn}>
+            BANNERS
+          </Link>
         </div>
 
-        {/* MAIN CONTENT AREA */}
+        {/* DEDICATED PAGE CONTENT AREA */}
         <div style={{ flex: 1, padding: '40px', backgroundColor: '#fff' }}>
-          {activePage === 'dashboard' && (
-            <AdminDashboard 
-              perfumes={perfumes} 
-              orders={orders} 
-              investments={investments}
-              onNavigate={setActivePage}
-            />
-          )}          
-          {activePage === 'inventory' && <InventoryManager perfumes={perfumes} fetchData={fetchData} />}
-          {activePage === 'manual-order' && <ManualOrder perfumes={perfumes} fetchData={fetchData} />}
-          {activePage === 'order-list' && <OrderList orders={orders} fetchData={fetchData} />}
-          
-          {activePage === 'expenses' && <ExpenseManagement />}
-          {activePage === 'investment' && <InvestmentTracker investments={investments} />}
-          
-          {/* FEATURE #54: COUPON MANAGEMENT VIEW */}
-          {activePage === 'coupons' && <CouponManagement />}
-
-          {activePage === 'banners' && <BannerManagement isAdmin={true} />}
+          {/* This Outlet renders the specific component based on the URL */}
+          <Outlet context={{ perfumes, orders, investments, fetchData }} />
         </div>
       </div>
     </div>
   );
 };
 
-// --- Styles (Maintained) ---
-const sidebarStyle = { width: '260px', backgroundColor: '#f9f9f9', borderRight: '1px solid #eee', padding: '30px 15px', display: 'flex', flexDirection: 'column', gap: '5px' };
-const sidebarLabel = { fontSize: '10px', letterSpacing: '2px', color: '#888', fontWeight: 'bold', marginBottom: '20px', paddingLeft: '10px' };
-const menuBtn = { textAlign: 'left', padding: '12px 15px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', letterSpacing: '1px', color: '#555', transition: '0.2s' };
-const activeBtn = { ...menuBtn, backgroundColor: '#000', color: '#fff', borderRadius: '4px' };
+// --- Styles (Maintained & Luxury Feel) ---
+const sidebarStyle = { 
+  width: '260px', 
+  backgroundColor: '#f9f9f9', 
+  borderRight: '1px solid #eee', 
+  padding: '30px 15px', 
+  display: 'flex', 
+  flexDirection: 'column', 
+  gap: '5px' 
+};
+
+const sidebarLabel = { 
+  fontSize: '10px', 
+  letterSpacing: '2px', 
+  color: '#888', 
+  fontWeight: 'bold', 
+  marginBottom: '20px', 
+  paddingLeft: '10px' 
+};
+
+const menuBtn = { 
+  textDecoration: 'none',
+  textAlign: 'left', 
+  padding: '12px 15px', 
+  backgroundColor: 'transparent', 
+  border: 'none', 
+  cursor: 'pointer', 
+  fontSize: '12px', 
+  fontWeight: 'bold', 
+  letterSpacing: '1px', 
+  color: '#555', 
+  transition: '0.2s',
+  display: 'block' 
+};
+
+const activeBtn = { 
+  ...menuBtn, 
+  backgroundColor: '#000', 
+  color: '#fff', 
+  borderRadius: '4px' 
+};
 
 export default Admin;

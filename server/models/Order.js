@@ -2,7 +2,6 @@ const mongoose = require('mongoose');
 
 const orderSchema = new mongoose.Schema({
   customerName: { type: String, required: true },
-  // 1. Added customerEmail to link orders to user accounts
   customerEmail: { type: String }, 
   phone: { type: String, required: true },
   address: { type: String },
@@ -10,13 +9,17 @@ const orderSchema = new mongoose.Schema({
     {
       perfumeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Perfume' },
       name: String,
-      price: Number,
-      quantity: { type: Number, default: 1 }
+      price: Number, // Original Price
+      quantity: { type: Number, default: 1 },
+      // NEW: Individual Item Discount Tracking
+      discountType: { type: String, enum: ['fixed', 'percentage', 'none'], default: 'none' },
+      discountValue: { type: Number, default: 0 },
+      finalItemPrice: { type: Number } // Price after manual item discount
     }
   ],
   totalAmount: { type: Number, required: true },
+  discountApplied: { type: Number, default: 0 }, // Coupon discount
   status: { type: String, default: 'Pending' },
-  // 2. Added isManual flag to separate business entries from customer purchases
   isManual: { type: Boolean, default: false }, 
   createdAt: { type: Date, default: Date.now }
 });
