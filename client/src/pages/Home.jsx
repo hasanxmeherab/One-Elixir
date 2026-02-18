@@ -17,6 +17,7 @@ const Home = () => {
     "logos/gucci.png",
     "logos/creed.png",
     "logos/dunhill.png",
+    "logos/oneelixir.png",
   ];
 
   useEffect(() => {

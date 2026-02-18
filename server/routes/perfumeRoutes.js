@@ -2,29 +2,32 @@ const express = require('express');
 const router = express.Router();
 const Perfume = require('../models/Perfume');
 
-// GET all perfumes
+// --- UPDATED: GET all perfumes with Search Support ---
 router.get('/', async (req, res) => {
     try {
-        const perfumes = await Perfume.find();
+        const { search } = req.query; // Get the search term from URL
+        let query = {};
+
+        // If a search term is provided, filter by name (case-insensitive)
+        if (search && search.trim() !== "") {
+            query.name = { $regex: search, $options: 'i' }; 
+        }
+
+        const perfumes = await Perfume.find(query);
         res.json(perfumes);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
 
-// RESTORE STOCK (New: Added for Archive functionality)
-// This adds quantity back to a perfume's stock when an order is deleted
+// RESTORE STOCK
 router.put('/restore-stock', async (req, res) => {
     try {
         const { id, quantity } = req.body;
         const perfume = await Perfume.findById(id);
-        
         if (!perfume) return res.status(404).json({ message: "Perfume not found" });
-
-        // Update the stock count
         perfume.stock = (Number(perfume.stock) || 0) + Number(quantity);
         await perfume.save();
-
         res.json({ message: "Stock successfully restored", newStock: perfume.stock });
     } catch (err) {
         res.status(500).json({ message: "Error restoring stock", error: err.message });
@@ -50,9 +53,8 @@ router.post('/', async (req, res) => {
         description: req.body.description,
         scentProfile: req.body.scentProfile,
         image: req.body.image,
-        stock: req.body.stock || 0 // Ensure stock is handled on creation
+        stock: req.body.stock || 0 
     });
-
     try {
         const newPerfume = await perfume.save();
         res.status(201).json(newPerfume);

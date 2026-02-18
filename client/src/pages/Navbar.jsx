@@ -1,216 +1,143 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useUser } from '../context/UserContext';
+import { Menu, Search, ShoppingBag, Heart, User, X } from 'lucide-react';
+import axios from 'axios';
 
-const Navbar = ({ onCartClick }) => {
+const Navbar = () => {
   const { user, logout } = useUser();
   const { cart } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-  // State for mobile menu toggle
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
 
-  const isCurrentlyAdmin = location.pathname.toLowerCase().includes('admin');
+  // --- Search API Call ---
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      // Only call API if user has typed more than 1 character
+      if (searchQuery.trim().length > 1) {
+        try {
+          const res = await axios.get(`${API_URL}/api/perfumes?search=${searchQuery}`);
+          setSuggestions(res.data.slice(0, 6)); 
+        } catch (err) { console.error("Search Error:", err); }
+      } else {
+        setSuggestions([]); 
+      }
+    };
+
+    const timeoutId = setTimeout(fetchSuggestions, 300); // Debounce: Wait for user to stop typing
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, API_URL]);
 
   const handleLogout = () => {
     logout();
-    setIsMobileOpen(false);
-    alert("Logged out from OneElixir");
+    setIsSidebarOpen(false);
     navigate('/');
   };
 
-  const closeMenu = () => setIsMobileOpen(false);
-
   return (
-    <nav style={navStyle}>
-      <div style={logoStyle}>
-        <Link to="/" style={{ textDecoration: 'none', color: '#000' }} onClick={closeMenu}>ONEELIXIR</Link>
-      </div>
+    <>
+      <nav style={navContainer}>
+        <div style={sideSection}><Menu size={22} onClick={() => setIsSidebarOpen(true)} style={iconAction} /></div>
+        <div style={centerSection}><Link to="/" style={logoLink}>ONEELIXIR</Link></div>
+        <div style={rightSection}>
+          <Search size={20} style={iconAction} onClick={() => setIsSearchOpen(true)} />
+          <Heart size={20} style={iconAction} onClick={() => navigate('/wishlist')} />
+          <div style={cartWrapper} onClick={() => navigate('/cart')}>
+            <ShoppingBag size={20} style={iconAction} />
+            {cart.length > 0 && <span style={badge}>{cart.reduce((a, b) => a + b.quantity, 0)}</span>}
+          </div>
+          <User size={20} style={iconAction} onClick={() => user ? navigate('/account') : navigate('/signin')} />
+        </div>
+      </nav>
 
-      {/* --- MOBILE HAMBURGER ICON (Visible only on mobile) --- */}
-      <div 
-        style={hamburgerContainerStyle} 
-        onClick={() => setIsMobileOpen(!isMobileOpen)}
-        className="mobile-hamburger-btn"
-      >
-        <div style={barStyle}></div>
-        <div style={barStyle}></div>
-        <div style={barStyle}></div>
-      </div>
-
-      {/* --- NAVIGATION LINKS --- */}
-      <div 
-        style={isMobileOpen ? mobileLinkGroupStyle : linkGroupStyle} 
-        className={isMobileOpen ? "mobile-menu-active" : "nav-links-desktop"}
-      >
-        {/* Close Button for Mobile Overlay */}
-        {isMobileOpen && (
-          <div style={closeBtnStyle} onClick={closeMenu}>×</div>
-        )}
-
-        {isCurrentlyAdmin ? (
-          <Link to="/" style={linkStyle} onClick={closeMenu}>EXIT TO SHOP</Link>
-        ) : (
-          <>
-            <Link to="/shop" style={linkStyle} onClick={closeMenu}>COLLECTION</Link>
-            
-            <div onClick={() => { onCartClick(); closeMenu(); }} style={{ ...linkStyle, cursor: 'pointer' }}>
-              CART ({cart.reduce((a, b) => a + b.quantity, 0)})
+      {/* --- FULL PAGE SEARCH OVERLAY --- */}
+      {isSearchOpen && (
+        <div style={searchPageOverlay}>
+          <div style={searchHeader}><X size={32} onClick={() => { setIsSearchOpen(false); setSearchQuery(""); }} style={iconAction} /></div>
+          <div style={searchContent}>
+            <input 
+              type="text" placeholder="START TYPING TO SEARCH..." style={largeSearchInput} 
+              autoFocus value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <div style={suggestionBox}>
+              {searchQuery.length > 0 ? (
+                <>
+                  {suggestions.map((item) => (
+                    <div key={item._id} style={suggestionItem} onClick={() => { navigate(`/product/${item._id}`); setIsSearchOpen(false); setSearchQuery(""); }}>
+                      <img src={item.image} alt={item.name} style={suggestionThumb} />
+                      <div>
+                        <div style={suggestionName}>{item.name.toUpperCase()}</div>
+                        <div style={suggestionPrice}>{item.price.toLocaleString()} TK</div>
+                      </div>
+                    </div>
+                  ))}
+                  {searchQuery.length > 1 && suggestions.length === 0 && <p style={statusText}>No results found for "{searchQuery}"</p>}
+                </>
+              ) : <p style={statusText}>FIND YOUR SIGNATURE SCENT</p>}
             </div>
+          </div>
+        </div>
+      )}
 
-            {user ? (
-              <div className="auth-flex" style={authWrapperStyle}>
-                <div 
-                  onClick={() => { navigate('/account'); closeMenu(); }} 
-                  style={accountWrapperStyle}
-                >
-                  <span style={userNameStyle}>
-                    HELLO, {user.name.toUpperCase()}
-                  </span>
-                </div>
-                <button onClick={handleLogout} style={logoutBtnStyle}>LOGOUT</button>
-              </div>
-            ) : (
-              <div className="auth-flex" style={authWrapperStyle}>
-                <Link to="/signin" style={linkStyle} onClick={closeMenu}>SIGN IN</Link>
-                <Link to="/signup" style={linkStyle} onClick={closeMenu}>SIGN UP</Link>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* FIXES THE SQUASHED LAYOUT ON MOBILE */}
-      <style>
-        {`
-          @media (max-width: 850px) {
-            .nav-links-desktop { 
-              display: none !important; 
-            }
-            .mobile-hamburger-btn { 
-              display: flex !important; 
-            }
-            .auth-flex {
-              flex-direction: column;
-              width: 100%;
-            }
-          }
-          @media (min-width: 851px) {
-            .mobile-hamburger-btn { 
-              display: none !important; 
-            }
-            .nav-links-desktop { 
-              display: flex !important; 
-            }
-          }
-        `}
-      </style>
-    </nav>
+      {/* --- SIDEBAR DRAWER --- */}
+      {isSidebarOpen && (
+        <div style={sidebarOverlay}>
+          <div style={sidebarContent}>
+            <div style={sidebarHeader}><X size={28} onClick={() => setIsSidebarOpen(false)} style={iconAction} /></div>
+            <ul style={navList}>
+              <li><Link to="/shop" style={navItem} onClick={() => setIsSidebarOpen(false)}>THE COLLECTION</Link></li>
+              {!user ? (
+                <>
+                  <li><Link to="/signin" style={navItem} onClick={() => setIsSidebarOpen(false)}>SIGN IN</Link></li>
+                  <li><Link to="/signup" style={navItem} onClick={() => setIsSidebarOpen(false)}>CREATE ACCOUNT</Link></li>
+                </>
+              ) : (
+                <>
+                  <li><Link to="/account" style={navItem} onClick={() => setIsSidebarOpen(false)}>MY PROFILE</Link></li>
+                  <li><button onClick={handleLogout} style={logoutButton}>LOGOUT</button></li>
+                </>
+              )}
+            </ul>
+          </div>
+          <div style={backdrop} onClick={() => setIsSidebarOpen(false)}></div>
+        </div>
+      )}
+    </>
   );
 };
 
 // --- STYLES ---
-const navStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  padding: '15px 5%',
-  borderBottom: '1px solid #eee',
-  position: 'sticky',
-  top: 0,
-  backgroundColor: '#fff',
-  zIndex: 1000,
-  minHeight: '70px'
-};
-
-const logoStyle = { 
-  fontSize: '20px', 
-  fontWeight: 'bold', 
-  letterSpacing: '3px' 
-};
-
-const linkGroupStyle = { 
-  display: 'flex', 
-  gap: '25px', 
-  alignItems: 'center' 
-};
-
-const mobileLinkGroupStyle = {
-  position: 'fixed',
-  top: 0,
-  right: 0,
-  width: '100%',
-  height: '100vh',
-  backgroundColor: '#fff',
-  display: 'flex',
-  flexDirection: 'column',
-  justifyContent: 'center',
-  alignItems: 'center',
-  gap: '35px',
-  zIndex: 2000,
-};
-
-const linkStyle = { 
-  textDecoration: 'none', 
-  color: '#000', 
-  fontSize: '12px', 
-  fontWeight: 'bold', 
-  letterSpacing: '1.5px' 
-};
-
-const authWrapperStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '20px'
-};
-
-const hamburgerContainerStyle = {
-  display: 'none', 
-  flexDirection: 'column',
-  gap: '5px',
-  cursor: 'pointer',
-  padding: '10px'
-};
-
-const barStyle = {
-  width: '22px',
-  height: '2px',
-  backgroundColor: '#000'
-};
-
-const closeBtnStyle = {
-  position: 'absolute',
-  top: '20px',
-  right: '25px',
-  fontSize: '35px',
-  cursor: 'pointer'
-};
-
-const accountWrapperStyle = {
-  cursor: 'pointer',
-  padding: '8px 12px',
-  backgroundColor: '#f8f8f8',
-  borderRadius: '2px',
-  display: 'flex',
-  alignItems: 'center'
-};
-
-const userNameStyle = { 
-  fontSize: '10px', 
-  color: '#333', 
-  fontWeight: 'bold',
-  pointerEvents: 'none'
-};
-
-const logoutBtnStyle = { 
-  background: 'none', 
-  border: '1px solid #000', 
-  padding: '6px 15px', 
-  fontSize: '10px', 
-  cursor: 'pointer', 
-  fontWeight: 'bold' 
-};
+const navContainer = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', alignItems: 'center', padding: '0 5%', height: '80px', backgroundColor: '#fff', borderBottom: '1px solid #e0e0e0', position: 'sticky', top: 0, zIndex: 1000 };
+const sideSection = { display: 'flex', justifyContent: 'flex-start' };
+const centerSection = { display: 'flex', justifyContent: 'center' };
+const rightSection = { display: 'flex', justifyContent: 'flex-end', gap: '25px', alignItems: 'center' };
+const logoLink = { fontSize: '24px', fontWeight: 'bold', letterSpacing: '6px', textDecoration: 'none', color: '#000' };
+const iconAction = { cursor: 'pointer', color: '#000' };
+const cartWrapper = { position: 'relative', cursor: 'pointer' };
+const badge = { position: 'absolute', top: '-10px', right: '-10px', backgroundColor: '#000', color: '#fff', fontSize: '10px', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold' };
+const searchPageOverlay = { position: 'fixed', top: 0, left: 0, width: '100%', height: '100vh', backgroundColor: '#fff', zIndex: 5000, display: 'flex', flexDirection: 'column' };
+const searchHeader = { padding: '30px 5%', display: 'flex', justifyContent: 'flex-end' };
+const searchContent = { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '60px', padding: '0 10%' };
+const largeSearchInput = { width: '100%', maxWidth: '800px', border: 'none', borderBottom: '2px solid #000', padding: '20px', fontSize: 'clamp(20px, 5vw, 32px)', textAlign: 'center', outline: 'none', letterSpacing: '2px', textTransform: 'uppercase' };
+const suggestionBox = { width: '100%', maxWidth: '800px', marginTop: '40px' };
+const suggestionItem = { display: 'flex', alignItems: 'center', gap: '20px', padding: '15px 0', borderBottom: '1px solid #f0f0f0', cursor: 'pointer' };
+const suggestionThumb = { width: '60px', height: '60px', objectFit: 'cover' };
+const suggestionName = { fontWeight: 'bold', fontSize: '13px', letterSpacing: '1px' };
+const suggestionPrice = { color: '#666', fontSize: '12px' };
+const statusText = { color: '#ccc', letterSpacing: '3px', fontSize: '12px', textAlign: 'center', marginTop: '50px' };
+const sidebarOverlay = { position: 'fixed', top: 0, left: 0, width: '100%', height: '100vh', zIndex: 2000, display: 'flex' };
+const sidebarContent = { width: '300px', backgroundColor: '#fff', height: '100%', padding: '40px', display: 'flex', flexDirection: 'column', zIndex: 2001 };
+const backdrop = { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(3px)' };
+const sidebarHeader = { marginBottom: '50px' };
+const navList = { listStyle: 'none', padding: 0, margin: 0 };
+const navItem = { display: 'block', textDecoration: 'none', color: '#000', fontSize: '14px', letterSpacing: '2px', padding: '15px 0', borderBottom: '1px solid #f9f9f9', fontWeight: 'bold' };
+const logoutButton = { ...navItem, background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' };
 
 export default Navbar;
