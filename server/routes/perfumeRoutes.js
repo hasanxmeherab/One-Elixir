@@ -2,15 +2,15 @@ const express = require('express');
 const router = express.Router();
 const Perfume = require('../models/Perfume');
 
-// --- UPDATED: GET all perfumes with Search Support ---
+// GET all perfumes with Search Support
 router.get('/', async (req, res) => {
     try {
-        const { search } = req.query; // Get the search term from URL
+        const { search } = req.query;
         let query = {};
 
-        // If a search term is provided, filter by name (case-insensitive)
+        // Case-insensitive search filter
         if (search && search.trim() !== "") {
-            query.name = { $regex: search, $options: 'i' }; 
+            query.name = { $regex: search.trim(), $options: 'i' }; 
         }
 
         const perfumes = await Perfume.find(query);
@@ -20,12 +20,13 @@ router.get('/', async (req, res) => {
     }
 });
 
-// RESTORE STOCK
+// RESTORE STOCK (Archive functionality)
 router.put('/restore-stock', async (req, res) => {
     try {
         const { id, quantity } = req.body;
         const perfume = await Perfume.findById(id);
         if (!perfume) return res.status(404).json({ message: "Perfume not found" });
+
         perfume.stock = (Number(perfume.stock) || 0) + Number(quantity);
         await perfume.save();
         res.json({ message: "Stock successfully restored", newStock: perfume.stock });
@@ -34,7 +35,7 @@ router.put('/restore-stock', async (req, res) => {
     }
 });
 
-// GET a single perfume by ID
+// GET single perfume by ID
 router.get('/:id', async (req, res) => {
     try {
         const perfume = await Perfume.findById(req.params.id);
@@ -67,7 +68,7 @@ router.post('/', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     try {
         await Perfume.findByIdAndDelete(req.params.id);
-        res.json({ message: "Product removed from collection" });
+        res.json({ message: "Product removed" });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -76,11 +77,7 @@ router.delete('/:id', async (req, res) => {
 // UPDATE a perfume
 router.put('/:id', async (req, res) => {
     try {
-        const updatedPerfume = await Perfume.findByIdAndUpdate(
-            req.params.id, 
-            req.body, 
-            { new: true }
-        );
+        const updatedPerfume = await Perfume.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.json(updatedPerfume);
     } catch (err) {
         res.status(400).json({ message: err.message });
