@@ -19,6 +19,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 // --- ADMIN PAGES ---
 import Admin from './pages/Admin';
+import AdminManagement from './pages/AdminManagement';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import InventoryManager from './pages/InventoryManager';
@@ -68,6 +69,7 @@ const AppContent = () => {
             <Route path="investment" element={<InvestmentTracker />} />
             <Route path="coupons" element={<CouponManagement />} />
             <Route path="banners" element={<BannerManagement isAdmin={true} />} />
+            <Route path="admins" element={<AdminManagement />} />
           </Route>
 
           <Route path="/admin-login" element={<AdminLogin />} />

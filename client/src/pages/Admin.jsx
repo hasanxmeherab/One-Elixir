@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Link, Outlet, useLocation } from 'react-router-dom'; // Added for routing
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'; // Added useNavigate
 import AdminNavbar from '../components/AdminNavbar';
 
 const Admin = () => {
   const [perfumes, setPerfumes] = useState([]);
   const [orders, setOrders] = useState([]);
   const [investments, setInvestments] = useState([]);
-  const location = useLocation(); // To track which link is active
+  const location = useLocation(); 
+  const navigate = useNavigate(); // Initialize navigate for logout
   
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -25,6 +26,14 @@ const Admin = () => {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  // --- NEW: LOGOUT LOGIC ---
+  const handleAdminLogout = () => {
+    localStorage.removeItem('isAdminAuthenticated');
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminData');
+    navigate('/admin-login');
+  };
 
   // Helper to check if a link is active for styling
   const isActive = (path) => location.pathname === path;
@@ -61,6 +70,10 @@ const Admin = () => {
           <Link to="/admin/investment" style={isActive('/admin/investment') ? activeBtn : menuBtn}>
             INVESTMENT
           </Link>
+
+          <Link to="/admin/admins" style={isActive('/admin/admins') ? activeBtn : menuBtn}>
+            ADMIN MANAGEMENT
+          </Link>
           
           <Link to="/admin/coupons" style={isActive('/admin/coupons') ? activeBtn : menuBtn}>
             COUPONS
@@ -69,11 +82,15 @@ const Admin = () => {
           <Link to="/admin/banners" style={isActive('/admin/banners') ? activeBtn : menuBtn}>
             BANNERS
           </Link>
+
+          {/* --- NEW: LOGOUT BUTTON AT BOTTOM --- */}
+          <button onClick={handleAdminLogout} style={logoutBtnStyle}>
+            LOGOUT SYSTEM
+          </button>
         </div>
 
         {/* DEDICATED PAGE CONTENT AREA */}
         <div style={{ flex: 1, padding: '40px', backgroundColor: '#fff' }}>
-          {/* This Outlet renders the specific component based on the URL */}
           <Outlet context={{ perfumes, orders, investments, fetchData }} />
         </div>
       </div>
@@ -121,6 +138,17 @@ const activeBtn = {
   backgroundColor: '#000', 
   color: '#fff', 
   borderRadius: '4px' 
+};
+
+// --- NEW: LOGOUT STYLE ---
+const logoutBtnStyle = {
+  ...menuBtn,
+  marginTop: 'auto', // Pushes button to the bottom
+  color: '#991b1b', // Dark red for danger/logout action
+  backgroundColor: '#fff',
+  border: '1px solid #fee2e2',
+  borderRadius: '4px',
+  textAlign: 'center'
 };
 
 export default Admin;

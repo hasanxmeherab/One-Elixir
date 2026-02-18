@@ -6,7 +6,6 @@ require('dotenv').config();
 
 const app = express();
 
-
 app.use(cors({
   origin: [
     "http://localhost:5173",          // Local development
@@ -25,6 +24,8 @@ app.use('/api/expenses', require('./routes/expenseRoutes'));
 app.use('/api/investments', require('./routes/investmentRoutes'));
 app.use('/api/banners', require('./routes/bannerRoutes'));
 app.use('/api/coupons', require('./routes/couponRoutes'));
+app.use('/api/admins', require('./routes/adminRoutes'));
+
 // Connect to MongoDB using env variable
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("OneElixir Database Connected"))

@@ -2,11 +2,12 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 
 const ProtectedRoute = ({ children }) => {
-  // Check if our "auth" flag exists in localStorage
+  // Check for both the flag and the JWT token
   const isAuthenticated = localStorage.getItem('isAdminAuthenticated') === 'true';
+  const hasToken = localStorage.getItem('adminToken');
 
-  if (!isAuthenticated) {
-    // Redirect to a simple login page if not authenticated
+  if (!isAuthenticated || !hasToken) {
+    // Redirect to the new admin login page
     return <Navigate to="/admin-login" replace />;
   }
 
