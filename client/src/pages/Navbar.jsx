@@ -29,11 +29,11 @@ const Navbar = ({ onCartClick }) => {
         <Link to="/" style={{ textDecoration: 'none', color: '#000' }} onClick={closeMenu}>ONEELIXIR</Link>
       </div>
 
-      {/* --- MOBILE HAMBURGER ICON --- */}
+      {/* --- MOBILE HAMBURGER ICON (Visible only on mobile) --- */}
       <div 
         style={hamburgerContainerStyle} 
         onClick={() => setIsMobileOpen(!isMobileOpen)}
-        className="mobile-only"
+        className="mobile-hamburger-btn"
       >
         <div style={barStyle}></div>
         <div style={barStyle}></div>
@@ -43,7 +43,7 @@ const Navbar = ({ onCartClick }) => {
       {/* --- NAVIGATION LINKS --- */}
       <div 
         style={isMobileOpen ? mobileLinkGroupStyle : linkGroupStyle} 
-        className={isMobileOpen ? "" : "desktop-only"}
+        className={isMobileOpen ? "mobile-menu-active" : "nav-links-desktop"}
       >
         {/* Close Button for Mobile Overlay */}
         {isMobileOpen && (
@@ -54,14 +54,14 @@ const Navbar = ({ onCartClick }) => {
           <Link to="/" style={linkStyle} onClick={closeMenu}>EXIT TO SHOP</Link>
         ) : (
           <>
-            <Link to="/shop" style={linkStyle} onClick={closeMenu}>SHOP</Link>
+            <Link to="/shop" style={linkStyle} onClick={closeMenu}>COLLECTION</Link>
             
             <div onClick={() => { onCartClick(); closeMenu(); }} style={{ ...linkStyle, cursor: 'pointer' }}>
               CART ({cart.reduce((a, b) => a + b.quantity, 0)})
             </div>
 
             {user ? (
-              <div style={authWrapperStyle}>
+              <div className="auth-flex" style={authWrapperStyle}>
                 <div 
                   onClick={() => { navigate('/account'); closeMenu(); }} 
                   style={accountWrapperStyle}
@@ -73,7 +73,7 @@ const Navbar = ({ onCartClick }) => {
                 <button onClick={handleLogout} style={logoutBtnStyle}>LOGOUT</button>
               </div>
             ) : (
-              <div style={authWrapperStyle}>
+              <div className="auth-flex" style={authWrapperStyle}>
                 <Link to="/signin" style={linkStyle} onClick={closeMenu}>SIGN IN</Link>
                 <Link to="/signup" style={linkStyle} onClick={closeMenu}>SIGN UP</Link>
               </div>
@@ -82,16 +82,28 @@ const Navbar = ({ onCartClick }) => {
         )}
       </div>
 
-      {/* RESPONSIVE CSS INJECTED GLOBALLY */}
+      {/* FIXES THE SQUASHED LAYOUT ON MOBILE */}
       <style>
         {`
           @media (max-width: 850px) {
-            .desktop-only { display: none !important; }
-            .mobile-only { display: flex !important; }
+            .nav-links-desktop { 
+              display: none !important; 
+            }
+            .mobile-hamburger-btn { 
+              display: flex !important; 
+            }
+            .auth-flex {
+              flex-direction: column;
+              width: 100%;
+            }
           }
           @media (min-width: 851px) {
-            .mobile-only { display: none !important; }
-            .desktop-only { display: flex !important; }
+            .mobile-hamburger-btn { 
+              display: none !important; 
+            }
+            .nav-links-desktop { 
+              display: flex !important; 
+            }
           }
         `}
       </style>
@@ -100,33 +112,31 @@ const Navbar = ({ onCartClick }) => {
 };
 
 // --- STYLES ---
-
 const navStyle = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
-  padding: '20px 5%',
+  padding: '15px 5%',
   borderBottom: '1px solid #eee',
   position: 'sticky',
   top: 0,
   backgroundColor: '#fff',
-  zIndex: 1000
+  zIndex: 1000,
+  minHeight: '70px'
 };
 
 const logoStyle = { 
-  fontSize: '22px', 
+  fontSize: '20px', 
   fontWeight: 'bold', 
-  letterSpacing: '4px' 
+  letterSpacing: '3px' 
 };
 
-// Desktop Link Container
 const linkGroupStyle = { 
   display: 'flex', 
-  gap: '30px', 
+  gap: '25px', 
   alignItems: 'center' 
 };
 
-// Mobile Link Container (Overlay)
 const mobileLinkGroupStyle = {
   position: 'fixed',
   top: 0,
@@ -138,34 +148,34 @@ const mobileLinkGroupStyle = {
   flexDirection: 'column',
   justifyContent: 'center',
   alignItems: 'center',
-  gap: '40px',
+  gap: '35px',
   zIndex: 2000,
 };
 
 const linkStyle = { 
   textDecoration: 'none', 
   color: '#000', 
-  fontSize: '13px', 
+  fontSize: '12px', 
   fontWeight: 'bold', 
-  letterSpacing: '2px' 
+  letterSpacing: '1.5px' 
 };
 
 const authWrapperStyle = {
   display: 'flex',
-  flexDirection: 'inherit', // Follows parent's direction (row on desktop, column on mobile)
   alignItems: 'center',
   gap: '20px'
 };
 
 const hamburgerContainerStyle = {
-  display: 'none', // Hidden by default, shown via Media Query
+  display: 'none', 
   flexDirection: 'column',
   gap: '5px',
-  cursor: 'pointer'
+  cursor: 'pointer',
+  padding: '10px'
 };
 
 const barStyle = {
-  width: '25px',
+  width: '22px',
   height: '2px',
   backgroundColor: '#000'
 };
@@ -173,26 +183,23 @@ const barStyle = {
 const closeBtnStyle = {
   position: 'absolute',
   top: '20px',
-  right: '30px',
-  fontSize: '40px',
-  cursor: 'pointer',
-  lineHeight: '1'
+  right: '25px',
+  fontSize: '35px',
+  cursor: 'pointer'
 };
 
 const accountWrapperStyle = {
   cursor: 'pointer',
-  padding: '10px 15px',
-  backgroundColor: '#f5f5f5',
+  padding: '8px 12px',
+  backgroundColor: '#f8f8f8',
   borderRadius: '2px',
   display: 'flex',
-  alignItems: 'center',
-  border: '1px solid transparent'
+  alignItems: 'center'
 };
 
 const userNameStyle = { 
-  fontSize: '11px', 
+  fontSize: '10px', 
   color: '#333', 
-  letterSpacing: '1px',
   fontWeight: 'bold',
   pointerEvents: 'none'
 };
@@ -200,11 +207,10 @@ const userNameStyle = {
 const logoutBtnStyle = { 
   background: 'none', 
   border: '1px solid #000', 
-  padding: '8px 20px', 
-  fontSize: '11px', 
+  padding: '6px 15px', 
+  fontSize: '10px', 
   cursor: 'pointer', 
-  fontWeight: 'bold',
-  letterSpacing: '1px'
+  fontWeight: 'bold' 
 };
 
 export default Navbar;
