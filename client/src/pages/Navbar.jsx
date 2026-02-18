@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useUser } from '../context/UserContext';
@@ -9,72 +9,103 @@ const Navbar = ({ onCartClick }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // STRICT CHECK: If the URL has 'admin', we hide customer features entirely
+  // State for mobile menu toggle
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
   const isCurrentlyAdmin = location.pathname.toLowerCase().includes('admin');
 
   const handleLogout = () => {
     logout();
+    setIsMobileOpen(false);
     alert("Logged out from OneElixir");
     navigate('/');
   };
 
+  const closeMenu = () => setIsMobileOpen(false);
+
   return (
     <nav style={navStyle}>
       <div style={logoStyle}>
-        <Link to="/" style={{ textDecoration: 'none', color: '#000' }}>ONEELIXIR</Link>
+        <Link to="/" style={{ textDecoration: 'none', color: '#000' }} onClick={closeMenu}>ONEELIXIR</Link>
       </div>
 
-      <div style={linkGroupStyle}>
-        {/* CASE 1: ADMIN VIEW */}
+      {/* --- MOBILE HAMBURGER ICON --- */}
+      <div 
+        style={hamburgerContainerStyle} 
+        onClick={() => setIsMobileOpen(!isMobileOpen)}
+        className="mobile-only"
+      >
+        <div style={barStyle}></div>
+        <div style={barStyle}></div>
+        <div style={barStyle}></div>
+      </div>
+
+      {/* --- NAVIGATION LINKS --- */}
+      <div 
+        style={isMobileOpen ? mobileLinkGroupStyle : linkGroupStyle} 
+        className={isMobileOpen ? "" : "desktop-only"}
+      >
+        {/* Close Button for Mobile Overlay */}
+        {isMobileOpen && (
+          <div style={closeBtnStyle} onClick={closeMenu}>×</div>
+        )}
+
         {isCurrentlyAdmin ? (
-          <>
-            <Link to="/" style={linkStyle}>EXIT TO SHOP</Link>
-          </>
+          <Link to="/" style={linkStyle} onClick={closeMenu}>EXIT TO SHOP</Link>
         ) : (
-          /* CASE 2: CUSTOMER VIEW */
           <>
-            <Link to="/shop" style={linkStyle}>SHOP</Link>
+            <Link to="/shop" style={linkStyle} onClick={closeMenu}>SHOP</Link>
             
-            {/* Cart Trigger */}
-            <div onClick={onCartClick} style={{ ...linkStyle, cursor: 'pointer' }}>
+            <div onClick={() => { onCartClick(); closeMenu(); }} style={{ ...linkStyle, cursor: 'pointer' }}>
               CART ({cart.reduce((a, b) => a + b.quantity, 0)})
             </div>
 
-            {/* --- CUSTOMER AUTH LOGIC --- */}
             {user ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                
-                {/* 1. Clickable wrapper that manually triggers navigation */}
+              <div style={authWrapperStyle}>
                 <div 
-                  onClick={() => navigate('/account')} 
+                  onClick={() => { navigate('/account'); closeMenu(); }} 
                   style={accountWrapperStyle}
                 >
                   <span style={userNameStyle}>
                     HELLO, {user.name.toUpperCase()}
                   </span>
                 </div>
-
                 <button onClick={handleLogout} style={logoutBtnStyle}>LOGOUT</button>
               </div>
             ) : (
-              <div style={{ display: 'flex', gap: '20px' }}>
-                <Link to="/signin" style={linkStyle}>SIGN IN</Link>
-                <Link to="/signup" style={linkStyle}>SIGN UP</Link>
+              <div style={authWrapperStyle}>
+                <Link to="/signin" style={linkStyle} onClick={closeMenu}>SIGN IN</Link>
+                <Link to="/signup" style={linkStyle} onClick={closeMenu}>SIGN UP</Link>
               </div>
             )}
           </>
         )}
       </div>
+
+      {/* RESPONSIVE CSS INJECTED GLOBALLY */}
+      <style>
+        {`
+          @media (max-width: 850px) {
+            .desktop-only { display: none !important; }
+            .mobile-only { display: flex !important; }
+          }
+          @media (min-width: 851px) {
+            .mobile-only { display: none !important; }
+            .desktop-only { display: flex !important; }
+          }
+        `}
+      </style>
     </nav>
   );
 };
 
-// --- Styles maintained and optimized for clickability ---
+// --- STYLES ---
+
 const navStyle = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
-  padding: '20px 10%',
+  padding: '20px 5%',
   borderBottom: '1px solid #eee',
   position: 'sticky',
   top: 0,
@@ -83,33 +114,78 @@ const navStyle = {
 };
 
 const logoStyle = { 
-  fontSize: '24px', 
+  fontSize: '22px', 
   fontWeight: 'bold', 
   letterSpacing: '4px' 
 };
 
+// Desktop Link Container
 const linkGroupStyle = { 
   display: 'flex', 
   gap: '30px', 
   alignItems: 'center' 
 };
 
+// Mobile Link Container (Overlay)
+const mobileLinkGroupStyle = {
+  position: 'fixed',
+  top: 0,
+  right: 0,
+  width: '100%',
+  height: '100vh',
+  backgroundColor: '#fff',
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+  alignItems: 'center',
+  gap: '40px',
+  zIndex: 2000,
+};
+
 const linkStyle = { 
   textDecoration: 'none', 
   color: '#000', 
-  fontSize: '12px', 
+  fontSize: '13px', 
   fontWeight: 'bold', 
-  letterSpacing: '1px' 
+  letterSpacing: '2px' 
+};
+
+const authWrapperStyle = {
+  display: 'flex',
+  flexDirection: 'inherit', // Follows parent's direction (row on desktop, column on mobile)
+  alignItems: 'center',
+  gap: '20px'
+};
+
+const hamburgerContainerStyle = {
+  display: 'none', // Hidden by default, shown via Media Query
+  flexDirection: 'column',
+  gap: '5px',
+  cursor: 'pointer'
+};
+
+const barStyle = {
+  width: '25px',
+  height: '2px',
+  backgroundColor: '#000'
+};
+
+const closeBtnStyle = {
+  position: 'absolute',
+  top: '20px',
+  right: '30px',
+  fontSize: '40px',
+  cursor: 'pointer',
+  lineHeight: '1'
 };
 
 const accountWrapperStyle = {
   cursor: 'pointer',
-  padding: '8px 12px',
-  backgroundColor: '#f5f5f5', // Subtle background to confirm hit area
+  padding: '10px 15px',
+  backgroundColor: '#f5f5f5',
   borderRadius: '2px',
   display: 'flex',
   alignItems: 'center',
-  transition: 'background 0.2s',
   border: '1px solid transparent'
 };
 
@@ -118,16 +194,17 @@ const userNameStyle = {
   color: '#333', 
   letterSpacing: '1px',
   fontWeight: 'bold',
-  pointerEvents: 'none' // Ensures click registers on the wrapper
+  pointerEvents: 'none'
 };
 
 const logoutBtnStyle = { 
   background: 'none', 
   border: '1px solid #000', 
-  padding: '5px 12px', 
+  padding: '8px 20px', 
   fontSize: '11px', 
   cursor: 'pointer', 
-  fontWeight: 'bold' 
+  fontWeight: 'bold',
+  letterSpacing: '1px'
 };
 
 export default Navbar;
