@@ -6,6 +6,9 @@ const ExpenseManagement = () => {
   const [formData, setFormData] = useState({
     title: '',
     amount: '',
+    quantity: '', 
+    unitPrice: '', 
+    unit: 'pcs', // NEW: Default unit
     category: 'Packaging',
     date: new Date().toISOString().split('T')[0]
   });
@@ -33,11 +36,27 @@ const ExpenseManagement = () => {
 
   useEffect(() => { fetchExpenses(); }, []);
 
+  const handlePriceChange = (field, val) => {
+    const updatedForm = { ...formData, [field]: val };
+    if (updatedForm.quantity && updatedForm.unitPrice) {
+      updatedForm.amount = Number(updatedForm.quantity) * Number(updatedForm.unitPrice);
+    }
+    setFormData(updatedForm);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       await axios.post(`${API_URL}/api/expenses`, formData);
-      setFormData({ title: '', amount: '', category: 'Packaging', date: new Date().toISOString().split('T')[0] });
+      setFormData({ 
+        title: '', 
+        amount: '', 
+        quantity: '', 
+        unitPrice: '', 
+        unit: 'pcs',
+        category: 'Packaging', 
+        date: new Date().toISOString().split('T')[0] 
+      });
       fetchExpenses();
       alert("Expense logged!");
     } catch (err) {
@@ -56,7 +75,7 @@ const ExpenseManagement = () => {
     <div>
       <h3 style={{ letterSpacing: '3px', marginBottom: '30px', fontWeight: 'bold' }}>EXPENSE MANAGEMENT</h3>
 
-      {/* Expense Summary Boxes */}
+      {/* Summary Boxes */}
       <div style={statsGrid}>
         <div style={statCard}>
           <span style={label}>THIS MONTH'S SPEND</span>
@@ -71,11 +90,9 @@ const ExpenseManagement = () => {
       {/* Log Form */}
       <form onSubmit={handleSubmit} style={formStyle}>
         <p style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '15px', letterSpacing: '1px' }}>LOG NEW EXPENDITURE</p>
+        
         <div style={row}>
-          <input type="text" placeholder="Description (e.g. Alcohol 5L)" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required style={inputStyle}/>
-          <input type="number" placeholder="Amount (TK)" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} required style={inputStyle}/>
-        </div>
-        <div style={row}>
+          <input type="text" placeholder="Description" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required style={{...inputStyle, flex: 2}}/>
           <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} style={inputStyle}>
             <option value="Packaging">Packaging (Bottles/Boxes)</option>
             <option value="Ingredients">Ingredients (Oil/Alcohol)</option>
@@ -83,8 +100,26 @@ const ExpenseManagement = () => {
             <option value="Tools">Tools/Equipment</option>
             <option value="Other">Other</option>
           </select>
+        </div>
+
+        <div style={row}>
+          <div style={{ display: 'flex', flex: 1.5, gap: '5px' }}>
+            <input type="number" placeholder="Qty" value={formData.quantity} onChange={e => handlePriceChange('quantity', e.target.value)} style={inputStyle} />
+            {/* NEW: Unit Selector */}
+            <select value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} style={{...inputStyle, flex: '0 0 80px'}}>
+              <option value="pcs">pcs</option>
+              <option value="ml">ml</option>
+              <option value="ltr">ltr</option>
+              <option value="kg">kg</option>
+              <option value="gm">gm</option>
+              <option value="pkt">pkt</option>
+            </select>
+          </div>
+          <input type="number" placeholder="Unit Price" value={formData.unitPrice} onChange={e => handlePriceChange('unitPrice', e.target.value)} style={inputStyle} />
+          <input type="number" placeholder="Total (TK)" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} required style={{...inputStyle, backgroundColor: '#f9f9f9'}} />
           <input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} style={inputStyle}/>
         </div>
+
         <button type="submit" style={btnStyle}>SAVE EXPENSE</button>
       </form>
 
@@ -95,7 +130,8 @@ const ExpenseManagement = () => {
             <th style={thStyle}>DATE</th>
             <th style={thStyle}>TITLE</th>
             <th style={thStyle}>CATEGORY</th>
-            <th style={thStyle}>AMOUNT</th>
+            <th style={thStyle}>DETAILS (QTY x PRICE)</th>
+            <th style={thStyle}>TOTAL</th>
             <th style={thStyle}>ACTION</th>
           </tr>
         </thead>
@@ -105,6 +141,14 @@ const ExpenseManagement = () => {
               <td style={tdStyle}>{new Date(exp.date).toLocaleDateString()}</td>
               <td style={tdStyle}>{exp.title}</td>
               <td style={tdStyle}>{exp.category}</td>
+              <td style={{ ...tdStyle, color: '#666' }}>
+                {/* --- UPDATED DISPLAY LOGIC --- */}
+                {exp.quantity && exp.unitPrice ? (
+                  <span>{exp.quantity} {exp.unit || 'pcs'} x {Number(exp.unitPrice).toLocaleString()} TK</span>
+                ) : (
+                  <span style={{ color: '#ccc' }}>—</span>
+                )}
+              </td>
               <td style={{ ...tdStyle, fontWeight: 'bold' }}>{Number(exp.amount).toLocaleString()} TK</td>
               <td style={tdStyle}>
                 <button onClick={() => deleteExpense(exp._id)} style={deleteBtn}>REMOVE</button>
@@ -117,7 +161,7 @@ const ExpenseManagement = () => {
   );
 };
 
-// --- Styles ---
+// --- Styles (Unchanged) ---
 const statsGrid = { display: 'flex', gap: '20px', marginBottom: '40px' };
 const statCard = { flex: 1, padding: '25px', backgroundColor: '#fff', border: '1px solid #eee', borderLeft: '5px solid #000' };
 const label = { display: 'block', fontSize: '10px', color: '#888', fontWeight: 'bold', letterSpacing: '2px', marginBottom: '10px' };
