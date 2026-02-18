@@ -9,17 +9,20 @@ const orderSchema = new mongoose.Schema({
     {
       perfumeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Perfume' },
       name: String,
-      price: Number, // Original Price
+      price: Number, 
       quantity: { type: Number, default: 1 },
-      // NEW: Individual Item Discount Tracking
       discountType: { type: String, enum: ['fixed', 'percentage', 'none'], default: 'none' },
       discountValue: { type: Number, default: 0 },
-      finalItemPrice: { type: Number } // Price after manual item discount
+      finalItemPrice: { type: Number } 
     }
   ],
   totalAmount: { type: Number, required: true },
-  discountApplied: { type: Number, default: 0 }, // Coupon discount
+  discountApplied: { type: Number, default: 0 }, 
   status: { type: String, default: 'Pending' },
+  // --- NEW FIELDS ---
+  paymentMethod: { type: String, default: 'Cash on Delivery' }, 
+  paymentStatus: { type: String, default: 'Unpaid' }, 
+  // ------------------
   isManual: { type: Boolean, default: false }, 
   createdAt: { type: Date, default: Date.now }
 });

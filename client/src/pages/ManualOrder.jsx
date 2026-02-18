@@ -7,6 +7,11 @@ const ManualOrder = () => {
   const { perfumes = [], fetchData } = useOutletContext();
 
   const [orderData, setOrderData] = useState({ customerName: '', phone: '', address: '' });
+  
+  // --- NEW: PAYMENT STATES ---
+  const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery');
+  const [paymentStatus, setPaymentStatus] = useState('Unpaid');
+
   const [selectedItems, setSelectedItems] = useState([{ 
     perfumeId: '', 
     quantity: 1, 
@@ -105,11 +110,15 @@ const ManualOrder = () => {
     }
 
     try {
+      // --- UPDATED: Payload now includes payment details ---
       await axios.post(`${API_URL}/api/orders/manual`, { 
         ...orderData, 
         items: itemsToOrder, 
         totalAmount: grandTotal,
-        discountApplied: couponDiscount 
+        discountApplied: couponDiscount,
+        paymentMethod,
+        paymentStatus,
+        isManual: true
       });
       
       for (const item of itemsToOrder) {
@@ -121,6 +130,8 @@ const ManualOrder = () => {
       setSelectedItems([{ perfumeId: '', quantity: 1, discountType: 'none', discountValue: 0 }]);
       setCouponDiscount(0);
       setCouponCode('');
+      setPaymentMethod('Cash on Delivery');
+      setPaymentStatus('Unpaid');
       fetchData();
       alert("Manual Order Recorded Successfully!");
     } catch (err) {
@@ -197,6 +208,29 @@ const ManualOrder = () => {
         <button type="button" onClick={addMoreItems} style={addBtn}>+ ADD ANOTHER ITEM</button>
         <input type="text" placeholder="Shipping Address" value={orderData.address} onChange={e => setOrderData({...orderData, address: e.target.value})} required style={{...inputStyle, marginTop: '10px'}}/>
 
+        {/* --- NEW: PAYMENT SECTION --- */}
+        <p style={labelStyle}>PAYMENT DETAILS</p>
+        <div style={row}>
+           <select 
+            value={paymentMethod} 
+            onChange={e => setPaymentMethod(e.target.value)} 
+            style={inputStyle}
+           >
+             <option value="Cash on Delivery">Cash on Delivery</option>
+             <option value="Bkash">Bkash</option>
+             <option value="Nagad">Nagad</option>
+             <option value="Bank Transfer">Bank Transfer</option>
+           </select>
+           <select 
+            value={paymentStatus} 
+            onChange={e => setPaymentStatus(e.target.value)} 
+            style={{...inputStyle, backgroundColor: paymentStatus === 'Paid' ? '#d1fae5' : '#fee2e2'}}
+           >
+             <option value="Unpaid">Unpaid</option>
+             <option value="Paid">Paid</option>
+           </select>
+        </div>
+
         <p style={labelStyle}>APPLY COUPON (OPTIONAL)</p>
         <div style={row}>
            <input type="text" placeholder="COUPON CODE" value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase())} style={inputStyle}/>
@@ -219,7 +253,7 @@ const ManualOrder = () => {
   );
 };
 
-// Styles maintained
+// Styles maintained from existing
 const containerStyle = { maxWidth: '800px' };
 const formStyle = { display: 'flex', flexDirection: 'column', gap: '15px', backgroundColor: '#fcfcfc', padding: '30px', border: '1px solid #eee' };
 const row = { display: 'flex', gap: '10px' };
