@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const Order = require('../models/Order');
 const Perfume = require('../models/Perfume');
+const { Resend } = require('resend'); // Import Resend
+
+// Initialize Resend with your API Key
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // 1. GET customer history (Web orders only, Case-Insensitive)
 router.get('/customer/:email', async (req, res) => {
@@ -26,11 +30,45 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 3. POST standard website order
+// 3. POST standard website order (UPDATED WITH EMAIL NOTIFICATION)
 router.post('/', async (req, res) => {
   const order = new Order(req.body); 
   try {
     const newOrder = await order.save();
+
+    // --- NEW: SEND ORDER CONFIRMATION EMAIL ---
+    if (newOrder.customerEmail) {
+      try {
+        await resend.emails.send({
+          from: 'OneElixir <onboarding@resend.dev>', // Update to your domain once verified
+          to: newOrder.customerEmail,
+          subject: `Order Confirmed - #${newOrder._id.toString().slice(-6).toUpperCase()}`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px;">
+              <h2 style="text-align: center; letter-spacing: 2px;">ONEELIXIR</h2>
+              <p>Hi ${newOrder.customerName},</p>
+              <p>Your order has been placed successfully! We are getting your fragrances ready for shipment.</p>
+              <hr />
+              <h4>Order Summary:</h4>
+              <p><strong>Order ID:</strong> #${newOrder._id}</p>
+              <ul>
+                ${newOrder.items.map(item => `
+                  <li>${item.quantity}x ${item.name} - ${item.price} TK</li>
+                `).join('')}
+              </ul>
+              <p><strong>Total Amount:</strong> ${newOrder.totalAmount} TK</p>
+              <p><strong>Shipping Address:</strong> ${newOrder.address}</p>
+              <hr />
+              <p style="font-size: 12px; color: #888;">If you have any questions, contact us at +880 1690-272870.</p>
+            </div>
+          `
+        });
+      } catch (emailErr) {
+        console.error("Email failed to send, but order was saved:", emailErr);
+        // We don't block the response if only the email fails
+      }
+    }
+
     res.status(201).json(newOrder);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -88,12 +126,11 @@ router.put('/:id', async (req, res) => {
     }
 
     // SCENARIO B: Moving AWAY FROM 'Delivered' (Add back to stock)
-    // Runs if admin reverts a Delivered order to Pending, Shipped, or Cancelled
     else if (oldStatus === 'delivered' && newStatus !== 'delivered') {
       const updatePromises = order.items.map(item => 
         Perfume.findByIdAndUpdate(
           item.perfumeId, 
-          { $inc: { stock: item.quantity } } // Incrementing quantity back
+          { $inc: { stock: item.quantity } }
         )
       );
       await Promise.all(updatePromises);
