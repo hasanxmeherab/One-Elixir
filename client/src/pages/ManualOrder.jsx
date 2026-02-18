@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import axios from 'axios';
-import { useOutletContext } from 'react-router-dom'; // Added for nested routing
+import { useOutletContext } from 'react-router-dom'; 
+import Select from 'react-select'; 
+import locationData from '../data/locationData.json'; 
 
 const ManualOrder = () => {
-  // --- REPLACED PROPS WITH OUTLET CONTEXT ---
   const { perfumes = [], fetchData } = useOutletContext();
 
   const [orderData, setOrderData] = useState({ customerName: '', phone: '', address: '' });
   
-  // --- NEW: PAYMENT STATES ---
+  const [division, setDivision] = useState(null);
+  const [district, setDistrict] = useState(null);
+
   const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery');
   const [paymentStatus, setPaymentStatus] = useState('Unpaid');
 
@@ -25,7 +28,12 @@ const ManualOrder = () => {
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-  // --- SAFETY CHECK ---
+  const shippingCost = useMemo(() => {
+    if (!district) return 0;
+    // Dhaka District = 80 TK, Others = 120 TK
+    return district.value === 'Dhaka' ? 80 : 120;
+  }, [district]);
+
   if (!perfumes || perfumes.length === 0) {
     return <div style={{ padding: '40px', textAlign: 'center' }}>Loading Perfume Data...</div>;
   }
@@ -47,7 +55,7 @@ const ManualOrder = () => {
   };
 
   const subtotal = calculateSubtotal();
-  const grandTotal = subtotal - couponDiscount;
+  const grandTotal = subtotal - couponDiscount + shippingCost;
 
   const handleApplyCoupon = async () => {
     if (!couponCode) return;
@@ -84,9 +92,13 @@ const ManualOrder = () => {
 
   const handleOrderSubmit = async (e) => {
     e.preventDefault();
-    const itemsToOrder = [];
 
-    // --- NEW: GET ADMIN NAME FROM LOCALSTORAGE ---
+    if (!division || !district) {
+        alert("Please select Division and District.");
+        return;
+    }
+
+    const itemsToOrder = [];
     const adminDataString = localStorage.getItem('adminData');
     const adminData = adminDataString ? JSON.parse(adminDataString) : null;
     const adminName = adminData ? adminData.name : "System Admin";
@@ -115,16 +127,17 @@ const ManualOrder = () => {
     }
 
     try {
-      // --- UPDATED: Payload now includes payment details AND createdBy ---
       await axios.post(`${API_URL}/api/orders/manual`, { 
         ...orderData, 
+        address: `${orderData.address}, ${district.label}, ${division.label}`,
         items: itemsToOrder, 
         totalAmount: grandTotal,
+        shippingCost: shippingCost, 
         discountApplied: couponDiscount,
         paymentMethod,
         paymentStatus,
         isManual: true,
-        createdBy: adminName // NEW TRACKING FIELD
+        createdBy: adminName 
       });
       
       for (const item of itemsToOrder) {
@@ -133,6 +146,8 @@ const ManualOrder = () => {
       }
       
       setOrderData({ customerName: '', phone: '', address: '' });
+      setDivision(null);
+      setDistrict(null);
       setSelectedItems([{ perfumeId: '', quantity: 1, discountType: 'none', discountValue: 0 }]);
       setCouponDiscount(0);
       setCouponCode('');
@@ -145,26 +160,37 @@ const ManualOrder = () => {
     }
   };
 
+  const customSelectStyles = {
+    control: (provided) => ({
+      ...provided,
+      padding: '5px',
+      border: '1px solid #ddd',
+      borderRadius: '0',
+      fontSize: '13px',
+      boxShadow: 'none',
+      '&:hover': { border: '1px solid #000' }
+    })
+  };
+
   return (
     <div style={containerStyle}>
       <h3 style={{ letterSpacing: '2px', marginBottom: '30px' }}>CREATE MANUAL ORDER</h3>
       
       <form onSubmit={handleOrderSubmit} style={formStyle}>
+        {/* CUSTOMER INFO */}
         <div style={row}>
           <input type="text" placeholder="Customer Name" value={orderData.customerName} onChange={e => setOrderData({...orderData, customerName: e.target.value})} required style={inputStyle}/>
           <input type="text" placeholder="Phone Number" value={orderData.phone} onChange={e => setOrderData({...orderData, phone: e.target.value})} required style={inputStyle}/>
         </div>
 
+        {/* PERFUME SELECTION SECTION */}
         <p style={labelStyle}>SELECT ITEMS & DISCOUNTS</p>
         {selectedItems.map((item, index) => {
           const currentPerfume = perfumes.find(p => p._id === item.perfumeId);
-          
           let linePrice = currentPerfume ? currentPerfume.price : 0;
           if (item.discountType === 'percentage') linePrice -= (linePrice * item.discountValue) / 100;
           else if (item.discountType === 'fixed') linePrice -= item.discountValue;
-          
           const lineTotal = linePrice * item.quantity;
-          
           const otherSelectedIds = selectedItems.filter((_, i) => i !== index).map(si => si.perfumeId);
 
           return (
@@ -210,28 +236,43 @@ const ManualOrder = () => {
             </div>
           );
         })}
-
         <button type="button" onClick={addMoreItems} style={addBtn}>+ ADD ANOTHER ITEM</button>
-        <input type="text" placeholder="Shipping Address" value={orderData.address} onChange={e => setOrderData({...orderData, address: e.target.value})} required style={{...inputStyle, marginTop: '10px'}}/>
 
-        {/* --- NEW: PAYMENT SECTION --- */}
+        {/* --- LOCATION PART PLACED AFTER PERFUME SECTION --- */}
+        <p style={labelStyle}>SHIPPING LOCATION</p>
+        <div style={row}>
+           <div style={{ flex: 1 }}>
+              <Select 
+                options={locationData.divisions}
+                styles={customSelectStyles}
+                placeholder="Select Division"
+                value={division}
+                onChange={(opt) => { setDivision(opt); setDistrict(null); }}
+              />
+           </div>
+           <div style={{ flex: 1 }}>
+              <Select 
+                options={division ? locationData.districtsByDivision[division.value] : []}
+                styles={customSelectStyles}
+                placeholder="Select District"
+                isDisabled={!division}
+                value={district}
+                onChange={(opt) => setDistrict(opt)}
+              />
+           </div>
+        </div>
+        <input type="text" placeholder="House Number, Road, Area Details" value={orderData.address} onChange={e => setOrderData({...orderData, address: e.target.value})} required style={{...inputStyle, marginTop: '10px'}}/>
+
+        {/* PAYMENT & COUPON */}
         <p style={labelStyle}>PAYMENT DETAILS</p>
         <div style={row}>
-           <select 
-            value={paymentMethod} 
-            onChange={e => setPaymentMethod(e.target.value)} 
-            style={inputStyle}
-           >
+           <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} style={inputStyle}>
              <option value="Cash on Delivery">Cash on Delivery</option>
              <option value="Bkash">Bkash</option>
              <option value="Nagad">Nagad</option>
              <option value="Bank Transfer">Bank Transfer</option>
            </select>
-           <select 
-            value={paymentStatus} 
-            onChange={e => setPaymentStatus(e.target.value)} 
-            style={{...inputStyle, backgroundColor: paymentStatus === 'Paid' ? '#d1fae5' : '#fee2e2'}}
-           >
+           <select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)} style={{...inputStyle, backgroundColor: paymentStatus === 'Paid' ? '#d1fae5' : '#fee2e2'}}>
              <option value="Unpaid">Unpaid</option>
              <option value="Paid">Paid</option>
            </select>
@@ -245,10 +286,12 @@ const ManualOrder = () => {
            </button>
         </div>
 
+        {/* SUMMARY BAR */}
         <div style={totalBar}>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '10px', opacity: 0.7 }}>AFTER ITEM DISCOUNTS: {subtotal.toLocaleString()} TK</span>
+            <span style={{ fontSize: '10px', opacity: 0.7 }}>SUBTOTAL: {subtotal.toLocaleString()} TK</span>
             {couponDiscount > 0 && <span style={{ fontSize: '10px', color: '#ff4d4d' }}>COUPON: -{couponDiscount.toLocaleString()} TK</span>}
+            <span style={{ fontSize: '10px', opacity: 0.9 }}>SHIPPING ({district ? district.label : 'Select District'}): +{shippingCost.toLocaleString()} TK</span>
             <span style={{ fontSize: '12px', letterSpacing: '2px', marginTop: '5px' }}>GRAND TOTAL</span>
           </div>
           <span style={{ fontSize: '20px', fontWeight: 'bold' }}>{grandTotal.toLocaleString()} TK</span>
@@ -259,7 +302,6 @@ const ManualOrder = () => {
   );
 };
 
-// Styles maintained from existing
 const containerStyle = { maxWidth: '800px' };
 const formStyle = { display: 'flex', flexDirection: 'column', gap: '15px', backgroundColor: '#fcfcfc', padding: '30px', border: '1px solid #eee' };
 const row = { display: 'flex', gap: '10px' };

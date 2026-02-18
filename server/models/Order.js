@@ -17,12 +17,11 @@ const orderSchema = new mongoose.Schema({
     }
   ],
   totalAmount: { type: Number, required: true },
+  shippingCost: { type: Number, default: 0 }, // NEW: Field to store delivery charge
   discountApplied: { type: Number, default: 0 }, 
   status: { type: String, default: 'Pending' },
-  // --- NEW FIELDS ---
   paymentMethod: { type: String, default: 'Cash on Delivery' }, 
   paymentStatus: { type: String, default: 'Unpaid' }, 
-  // ------------------
   isManual: { type: Boolean, default: false },
   createdBy: { type: String }, 
   createdAt: { type: Date, default: Date.now }

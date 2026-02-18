@@ -54,9 +54,10 @@ const OrderList = () => {
 
       doc.text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`, 140, 59);
       doc.text(`Order ID: #${order._id.slice(-6).toUpperCase()}`, 140, 65);
-      doc.text(`Payment: ${order.paymentMethod} (${order.paymentStatus})`, 20, 77);
       
-      // NEW: Show Admin Name on Receipt
+      // MODIFIED: Removed Payment Status from the PDF line
+      doc.text(`Payment Method: ${order.paymentMethod}`, 20, 77);
+      
       if (order.createdBy) {
         doc.text(`Processed By: ${order.createdBy}`, 20, 83);
       }
@@ -90,7 +91,14 @@ const OrderList = () => {
       doc.text(`${subtotal.toLocaleString()} TK`, 190, finalY, { align: "right" });
 
       let currentY = finalY + 8;
-      const totalSavings = subtotal - order.totalAmount;
+
+      if (order.shippingCost > 0) {
+        doc.text("Shipping Fee:", 135, currentY);
+        doc.text(`${order.shippingCost.toLocaleString()} TK`, 190, currentY, { align: "right" });
+        currentY += 8;
+      }
+
+      const totalSavings = subtotal - (order.totalAmount - (order.shippingCost || 0));
       if (totalSavings > 0) {
         doc.setTextColor(200, 0, 0);
         doc.text("Total Discount:", 135, currentY);
@@ -146,14 +154,15 @@ const OrderList = () => {
           <tr style={headerStyle}>
             <th>DATE</th>
             <th>CUSTOMER</th>
+            <th>ADDRESS & DISTRICT</th>
             <th>ITEMS</th>
+            <th>SHIPPING</th>
             <th>TOTAL</th>
-            <th>PAYMENT METHOD</th>
             <th>PAYMENT</th>
-            <th>CREATED BY</th> {/* NEW */}
-            <th>ORDER STATUS</th>
+            <th>CREATED BY</th>
+            <th>STATUS</th>
             <th>ACTIONS</th>
-            <th>RECEIPT</th>
+            <th>PDF</th>
           </tr>
         </thead>
         <tbody>
@@ -164,14 +173,26 @@ const OrderList = () => {
                 <div style={{ fontWeight: 'bold' }}>{order.customerName}</div>
                 <div style={{ fontSize: '11px', color: '#666' }}>{order.phone}</div>
               </td>
+              <td style={{ maxWidth: '200px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 'bold' }}>
+                  {order.address.split(',').slice(-2).join(',')}
+                </div>
+                <div style={{ fontSize: '11px', color: '#777' }}>
+                  {order.address.split(',').slice(0, -2).join(',')}
+                </div>
+              </td>
               <td>
                 <div style={{ fontSize: '11px' }}>
                   {order.items.map((item, i) => <div key={i}>{item.quantity}x {item.name}</div>)}
                 </div>
               </td>
+              <td style={{ fontSize: '12px' }}>
+                {/* Ensure shippingCost is showing correctly */}
+                {order.shippingCost ? `${order.shippingCost} TK` : '0 TK'}
+              </td>
               <td style={{ fontWeight: 'bold' }}>{order.totalAmount.toLocaleString()} TK</td>
-              <td style={{ fontSize: '11px' }}>{order.paymentMethod || 'COD'}</td>
               <td>
+                <div style={{ fontSize: '10px', marginBottom: '3px' }}>{order.paymentMethod}</div>
                 <select 
                   value={order.paymentStatus || 'Unpaid'} 
                   onChange={(e) => updatePaymentStatus(order._id, e.target.value)}
@@ -181,7 +202,6 @@ const OrderList = () => {
                   <option value="Paid">Paid</option>
                 </select>
               </td>
-              {/* NEW: CREATED BY CELL */}
               <td style={{ fontSize: '11px', color: '#666' }}>
                 {order.createdBy || 'Customer'}
               </td>
@@ -198,10 +218,10 @@ const OrderList = () => {
                   <button onClick={() => updateStatus(order._id, 'Pending')} style={restoreBtn}>RESTORE</button>
                 )}
               </td>
-              <td><button onClick={() => downloadReceipt(order)} style={downloadBtn}>PDF 📄</button></td>
+              <td><button onClick={() => downloadReceipt(order)} style={downloadBtn}>📄</button></td>
             </tr>
           )) : (
-            <tr><td colSpan="10" style={{ textAlign: 'center', padding: '50px', color: '#999' }}>No orders found.</td></tr>
+            <tr><td colSpan="11" style={{ textAlign: 'center', padding: '50px', color: '#999' }}>No orders found.</td></tr>
           )}
         </tbody>
       </table>
@@ -209,19 +229,19 @@ const OrderList = () => {
   );
 };
 
-// Styles maintained
+// ... existing styles ...
 const containerStyle = { width: '100%' };
 const headerRow = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' };
-const searchStyle = { padding: '8px 12px', border: '1px solid #ddd', fontSize: '12px', width: '180px', outline: 'none' };
+const searchStyle = { padding: '8px 12px', border: '1px solid #ddd', fontSize: '12px', width: '150px', outline: 'none' };
 const filterDropdownStyle = { padding: '8px', border: '1px solid #ddd', fontSize: '11px', outline: 'none', cursor: 'pointer', fontWeight: 'bold' };
-const tableStyle = { width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' };
+const tableStyle = { width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' };
 const headerStyle = { borderBottom: '2px solid #000', padding: '10px' };
 const rowStyle = { borderBottom: '1px solid #eee' };
-const selectStyle = { padding: '5px', fontSize: '11px', border: '1px solid #ddd' };
-const toggleBtn = { backgroundColor: '#f0f0f0', border: '1px solid #ddd', padding: '8px 15px', cursor: 'pointer', fontSize: '10px', fontWeight: 'bold', letterSpacing: '1px' };
+const selectStyle = { padding: '5px', fontSize: '10px', border: '1px solid #ddd' };
+const toggleBtn = { backgroundColor: '#f0f0f0', border: '1px solid #ddd', padding: '8px 12px', cursor: 'pointer', fontSize: '10px', fontWeight: 'bold', letterSpacing: '1px' };
 const activeToggleBtn = { ...toggleBtn, backgroundColor: '#000', color: '#fff' };
 const restoreBtn = { backgroundColor: '#222', color: '#fff', border: 'none', padding: '5px 12px', cursor: 'pointer', fontSize: '10px' };
-const downloadBtn = { backgroundColor: '#fff', border: '1px solid #000', padding: '5px 10px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' };
+const downloadBtn = { backgroundColor: '#fff', border: '1px solid #000', padding: '5px 8px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' };
 
 const paymentSelectStyle = (status) => ({
   padding: '4px',
