@@ -86,6 +86,11 @@ const ManualOrder = () => {
     e.preventDefault();
     const itemsToOrder = [];
 
+    // --- NEW: GET ADMIN NAME FROM LOCALSTORAGE ---
+    const adminDataString = localStorage.getItem('adminData');
+    const adminData = adminDataString ? JSON.parse(adminDataString) : null;
+    const adminName = adminData ? adminData.name : "System Admin";
+
     for (const item of selectedItems) {
       if (!item.perfumeId) continue; 
       const perfume = perfumes.find(p => p._id === item.perfumeId);
@@ -110,7 +115,7 @@ const ManualOrder = () => {
     }
 
     try {
-      // --- UPDATED: Payload now includes payment details ---
+      // --- UPDATED: Payload now includes payment details AND createdBy ---
       await axios.post(`${API_URL}/api/orders/manual`, { 
         ...orderData, 
         items: itemsToOrder, 
@@ -118,7 +123,8 @@ const ManualOrder = () => {
         discountApplied: couponDiscount,
         paymentMethod,
         paymentStatus,
-        isManual: true
+        isManual: true,
+        createdBy: adminName // NEW TRACKING FIELD
       });
       
       for (const item of itemsToOrder) {

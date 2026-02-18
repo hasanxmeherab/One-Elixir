@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { UserPlus, ShieldCheck, Mail, Calendar } from 'lucide-react';
+import { UserPlus, ShieldCheck, Mail, Calendar, Trash2 } from 'lucide-react';
 
 const AdminManagement = () => {
   const [admins, setAdmins] = useState([]);
@@ -15,6 +15,19 @@ const AdminManagement = () => {
   };
 
   useEffect(() => { fetchAdmins(); }, []);
+
+  // --- NEW: DELETE ADMIN LOGIC ---
+  const deleteAdmin = async (id) => {
+    if (window.confirm("Are you sure you want to revoke this admin's access?")) {
+      try {
+        await axios.delete(`${API_URL}/api/admins/${id}`);
+        alert("Admin access revoked");
+        fetchAdmins();
+      } catch (err) {
+        alert("Failed to delete admin");
+      }
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,7 +47,6 @@ const AdminManagement = () => {
       </div>
 
       <div style={contentGrid}>
-        {/* ADD FORM */}
         <div style={card}>
           <h3 style={cardTitle}><UserPlus size={18} /> CREATE NEW ADMIN</h3>
           <form onSubmit={handleSubmit} style={formStyle}>
@@ -45,7 +57,6 @@ const AdminManagement = () => {
           </form>
         </div>
 
-        {/* ADMIN LIST */}
         <div style={tableCard}>
           <table style={tableStyle}>
             <thead>
@@ -54,6 +65,7 @@ const AdminManagement = () => {
                 <th style={th}>CONTACT</th>
                 <th style={th}>ROLE</th>
                 <th style={th}>JOINED</th>
+                <th style={th}>ACTION</th> {/* NEW */}
               </tr>
             </thead>
             <tbody>
@@ -63,6 +75,16 @@ const AdminManagement = () => {
                   <td style={td}>{admin.email}</td>
                   <td style={td}><span style={badge}><ShieldCheck size={12} /> {admin.role.toUpperCase()}</span></td>
                   <td style={td}>{new Date(admin.createdAt).toLocaleDateString()}</td>
+                  <td style={td}>
+                    {/* REVOKE BUTTON */}
+                    <button 
+                      onClick={() => deleteAdmin(admin._id)} 
+                      style={{ border: 'none', background: 'none', color: '#ff4d4d', cursor: 'pointer' }}
+                      title="Revoke Access"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -73,7 +95,7 @@ const AdminManagement = () => {
   );
 };
 
-// --- STYLES ---
+// Styles (unchanged except layout compatibility)
 const container = { padding: '20px' };
 const header = { marginBottom: '30px', borderBottom: '1px solid #eee', paddingBottom: '15px' };
 const contentGrid = { display: 'grid', gridTemplateColumns: '350px 1fr', gap: '30px' };

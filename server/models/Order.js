@@ -23,7 +23,8 @@ const orderSchema = new mongoose.Schema({
   paymentMethod: { type: String, default: 'Cash on Delivery' }, 
   paymentStatus: { type: String, default: 'Unpaid' }, 
   // ------------------
-  isManual: { type: Boolean, default: false }, 
+  isManual: { type: Boolean, default: false },
+  createdBy: { type: String }, 
   createdAt: { type: Date, default: Date.now }
 });
 

@@ -8,11 +8,8 @@ const OrderList = () => {
   const { orders = [], fetchData } = useOutletContext();
   const [showArchived, setShowArchived] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // --- NEW: FILTER STATES ---
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('ALL');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('ALL');
-  
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   if (!orders) {
@@ -34,7 +31,6 @@ const OrderList = () => {
     } catch (err) { alert("Failed to update status"); }
   };
 
-  // --- PDF RECEIPT GENERATOR (Maintained) ---
   const downloadReceipt = (order) => {
     try {
       const doc = new jsPDF();
@@ -59,6 +55,11 @@ const OrderList = () => {
       doc.text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`, 140, 59);
       doc.text(`Order ID: #${order._id.slice(-6).toUpperCase()}`, 140, 65);
       doc.text(`Payment: ${order.paymentMethod} (${order.paymentStatus})`, 20, 77);
+      
+      // NEW: Show Admin Name on Receipt
+      if (order.createdBy) {
+        doc.text(`Processed By: ${order.createdBy}`, 20, 83);
+      }
 
       const tableColumn = ["Item", "Qty", "Price", "Discount", "Total"];
       const tableRows = order.items.map(item => {
@@ -67,16 +68,14 @@ const OrderList = () => {
         let discLabel = "0 TK";
         if (item.discountType === 'percentage') discLabel = `${item.discountValue}%`;
         else if (item.discountType === 'fixed') discLabel = `${item.discountValue} TK`;
-
         const finalPrice = item.finalItemPrice || (item.discountType === 'percentage' 
           ? itemPrice - (itemPrice * item.discountValue / 100) 
           : itemPrice - (item.discountValue || 0));
-
         return [item.name, qty, `${itemPrice.toLocaleString()} TK`, discLabel, `${(finalPrice * qty).toLocaleString()} TK` ];
       });
 
       autoTable(doc, {
-        startY: 85,
+        startY: order.createdBy ? 90 : 85,
         head: [tableColumn],
         body: tableRows,
         theme: 'striped',
@@ -109,7 +108,6 @@ const OrderList = () => {
     } catch (error) { console.error("PDF Error:", error); }
   };
 
-  // --- UPDATED: ADVANCED FILTERING LOGIC ---
   const baseFiltered = orders.filter(order => showArchived ? order.status === 'Canceled' : order.status !== 'Canceled');
   
   const displayedOrders = baseFiltered.filter(order => {
@@ -117,7 +115,6 @@ const OrderList = () => {
     const matchesSearch = order.customerName.toLowerCase().includes(search) || order.phone.includes(search);
     const matchesStatus = paymentStatusFilter === 'ALL' || order.paymentStatus === paymentStatusFilter;
     const matchesMethod = paymentMethodFilter === 'ALL' || order.paymentMethod === paymentMethodFilter;
-    
     return matchesSearch && matchesStatus && matchesMethod;
   });
 
@@ -125,26 +122,19 @@ const OrderList = () => {
     <div style={containerStyle}>
       <div style={headerRow}>
         <h3 style={{ letterSpacing: '2px', margin: 0 }}>{showArchived ? 'ARCHIVED ORDERS' : 'ACTIVE ORDERS'}</h3>
-        
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          {/* SEARCH */}
           <input type="text" placeholder="Search customer..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={searchStyle} />
-          
-          {/* PAYMENT STATUS FILTER */}
           <select value={paymentStatusFilter} onChange={(e) => setPaymentStatusFilter(e.target.value)} style={filterDropdownStyle}>
             <option value="ALL">ALL PAYMENT</option>
             <option value="Paid">PAID</option>
             <option value="Unpaid">UNPAID</option>
           </select>
-
-          {/* PAYMENT METHOD FILTER */}
           <select value={paymentMethodFilter} onChange={(e) => setPaymentMethodFilter(e.target.value)} style={filterDropdownStyle}>
             <option value="ALL">ALL METHODS</option>
             <option value="Cash on Delivery">COD</option>
             <option value="Bkash">BKASH</option>
             <option value="Nagad">NAGAD</option>
           </select>
-
           <button onClick={() => { setShowArchived(!showArchived); setSearchTerm(''); }} style={showArchived ? activeToggleBtn : toggleBtn}>
             {showArchived ? '← BACK' : 'ARCHIVED'}
           </button>
@@ -160,6 +150,7 @@ const OrderList = () => {
             <th>TOTAL</th>
             <th>PAYMENT METHOD</th>
             <th>PAYMENT</th>
+            <th>CREATED BY</th> {/* NEW */}
             <th>ORDER STATUS</th>
             <th>ACTIONS</th>
             <th>RECEIPT</th>
@@ -190,6 +181,10 @@ const OrderList = () => {
                   <option value="Paid">Paid</option>
                 </select>
               </td>
+              {/* NEW: CREATED BY CELL */}
+              <td style={{ fontSize: '11px', color: '#666' }}>
+                {order.createdBy || 'Customer'}
+              </td>
               <td><span style={getStatusStyle(order.status)}>{order.status.toUpperCase()}</span></td>
               <td>
                 {order.status !== 'Canceled' ? (
@@ -206,7 +201,7 @@ const OrderList = () => {
               <td><button onClick={() => downloadReceipt(order)} style={downloadBtn}>PDF 📄</button></td>
             </tr>
           )) : (
-            <tr><td colSpan="9" style={{ textAlign: 'center', padding: '50px', color: '#999' }}>No orders found.</td></tr>
+            <tr><td colSpan="10" style={{ textAlign: 'center', padding: '50px', color: '#999' }}>No orders found.</td></tr>
           )}
         </tbody>
       </table>
@@ -214,7 +209,7 @@ const OrderList = () => {
   );
 };
 
-// --- Styles ---
+// Styles maintained
 const containerStyle = { width: '100%' };
 const headerRow = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' };
 const searchStyle = { padding: '8px 12px', border: '1px solid #ddd', fontSize: '12px', width: '180px', outline: 'none' };
