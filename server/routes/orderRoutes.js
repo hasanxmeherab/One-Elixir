@@ -65,7 +65,6 @@ router.post('/', async (req, res) => {
         });
       } catch (emailErr) {
         console.error("Email failed to send, but order was saved:", emailErr);
-        // We don't block the response if only the email fails
       }
     }
 
@@ -104,17 +103,17 @@ router.put('/:id/cancel', async (req, res) => {
   }
 });
 
-// 6. PUT update status (Admin Action)
+// 6. PUT update status & payment status (Admin Action)
 router.put('/:id', async (req, res) => {
-  const { status } = req.body;
+  const { status, paymentStatus } = req.body; // Added paymentStatus here
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
 
+    // --- STOCK LOGIC (Existing) ---
     const oldStatus = order.status.toLowerCase();
     const newStatus = status?.toLowerCase();
 
-    // SCENARIO A: Moving TO 'Delivered' (Subtract from stock)
     if (newStatus === 'delivered' && oldStatus !== 'delivered') {
       const updatePromises = order.items.map(item => 
         Perfume.findByIdAndUpdate(
@@ -124,8 +123,6 @@ router.put('/:id', async (req, res) => {
       );
       await Promise.all(updatePromises);
     }
-
-    // SCENARIO B: Moving AWAY FROM 'Delivered' (Add back to stock)
     else if (oldStatus === 'delivered' && newStatus !== 'delivered') {
       const updatePromises = order.items.map(item => 
         Perfume.findByIdAndUpdate(
@@ -136,8 +133,10 @@ router.put('/:id', async (req, res) => {
       await Promise.all(updatePromises);
     }
 
-    // Update the order status as usual
-    order.status = status;
+    // --- UPDATE FIELDS ---
+    if (status) order.status = status;
+    if (paymentStatus) order.paymentStatus = paymentStatus; // Update payment status if provided
+
     const updatedOrder = await order.save();
     res.json(updatedOrder);
 

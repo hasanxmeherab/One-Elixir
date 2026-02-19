@@ -10,6 +10,8 @@ const OrderList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('ALL');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('ALL');
+  const [selectedPayment, setSelectedPayment] = useState(null); 
+
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   if (!orders) {
@@ -54,8 +56,6 @@ const OrderList = () => {
 
       doc.text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`, 140, 59);
       doc.text(`Order ID: #${order._id.slice(-6).toUpperCase()}`, 140, 65);
-      
-      // MODIFIED: Removed Payment Status from the PDF line
       doc.text(`Payment Method: ${order.paymentMethod}`, 20, 77);
       
       if (order.createdBy) {
@@ -91,7 +91,6 @@ const OrderList = () => {
       doc.text(`${subtotal.toLocaleString()} TK`, 190, finalY, { align: "right" });
 
       let currentY = finalY + 8;
-
       if (order.shippingCost > 0) {
         doc.text("Shipping Fee:", 135, currentY);
         doc.text(`${order.shippingCost.toLocaleString()} TK`, 190, currentY, { align: "right" });
@@ -140,8 +139,7 @@ const OrderList = () => {
           <select value={paymentMethodFilter} onChange={(e) => setPaymentMethodFilter(e.target.value)} style={filterDropdownStyle}>
             <option value="ALL">ALL METHODS</option>
             <option value="Cash on Delivery">COD</option>
-            <option value="Bkash">BKASH</option>
-            <option value="Nagad">NAGAD</option>
+            <option value="Full Payment">FULL PAYMENT</option>
           </select>
           <button onClick={() => { setShowArchived(!showArchived); setSearchTerm(''); }} style={showArchived ? activeToggleBtn : toggleBtn}>
             {showArchived ? '← BACK' : 'ARCHIVED'}
@@ -154,11 +152,12 @@ const OrderList = () => {
           <tr style={headerStyle}>
             <th>DATE</th>
             <th>CUSTOMER</th>
-            <th>ADDRESS & DISTRICT</th>
+            <th>ADDRESS</th>
             <th>ITEMS</th>
             <th>SHIPPING</th>
             <th>TOTAL</th>
             <th>PAYMENT</th>
+            <th>INFO</th>
             <th>CREATED BY</th>
             <th>STATUS</th>
             <th>ACTIONS</th>
@@ -173,38 +172,29 @@ const OrderList = () => {
                 <div style={{ fontWeight: 'bold' }}>{order.customerName}</div>
                 <div style={{ fontSize: '11px', color: '#666' }}>{order.phone}</div>
               </td>
-              <td style={{ maxWidth: '200px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 'bold' }}>
-                  {order.address.split(',').slice(-2).join(',')}
-                </div>
-                <div style={{ fontSize: '11px', color: '#777' }}>
-                  {order.address.split(',').slice(0, -2).join(',')}
-                </div>
+              <td style={{ maxWidth: '150px' }}>
+                <div style={{ fontSize: '11px' }}>{order.address?.split(',').slice(-2).join(',')}</div>
               </td>
               <td>
                 <div style={{ fontSize: '11px' }}>
                   {order.items.map((item, i) => <div key={i}>{item.quantity}x {item.name}</div>)}
                 </div>
               </td>
-              <td style={{ fontSize: '12px' }}>
-                {/* Ensure shippingCost is showing correctly */}
-                {order.shippingCost ? `${order.shippingCost} TK` : '0 TK'}
-              </td>
+              <td style={{ fontSize: '11px' }}>{order.shippingCost} TK</td>
               <td style={{ fontWeight: 'bold' }}>{order.totalAmount.toLocaleString()} TK</td>
               <td>
                 <div style={{ fontSize: '10px', marginBottom: '3px' }}>{order.paymentMethod}</div>
-                <select 
-                  value={order.paymentStatus || 'Unpaid'} 
-                  onChange={(e) => updatePaymentStatus(order._id, e.target.value)}
-                  style={paymentSelectStyle(order.paymentStatus)}
-                >
+                <select value={order.paymentStatus || 'Unpaid'} onChange={(e) => updatePaymentStatus(order._id, e.target.value)} style={paymentSelectStyle(order.paymentStatus)}>
                   <option value="Unpaid">Unpaid</option>
                   <option value="Paid">Paid</option>
                 </select>
               </td>
-              <td style={{ fontSize: '11px', color: '#666' }}>
-                {order.createdBy || 'Customer'}
+              <td>
+                {order.paymentDetails?.transactionId ? (
+                  <button onClick={() => setSelectedPayment(order.paymentDetails)} style={infoBtnStyle}>INFO</button>
+                ) : '-'}
               </td>
+              <td style={{ fontSize: '11px', color: '#666' }}>{order.createdBy || 'Customer'}</td>
               <td><span style={getStatusStyle(order.status)}>{order.status.toUpperCase()}</span></td>
               <td>
                 {order.status !== 'Canceled' ? (
@@ -221,15 +211,32 @@ const OrderList = () => {
               <td><button onClick={() => downloadReceipt(order)} style={downloadBtn}>📄</button></td>
             </tr>
           )) : (
-            <tr><td colSpan="11" style={{ textAlign: 'center', padding: '50px', color: '#999' }}>No orders found.</td></tr>
+            <tr><td colSpan="12" style={{ textAlign: 'center', padding: '50px', color: '#999' }}>No orders found.</td></tr>
           )}
         </tbody>
       </table>
+
+      {/* --- ADMIN PAYMENT INFO MODAL --- */}
+      {selectedPayment && (
+        <div style={adminModalOverlay}>
+          <div style={adminModalContent}>
+            <h3 style={{fontSize:'14px', letterSpacing:'1px'}}>PAYMENT VERIFICATION</h3>
+            <p style={{fontSize:'13px'}}><b>Paid Amount:</b> <span style={{color:'green', fontWeight:'bold'}}>{selectedPayment.amountPaid} TK</span></p>
+            <p style={{fontSize:'13px'}}><b>Platform:</b> {selectedPayment.platform}</p>
+            <p style={{fontSize:'13px'}}><b>Sender:</b> {selectedPayment.senderNumber}</p>
+            <p style={{fontSize:'13px'}}><b>TrxID:</b> {selectedPayment.transactionId}</p>
+            <p style={{fontSize:'13px'}}><b>Screenshot:</b></p>
+            <a href={selectedPayment.screenshot} target="_blank" rel="noreferrer">
+                <img src={selectedPayment.screenshot} alt="Payment" style={{width:'100%', maxHeight:'300px', objectFit:'contain', border:'1px solid #ddd'}} />
+            </a>
+            <button onClick={() => setSelectedPayment(null)} style={closeBtnStyle}>CLOSE</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-// ... existing styles ...
 const containerStyle = { width: '100%' };
 const headerRow = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' };
 const searchStyle = { padding: '8px 12px', border: '1px solid #ddd', fontSize: '12px', width: '150px', outline: 'none' };
@@ -242,15 +249,13 @@ const toggleBtn = { backgroundColor: '#f0f0f0', border: '1px solid #ddd', paddin
 const activeToggleBtn = { ...toggleBtn, backgroundColor: '#000', color: '#fff' };
 const restoreBtn = { backgroundColor: '#222', color: '#fff', border: 'none', padding: '5px 12px', cursor: 'pointer', fontSize: '10px' };
 const downloadBtn = { backgroundColor: '#fff', border: '1px solid #000', padding: '5px 8px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' };
+const infoBtnStyle = { background: '#000', color: '#fff', border: 'none', padding: '4px 8px', fontSize: '9px', cursor: 'pointer', fontWeight: 'bold' };
+const adminModalOverlay = { position: 'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.8)', display:'flex', justifyContent:'center', alignItems:'center', zIndex:3000 };
+const adminModalContent = { background:'#fff', padding:'30px', width:'350px', display:'flex', flexDirection:'column', gap:'10px' };
+const closeBtnStyle = { background:'#000', color:'#fff', border:'none', padding:'10px', cursor:'pointer', fontWeight:'bold', marginTop:'10px' };
 
 const paymentSelectStyle = (status) => ({
-  padding: '4px',
-  fontSize: '10px',
-  fontWeight: 'bold',
-  border: '1px solid #ddd',
-  color: status === 'Paid' ? '#065f46' : '#991b1b',
-  backgroundColor: status === 'Paid' ? '#d1fae5' : '#fee2e2',
-  cursor: 'pointer'
+  padding: '4px', fontSize: '10px', fontWeight: 'bold', border: '1px solid #ddd', color: status === 'Paid' ? '#065f46' : '#991b1b', backgroundColor: status === 'Paid' ? '#d1fae5' : '#fee2e2', cursor: 'pointer'
 });
 
 const getStatusStyle = (status) => {
