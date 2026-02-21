@@ -4,20 +4,14 @@ import axios from 'axios';
 const ExpenseManagement = () => {
   const [expenses, setExpenses] = useState([]);
   const [formData, setFormData] = useState({
-    title: '',
-    amount: '',
-    quantity: '', 
-    unitPrice: '', 
-    unit: 'pcs', // NEW: Default unit
-    category: 'Packaging',
+    title: '', amount: '', quantity: '', unitPrice: '',
+    unit: 'pcs', category: 'Packaging',
     date: new Date().toISOString().split('T')[0]
   });
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-  // --- Calculations ---
   const totalExpenses = expenses.reduce((acc, exp) => acc + Number(exp.amount), 0);
-  
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
   const monthlyExpenses = expenses.filter(exp => {
@@ -29,9 +23,7 @@ const ExpenseManagement = () => {
     try {
       const res = await axios.get(`${API_URL}/api/expenses`);
       setExpenses(res.data);
-    } catch (err) {
-      console.error("Failed to fetch expenses", err);
-    }
+    } catch (err) { console.error("Failed to fetch expenses", err); }
   };
 
   useEffect(() => { fetchExpenses(); }, []);
@@ -48,20 +40,14 @@ const ExpenseManagement = () => {
     e.preventDefault();
     try {
       await axios.post(`${API_URL}/api/expenses`, formData);
-      setFormData({ 
-        title: '', 
-        amount: '', 
-        quantity: '', 
-        unitPrice: '', 
-        unit: 'pcs',
-        category: 'Packaging', 
-        date: new Date().toISOString().split('T')[0] 
+      setFormData({
+        title: '', amount: '', quantity: '', unitPrice: '',
+        unit: 'pcs', category: 'Packaging',
+        date: new Date().toISOString().split('T')[0]
       });
       fetchExpenses();
       alert("Expense logged!");
-    } catch (err) {
-      alert("Failed to save expense");
-    }
+    } catch (err) { alert("Failed to save expense"); }
   };
 
   const deleteExpense = async (id) => {
@@ -73,27 +59,34 @@ const ExpenseManagement = () => {
 
   return (
     <div>
-      <h3 style={{ letterSpacing: '3px', marginBottom: '30px', fontWeight: 'bold' }}>EXPENSE MANAGEMENT</h3>
+      <h3 className="tracking-[3px] mb-8 font-bold">EXPENSE MANAGEMENT</h3>
 
       {/* Summary Boxes */}
-      <div style={statsGrid}>
-        <div style={statCard}>
-          <span style={label}>THIS MONTH'S SPEND</span>
-          <span style={value}>{monthlyExpenses.toLocaleString()} TK</span>
+      <div className="flex gap-5 mb-10 flex-wrap">
+        <div className="flex-1 min-w-[150px] p-6 bg-white border border-[#eee] border-l-4 border-l-black">
+          <span className="block text-[10px] text-[#888] font-bold tracking-[2px] mb-2.5">THIS MONTH'S SPEND</span>
+          <span className="text-xl font-bold">{monthlyExpenses.toLocaleString()} TK</span>
         </div>
-        <div style={statCard}>
-          <span style={label}>TOTAL EXPENDITURE</span>
-          <span style={value}>{totalExpenses.toLocaleString()} TK</span>
+        <div className="flex-1 min-w-[150px] p-6 bg-white border border-[#eee] border-l-4 border-l-black">
+          <span className="block text-[10px] text-[#888] font-bold tracking-[2px] mb-2.5">TOTAL EXPENDITURE</span>
+          <span className="text-xl font-bold">{totalExpenses.toLocaleString()} TK</span>
         </div>
       </div>
 
       {/* Log Form */}
-      <form onSubmit={handleSubmit} style={formStyle}>
-        <p style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '15px', letterSpacing: '1px' }}>LOG NEW EXPENDITURE</p>
-        
-        <div style={row}>
-          <input type="text" placeholder="Description" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required style={{...inputStyle, flex: 2}}/>
-          <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} style={inputStyle}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 bg-[#fcfcfc] p-8 border border-[#eee] mb-12">
+        <p className="text-[11px] font-bold tracking-wider">LOG NEW EXPENDITURE</p>
+
+        <div className="flex gap-2.5 flex-col sm:flex-row">
+          <input
+            type="text" placeholder="Description" required
+            value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})}
+            className="flex-[2] p-3 border border-[#ddd] outline-none text-sm bg-white"
+          />
+          <select
+            value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}
+            className="flex-1 p-3 border border-[#ddd] outline-none text-sm bg-white"
+          >
             <option value="Packaging">Packaging (Bottles/Boxes)</option>
             <option value="Ingredients">Ingredients (Oil/Alcohol)</option>
             <option value="Marketing">Marketing/Ads</option>
@@ -102,11 +95,17 @@ const ExpenseManagement = () => {
           </select>
         </div>
 
-        <div style={row}>
-          <div style={{ display: 'flex', flex: 1.5, gap: '5px' }}>
-            <input type="number" placeholder="Qty" value={formData.quantity} onChange={e => handlePriceChange('quantity', e.target.value)} style={inputStyle} />
-            {/* NEW: Unit Selector */}
-            <select value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} style={{...inputStyle, flex: '0 0 80px'}}>
+        <div className="flex gap-2.5 flex-wrap">
+          <div className="flex flex-[1.5] gap-1.5 min-w-[150px]">
+            <input
+              type="number" placeholder="Qty"
+              value={formData.quantity} onChange={e => handlePriceChange('quantity', e.target.value)}
+              className="flex-1 p-3 border border-[#ddd] outline-none text-sm bg-white"
+            />
+            <select
+              value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})}
+              className="w-[80px] p-3 border border-[#ddd] outline-none text-sm bg-white"
+            >
               <option value="pcs">pcs</option>
               <option value="ml">ml</option>
               <option value="ltr">ltr</option>
@@ -115,66 +114,70 @@ const ExpenseManagement = () => {
               <option value="pkt">pkt</option>
             </select>
           </div>
-          <input type="number" placeholder="Unit Price" value={formData.unitPrice} onChange={e => handlePriceChange('unitPrice', e.target.value)} style={inputStyle} />
-          <input type="number" placeholder="Total (TK)" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} required style={{...inputStyle, backgroundColor: '#f9f9f9'}} />
-          <input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} style={inputStyle}/>
+          <input
+            type="number" placeholder="Unit Price"
+            value={formData.unitPrice} onChange={e => handlePriceChange('unitPrice', e.target.value)}
+            className="flex-1 min-w-[100px] p-3 border border-[#ddd] outline-none text-sm bg-white"
+          />
+          <input
+            type="number" placeholder="Total (TK)" required
+            value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})}
+            className="flex-1 min-w-[100px] p-3 border border-[#ddd] outline-none text-sm bg-[#f9f9f9]"
+          />
+          <input
+            type="date"
+            value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})}
+            className="flex-1 min-w-[120px] p-3 border border-[#ddd] outline-none text-sm bg-white"
+          />
         </div>
 
-        <button type="submit" style={btnStyle}>SAVE EXPENSE</button>
+        <button
+          type="submit"
+          className="p-4 bg-black text-white border-none cursor-pointer font-bold tracking-[2px] text-xs hover:bg-gray-800 transition-colors"
+        >
+          SAVE EXPENSE
+        </button>
       </form>
 
       {/* History Table */}
-      <table style={tableStyle}>
-        <thead>
-          <tr style={thRow}>
-            <th style={thStyle}>DATE</th>
-            <th style={thStyle}>TITLE</th>
-            <th style={thStyle}>CATEGORY</th>
-            <th style={thStyle}>DETAILS (QTY x PRICE)</th>
-            <th style={thStyle}>TOTAL</th>
-            <th style={thStyle}>ACTION</th>
-          </tr>
-        </thead>
-        <tbody>
-          {expenses.map(exp => (
-            <tr key={exp._id} style={tdRow}>
-              <td style={tdStyle}>{new Date(exp.date).toLocaleDateString()}</td>
-              <td style={tdStyle}>{exp.title}</td>
-              <td style={tdStyle}>{exp.category}</td>
-              <td style={{ ...tdStyle, color: '#666' }}>
-                {/* --- UPDATED DISPLAY LOGIC --- */}
-                {exp.quantity && exp.unitPrice ? (
-                  <span>{exp.quantity} {exp.unit || 'pcs'} x {Number(exp.unitPrice).toLocaleString()} TK</span>
-                ) : (
-                  <span style={{ color: '#ccc' }}>—</span>
-                )}
-              </td>
-              <td style={{ ...tdStyle, fontWeight: 'bold' }}>{Number(exp.amount).toLocaleString()} TK</td>
-              <td style={tdStyle}>
-                <button onClick={() => deleteExpense(exp._id)} style={deleteBtn}>REMOVE</button>
-              </td>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-left">
+          <thead>
+            <tr className="border-b-2 border-black">
+              {['DATE', 'TITLE', 'CATEGORY', 'DETAILS (QTY x PRICE)', 'TOTAL', 'ACTION'].map(h => (
+                <th key={h} className="py-4 px-2.5 text-[11px] text-[#888] tracking-wider">{h}</th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {expenses.map(exp => (
+              <tr key={exp._id} className="border-b border-[#eee]">
+                <td className="py-4 px-2.5 text-sm">{new Date(exp.date).toLocaleDateString()}</td>
+                <td className="py-4 px-2.5 text-sm">{exp.title}</td>
+                <td className="py-4 px-2.5 text-sm">{exp.category}</td>
+                <td className="py-4 px-2.5 text-sm text-[#666]">
+                  {exp.quantity && exp.unitPrice ? (
+                    <span>{exp.quantity} {exp.unit || 'pcs'} x {Number(exp.unitPrice).toLocaleString()} TK</span>
+                  ) : (
+                    <span className="text-[#ccc]">—</span>
+                  )}
+                </td>
+                <td className="py-4 px-2.5 text-sm font-bold">{Number(exp.amount).toLocaleString()} TK</td>
+                <td className="py-4 px-2.5 text-sm">
+                  <button
+                    onClick={() => deleteExpense(exp._id)}
+                    className="text-red-500 border-none bg-transparent cursor-pointer text-[11px] underline font-bold hover:opacity-70 transition-opacity"
+                  >
+                    REMOVE
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
-
-// --- Styles (Unchanged) ---
-const statsGrid = { display: 'flex', gap: '20px', marginBottom: '40px' };
-const statCard = { flex: 1, padding: '25px', backgroundColor: '#fff', border: '1px solid #eee', borderLeft: '5px solid #000' };
-const label = { display: 'block', fontSize: '10px', color: '#888', fontWeight: 'bold', letterSpacing: '2px', marginBottom: '10px' };
-const value = { fontSize: '20px', fontWeight: 'bold' };
-const formStyle = { display: 'flex', flexDirection: 'column', gap: '15px', backgroundColor: '#fcfcfc', padding: '30px', border: '1px solid #eee', marginBottom: '50px' };
-const row = { display: 'flex', gap: '10px' };
-const inputStyle = { padding: '12px', border: '1px solid #ddd', outline: 'none', fontSize: '13px', flex: 1, backgroundColor: '#fff' };
-const btnStyle = { padding: '15px', background: '#000', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold', letterSpacing: '2px', fontSize: '12px' };
-const tableStyle = { width: '100%', borderCollapse: 'collapse', textAlign: 'left' };
-const thRow = { borderBottom: '2px solid #000' };
-const thStyle = { padding: '15px 10px', fontSize: '11px', color: '#888', letterSpacing: '1px' };
-const tdRow = { borderBottom: '1px solid #eee' };
-const tdStyle = { padding: '15px 10px', fontSize: '13px' };
-const deleteBtn = { color: 'red', border: 'none', background: 'none', cursor: 'pointer', fontSize: '11px', textDecoration: 'underline', fontWeight: 'bold' };
 
 export default ExpenseManagement;

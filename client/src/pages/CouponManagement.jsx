@@ -6,9 +6,7 @@ const CouponManagement = () => {
   const [newCoupon, setNewCoupon] = useState({ code: '', discountValue: '', discountType: 'percentage' });
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-  useEffect(() => {
-    fetchCoupons();
-  }, []);
+  useEffect(() => { fetchCoupons(); }, []);
 
   const fetchCoupons = async () => {
     try {
@@ -37,68 +35,71 @@ const CouponManagement = () => {
   };
 
   return (
-    <div style={panelStyle}>
-      <h2 style={titleStyle}>COUPON MANAGEMENT</h2>
-      
+    <div className="p-5 bg-white border border-[#eee]">
+      <h2 className="tracking-[2px] text-sm mb-5 font-bold">COUPON MANAGEMENT</h2>
+
       {/* Create Coupon Form */}
-      <form onSubmit={handleCreate} style={formStyle}>
-        <input 
-          type="text" placeholder="CODE (e.g. SAVE20)" required 
-          value={newCoupon.code} onChange={e => setNewCoupon({...newCoupon, code: e.target.value.toUpperCase()})}
-          style={inputStyle}
+      <form onSubmit={handleCreate} className="flex gap-2.5 mb-8 flex-wrap">
+        <input
+          type="text" placeholder="CODE (e.g. SAVE20)" required
+          value={newCoupon.code}
+          onChange={e => setNewCoupon({...newCoupon, code: e.target.value.toUpperCase()})}
+          className="p-2.5 border border-[#ddd] outline-none text-sm flex-1 min-w-[120px]"
         />
-        <input 
-          type="number" placeholder="Value" required 
-          value={newCoupon.discountValue} onChange={e => setNewCoupon({...newCoupon, discountValue: e.target.value})}
-          style={inputStyle}
+        <input
+          type="number" placeholder="Value" required
+          value={newCoupon.discountValue}
+          onChange={e => setNewCoupon({...newCoupon, discountValue: e.target.value})}
+          className="p-2.5 border border-[#ddd] outline-none text-sm flex-1 min-w-[100px]"
         />
-        <select 
-          value={newCoupon.discountType} 
+        <select
+          value={newCoupon.discountType}
           onChange={e => setNewCoupon({...newCoupon, discountType: e.target.value})}
-          style={inputStyle}
+          className="p-2.5 border border-[#ddd] outline-none text-sm flex-1 min-w-[140px]"
         >
           <option value="percentage">Percentage (%)</option>
           <option value="fixed">Fixed Amount (TK)</option>
         </select>
-        <button type="submit" style={addBtn}>CREATE COUPON</button>
+        <button
+          type="submit"
+          className="bg-black text-white border-none px-5 py-2.5 cursor-pointer font-bold text-sm hover:bg-gray-800 transition-colors"
+        >
+          CREATE COUPON
+        </button>
       </form>
 
-      {/* Coupon List Table */}
-      <table style={tableStyle}>
-        <thead>
-          <tr style={headerRow}>
-            <th>CODE</th>
-            <th>VALUE</th>
-            <th>TYPE</th>
-            <th>ACTION</th>
-          </tr>
-        </thead>
-        <tbody>
-          {coupons.map(c => (
-            <tr key={c._id} style={rowStyle}>
-              <td>{c.code}</td>
-              <td>{c.discountValue}</td>
-              <td>{c.discountType}</td>
-              <td>
-                <button onClick={() => handleDelete(c._id)} style={delBtn}>DELETE</button>
-              </td>
+      {/* Coupon Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="text-left border-b-2 border-black text-xs">
+              <th className="py-3 px-2">CODE</th>
+              <th className="py-3 px-2">VALUE</th>
+              <th className="py-3 px-2">TYPE</th>
+              <th className="py-3 px-2">ACTION</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {coupons.map(c => (
+              <tr key={c._id} className="border-b border-[#eee] text-sm">
+                <td className="py-3 px-2 font-bold tracking-wider">{c.code}</td>
+                <td className="py-3 px-2">{c.discountValue}</td>
+                <td className="py-3 px-2 capitalize">{c.discountType}</td>
+                <td className="py-3 px-2">
+                  <button
+                    onClick={() => handleDelete(c._id)}
+                    className="text-red-500 bg-transparent border-none cursor-pointer text-[11px] underline hover:opacity-70 transition-opacity"
+                  >
+                    DELETE
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
-
-// --- Admin UI Styles ---
-const panelStyle = { padding: '20px', backgroundColor: '#fff', border: '1px solid #eee' };
-const titleStyle = { letterSpacing: '2px', fontSize: '14px', marginBottom: '20px' };
-const formStyle = { display: 'flex', gap: '10px', marginBottom: '30px' };
-const inputStyle = { padding: '10px', border: '1px solid #ddd', outline: 'none' };
-const addBtn = { backgroundColor: '#000', color: '#fff', border: 'none', padding: '10px 20px', cursor: 'pointer', fontWeight: 'bold' };
-const tableStyle = { width: '100%', borderCollapse: 'collapse' };
-const headerRow = { textAlign: 'left', borderBottom: '2px solid #000', fontSize: '12px' };
-const rowStyle = { borderBottom: '1px solid #eee', fontSize: '13px' };
-const delBtn = { color: 'red', background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', textDecoration: 'underline' };
 
 export default CouponManagement;

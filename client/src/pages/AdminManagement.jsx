@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { UserPlus, ShieldCheck, Mail, Calendar, Trash2 } from 'lucide-react';
+import { UserPlus, ShieldCheck, Trash2 } from 'lucide-react';
 
 const AdminManagement = () => {
   const [admins, setAdmins] = useState([]);
@@ -16,16 +16,13 @@ const AdminManagement = () => {
 
   useEffect(() => { fetchAdmins(); }, []);
 
-  // --- NEW: DELETE ADMIN LOGIC ---
   const deleteAdmin = async (id) => {
     if (window.confirm("Are you sure you want to revoke this admin's access?")) {
       try {
         await axios.delete(`${API_URL}/api/admins/${id}`);
         alert("Admin access revoked");
         fetchAdmins();
-      } catch (err) {
-        alert("Failed to delete admin");
-      }
+      } catch (err) { alert("Failed to delete admin"); }
     }
   };
 
@@ -40,46 +37,71 @@ const AdminManagement = () => {
   };
 
   return (
-    <div style={container}>
-      <div style={header}>
-        <h2 style={{ letterSpacing: '3px' }}>ADMINISTRATOR MANAGEMENT</h2>
-        <p style={{ fontSize: '12px', color: '#666' }}>Manage access and roles for OneElixir staff.</p>
+    <div className="p-5">
+      {/* Header */}
+      <div className="mb-8 border-b border-[#eee] pb-4">
+        <h2 className="tracking-[3px] font-bold">ADMINISTRATOR MANAGEMENT</h2>
+        <p className="text-xs text-[#666] mt-1">Manage access and roles for OneElixir staff.</p>
       </div>
 
-      <div style={contentGrid}>
-        <div style={card}>
-          <h3 style={cardTitle}><UserPlus size={18} /> CREATE NEW ADMIN</h3>
-          <form onSubmit={handleSubmit} style={formStyle}>
-            <input type="text" placeholder="Full Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required style={inputStyle} />
-            <input type="email" placeholder="Email Address" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required style={inputStyle} />
-            <input type="password" placeholder="Password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} required style={inputStyle} />
-            <button type="submit" style={submitBtn}>AUTHORIZE ADMIN</button>
+      {/* Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-[350px_1fr] gap-8">
+
+        {/* Create Admin Form */}
+        <div className="bg-white p-6 border border-[#eee] rounded">
+          <h3 className="text-sm tracking-wider mb-5 flex items-center gap-2.5">
+            <UserPlus size={18} /> CREATE NEW ADMIN
+          </h3>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <input
+              type="text" placeholder="Full Name" required
+              value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
+              className="p-3 border border-[#ddd] text-sm outline-none"
+            />
+            <input
+              type="email" placeholder="Email Address" required
+              value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
+              className="p-3 border border-[#ddd] text-sm outline-none"
+            />
+            <input
+              type="password" placeholder="Password" required
+              value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}
+              className="p-3 border border-[#ddd] text-sm outline-none"
+            />
+            <button
+              type="submit"
+              className="p-3 bg-black text-white border-none cursor-pointer font-bold tracking-wider hover:bg-gray-800 transition-colors"
+            >
+              AUTHORIZE ADMIN
+            </button>
           </form>
         </div>
 
-        <div style={tableCard}>
-          <table style={tableStyle}>
+        {/* Admin Table */}
+        <div className="bg-white border border-[#eee] rounded overflow-hidden overflow-x-auto">
+          <table className="w-full border-collapse">
             <thead>
-              <tr style={thRow}>
-                <th style={th}>NAME</th>
-                <th style={th}>CONTACT</th>
-                <th style={th}>ROLE</th>
-                <th style={th}>JOINED</th>
-                <th style={th}>ACTION</th> {/* NEW */}
+              <tr className="bg-[#f9f9f9] text-left">
+                {['NAME', 'CONTACT', 'ROLE', 'JOINED', 'ACTION'].map(h => (
+                  <th key={h} className="py-4 px-4 text-[11px] tracking-wider text-[#888]">{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {admins.map(admin => (
-                <tr key={admin._id} style={tr}>
-                  <td style={td}><strong>{admin.name}</strong></td>
-                  <td style={td}>{admin.email}</td>
-                  <td style={td}><span style={badge}><ShieldCheck size={12} /> {admin.role.toUpperCase()}</span></td>
-                  <td style={td}>{new Date(admin.createdAt).toLocaleDateString()}</td>
-                  <td style={td}>
-                    {/* REVOKE BUTTON */}
-                    <button 
-                      onClick={() => deleteAdmin(admin._id)} 
-                      style={{ border: 'none', background: 'none', color: '#ff4d4d', cursor: 'pointer' }}
+                <tr key={admin._id} className="border-b border-[#f0f0f0]">
+                  <td className="py-4 px-4 text-sm font-bold">{admin.name}</td>
+                  <td className="py-4 px-4 text-sm">{admin.email}</td>
+                  <td className="py-4 px-4 text-sm">
+                    <span className="inline-flex items-center gap-1.5 bg-[#e6fffa] text-[#2c7a7b] px-2.5 py-1 rounded-full text-[10px] font-bold">
+                      <ShieldCheck size={12} /> {admin.role.toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="py-4 px-4 text-sm">{new Date(admin.createdAt).toLocaleDateString()}</td>
+                  <td className="py-4 px-4 text-sm">
+                    <button
+                      onClick={() => deleteAdmin(admin._id)}
+                      className="border-none bg-transparent text-red-500 cursor-pointer hover:opacity-70 transition-opacity"
                       title="Revoke Access"
                     >
                       <Trash2 size={16} />
@@ -94,22 +116,5 @@ const AdminManagement = () => {
     </div>
   );
 };
-
-// Styles (unchanged except layout compatibility)
-const container = { padding: '20px' };
-const header = { marginBottom: '30px', borderBottom: '1px solid #eee', paddingBottom: '15px' };
-const contentGrid = { display: 'grid', gridTemplateColumns: '350px 1fr', gap: '30px' };
-const card = { backgroundColor: '#fff', padding: '25px', border: '1px solid #eee', borderRadius: '4px' };
-const tableCard = { backgroundColor: '#fff', border: '1px solid #eee', borderRadius: '4px', overflow: 'hidden' };
-const cardTitle = { fontSize: '14px', letterSpacing: '1px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' };
-const formStyle = { display: 'flex', flexDirection: 'column', gap: '15px' };
-const inputStyle = { padding: '12px', border: '1px solid #ddd', fontSize: '13px', outline: 'none' };
-const submitBtn = { padding: '12px', backgroundColor: '#000', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold', letterSpacing: '1px' };
-const tableStyle = { width: '100%', borderCollapse: 'collapse' };
-const thRow = { backgroundColor: '#f9f9f9', textAlign: 'left' };
-const th = { padding: '15px', fontSize: '11px', letterSpacing: '1px', color: '#888' };
-const tr = { borderBottom: '1px solid #f0f0f0' };
-const td = { padding: '15px', fontSize: '13px' };
-const badge = { display: 'inline-flex', alignItems: 'center', gap: '5px', backgroundColor: '#e6fffa', color: '#2c7a7b', padding: '4px 10px', borderRadius: '20px', fontSize: '10px', fontWeight: 'bold' };
 
 export default AdminManagement;
