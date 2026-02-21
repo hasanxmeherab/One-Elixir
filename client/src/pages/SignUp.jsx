@@ -7,7 +7,7 @@ import { Eye, EyeOff, Check, X } from 'lucide-react';
 const SignUp = () => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '' });
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false); // Added for UX
+  const [loading, setLoading] = useState(false);
   const { login } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
@@ -15,7 +15,6 @@ const SignUp = () => {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const from = location.state?.from || '/';
 
-  // --- Password Strength Logic ---
   const strength = useMemo(() => {
     const pw = formData.password;
     if (!pw) return { score: 0, label: '', color: '#ddd' };
@@ -34,7 +33,6 @@ const SignUp = () => {
     }
   }, [formData.password]);
 
-  // --- Match Indicator Logic ---
   const passwordsMatch = formData.confirmPassword && formData.password === formData.confirmPassword;
 
   const handleSubmit = async (e) => {
@@ -43,19 +41,15 @@ const SignUp = () => {
       alert("Passwords do not match!");
       return;
     }
-    
     setLoading(true);
     try {
-      const res = await axios.post(`${API_URL}/api/auth/signup`, {
+      await axios.post(`${API_URL}/api/auth/signup`, {
         name: formData.name,
         email: formData.email.toLowerCase(),
         password: formData.password
       });
-      
-      // Verification Logic Change
       alert("A verification link has been sent to your email. Please verify your account to sign in.");
       navigate('/signin'); 
-      
     } catch (err) {
       alert(err.response?.data?.message || "Registration failed.");
     } finally {
@@ -64,91 +58,106 @@ const SignUp = () => {
   };
 
   return (
-    <div style={container}>
-      <form onSubmit={handleSubmit} style={signUpBox}>
-        <h2 style={title}>CREATE ACCOUNT</h2>
-        <p style={subtitle}>Join the OneElixir inner circle</p>
+    <div className="min-h-[90vh] flex justify-center items-center px-4 py-10">
+      <form onSubmit={handleSubmit} className="w-full max-w-[400px] text-center p-10 border border-[#eee] bg-white">
         
-        <input 
+        <h2 className="tracking-[5px] font-light mb-2.5">CREATE ACCOUNT</h2>
+        <p className="text-[10px] text-[#888] mb-8 tracking-wider">Join the OneElixir inner circle</p>
+
+        {/* Name */}
+        <input
           type="text" placeholder="FULL NAME" required
-          value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} 
-          style={inputStyle} 
+          value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
+          className="w-full p-4 mb-4 border border-[#ddd] outline-none text-sm box-border"
         />
-        <input 
+
+        {/* Email */}
+        <input
           type="email" placeholder="EMAIL" required
-          value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} 
-          style={inputStyle} 
+          value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
+          className="w-full p-4 mb-4 border border-[#ddd] outline-none text-sm box-border"
         />
-        
-        <div style={passwordWrapper}>
-          <input 
-            type={showPassword ? "text" : "password"} 
+
+        {/* Password */}
+        <div className="relative w-full mb-4">
+          <input
+            type={showPassword ? "text" : "password"}
             placeholder="PASSWORD" required
-            value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} 
-            style={passwordInput} 
+            value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}
+            className="w-full p-4 border border-[#ddd] outline-none text-sm box-border"
           />
-          <div onClick={() => setShowPassword(!showPassword)} style={iconStyle}>
+          <div
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-[#888] flex items-center"
+          >
             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
           </div>
         </div>
 
+        {/* Password Strength Meter */}
         {formData.password && (
-          <div style={meterContainer}>
-            <div style={{ ...meterBar, width: `${strength.score}%`, backgroundColor: strength.color }}></div>
-            <span style={{ ...strengthText, color: strength.color }}>{strength.label}</span>
+          <div className="relative w-full h-1 bg-[#eee] mb-4 rounded-sm">
+            <div
+              className="h-full rounded-sm transition-all duration-400"
+              style={{ width: `${strength.score}%`, backgroundColor: strength.color }}
+            />
+            <span
+              className="absolute right-0 top-1.5 text-[9px] font-bold tracking-wider"
+              style={{ color: strength.color }}
+            >
+              {strength.label}
+            </span>
           </div>
         )}
 
-        <div style={passwordWrapper}>
-          <input 
-            type={showPassword ? "text" : "password"} 
+        {/* Confirm Password */}
+        <div className="relative w-full mb-4">
+          <input
+            type={showPassword ? "text" : "password"}
             placeholder="CONFIRM PASSWORD" required
-            value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} 
-            style={passwordInput} 
+            value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})}
+            className="w-full p-4 border border-[#ddd] outline-none text-sm box-border"
           />
-          <div style={indicatorGroup}>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
             {formData.confirmPassword && (
-              <span style={{ marginRight: '8px', display: 'flex', color: passwordsMatch ? '#27ae60' : '#ff4d4d' }}>
+              <span className={`flex ${passwordsMatch ? 'text-[#27ae60]' : 'text-[#ff4d4d]'}`}>
                 {passwordsMatch ? <Check size={16} /> : <X size={16} />}
               </span>
             )}
-            <div onClick={() => setShowPassword(!showPassword)} style={{ cursor: 'pointer', color: '#888', display: 'flex' }}>
+            <div
+              onClick={() => setShowPassword(!showPassword)}
+              className="cursor-pointer text-[#888] flex items-center"
+            >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </div>
           </div>
         </div>
-        
-        <button 
-          type="submit" 
-          style={formData.confirmPassword && !passwordsMatch ? disabledBtn : btnStyle} 
+
+        {/* Submit Button */}
+        <button
+          type="submit"
           disabled={(formData.confirmPassword && !passwordsMatch) || loading}
+          className={`w-full p-4 text-white border-none cursor-pointer font-bold tracking-[2px] mt-2.5 transition-colors ${
+            formData.confirmPassword && !passwordsMatch
+              ? 'bg-[#888] cursor-not-allowed'
+              : 'bg-black hover:bg-gray-800'
+          }`}
         >
           {loading ? "SENDING EMAIL..." : "REGISTER"}
         </button>
-        <p style={footerText}>
-          Already have an account? <span onClick={() => navigate('/signin', { state: { from } })} style={link}>Sign In</span>
+
+        <p className="text-xs mt-5 text-[#666]">
+          Already have an account?{' '}
+          <span
+            onClick={() => navigate('/signin', { state: { from } })}
+            className="underline cursor-pointer text-black font-bold hover:opacity-70 transition-opacity"
+          >
+            Sign In
+          </span>
         </p>
       </form>
     </div>
   );
 };
-
-// --- Styles (Maintained) ---
-const container = { height: '90vh', display: 'flex', justifyContent: 'center', alignItems: 'center' };
-const signUpBox = { width: '400px', textAlign: 'center', padding: '50px', border: '1px solid #eee', backgroundColor: '#fff' };
-const title = { letterSpacing: '5px', fontWeight: '300', marginBottom: '10px' };
-const subtitle = { fontSize: '10px', color: '#888', marginBottom: '30px', letterSpacing: '1px' };
-const inputStyle = { width: '100%', padding: '15px', marginBottom: '15px', border: '1px solid #ddd', outline: 'none', fontSize: '13px' };
-const passwordWrapper = { position: 'relative', width: '100%', marginBottom: '15px' };
-const passwordInput = { ...inputStyle, marginBottom: '0' };
-const iconStyle = { position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: '#888', display: 'flex', alignItems: 'center' };
-const indicatorGroup = { position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: '5px' };
-const meterContainer = { width: '100%', height: '4px', backgroundColor: '#eee', marginBottom: '15px', position: 'relative', borderRadius: '2px' };
-const meterBar = { height: '100%', transition: 'all 0.4s ease', borderRadius: '2px' };
-const strengthText = { position: 'absolute', right: '0', top: '6px', fontSize: '9px', fontWeight: 'bold', letterSpacing: '1px' };
-const btnStyle = { width: '100%', padding: '15px', backgroundColor: '#000', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold', letterSpacing: '2px', marginTop: '10px' };
-const disabledBtn = { ...btnStyle, backgroundColor: '#888', cursor: 'not-allowed' };
-const footerText = { fontSize: '12px', marginTop: '20px', color: '#666' };
-const link = { textDecoration: 'underline', cursor: 'pointer', color: '#000', fontWeight: 'bold' };
 
 export default SignUp;

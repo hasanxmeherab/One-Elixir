@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import { Eye, EyeOff } from 'lucide-react'; // Import icons for consistency
+import { Eye, EyeOff } from 'lucide-react';
 
 const SignIn = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // Eye toggle state
+  const [showPassword, setShowPassword] = useState(false);
   const { login } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
@@ -18,12 +18,10 @@ const SignIn = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Normalize email to lowercase before sending to backend
       const res = await axios.post(`${API_URL}/api/auth/signin`, { 
         email: email.toLowerCase(), 
         password 
       });
-      
       login(res.data);
       navigate(from, { replace: true });
     } catch (err) {
@@ -32,64 +30,64 @@ const SignIn = () => {
   };
 
   return (
-    <div style={container}>
-      <form onSubmit={handleSubmit} style={loginBox}>
-        <h2 style={title}>SIGN IN</h2>
-        <p style={subtitle}>Welcome back to OneElixir.</p>
+    <div className="h-[85vh] flex justify-center items-center px-4">
+      <form onSubmit={handleSubmit} className="w-full max-w-[350px] text-center p-10 border border-[#eee] bg-white">
         
-        <input 
-          type="email" placeholder="EMAIL" value={email} 
-          onChange={e => setEmail(e.target.value)} required style={inputStyle} 
+        <h2 className="tracking-[5px] font-light mb-2.5">SIGN IN</h2>
+        <p className="text-[10px] text-[#888] mb-8">Welcome back to OneElixir.</p>
+
+        {/* Email */}
+        <input
+          type="email" placeholder="EMAIL" required
+          value={email} onChange={e => setEmail(e.target.value)}
+          className="w-full p-4 mb-4 border border-[#ddd] outline-none box-border text-sm"
         />
 
-        {/* Password field with Eye Toggle */}
-        <div style={passwordWrapper}>
-          <input 
-            type={showPassword ? "text" : "password"} 
-            placeholder="PASSWORD" value={password} 
-            onChange={e => setPassword(e.target.value)} required 
-            style={passwordInput} 
+        {/* Password with Eye Toggle */}
+        <div className="relative w-full mb-2.5">
+          <input
+            type={showPassword ? "text" : "password"}
+            placeholder="PASSWORD" required
+            value={password} onChange={e => setPassword(e.target.value)}
+            className="w-full p-4 border border-[#ddd] outline-none box-border text-sm"
           />
-          <div onClick={() => setShowPassword(!showPassword)} style={iconStyle}>
+          <div
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-[#888] flex items-center"
+          >
             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
           </div>
         </div>
 
-        <div style={forgotPasswordContainer}>
-        <span onClick={() => navigate('/forgot-password')} style={forgotLink}>
-          Forgot Password?
-        </span>
-      </div>
-        
-        <button type="submit" style={btnStyle}>LOGIN</button>
-        
-        <p style={footerText}>
-          Don't have an account? <span onClick={() => navigate('/signup', { state: { from } })} style={link}>Sign Up</span>
+        {/* Forgot Password */}
+        <div className="w-full text-right mb-5">
+          <span
+            onClick={() => navigate('/forgot-password')}
+            className="text-[10px] text-[#888] cursor-pointer tracking-wider uppercase hover:text-black transition-colors"
+          >
+            Forgot Password?
+          </span>
+        </div>
+
+        <button
+          type="submit"
+          className="w-full p-4 bg-black text-white border-none cursor-pointer font-bold tracking-[2px] hover:bg-gray-800 transition-colors"
+        >
+          LOGIN
+        </button>
+
+        <p className="text-xs mt-5 text-[#666]">
+          Don't have an account?{' '}
+          <span
+            onClick={() => navigate('/signup', { state: { from } })}
+            className="underline cursor-pointer text-black font-bold hover:opacity-70 transition-opacity"
+          >
+            Sign Up
+          </span>
         </p>
       </form>
     </div>
   );
 };
-
-// --- Styles ---
-const container = { height: '85vh', display: 'flex', justifyContent: 'center', alignItems: 'center' };
-const loginBox = { width: '350px', textAlign: 'center', padding: '40px', border: '1px solid #eee', backgroundColor: '#fff' };
-const title = { letterSpacing: '5px', fontWeight: '300', marginBottom: '10px' };
-const subtitle = { fontSize: '10px', color: '#888', marginBottom: '30px' };
-
-const inputStyle = { width: '100%', padding: '15px', marginBottom: '15px', border: '1px solid #ddd', outline: 'none', boxSizing: 'border-box' };
-
-// Added for Password/Eye Toggle alignment
-const passwordWrapper = { position: 'relative', width: '100%', marginBottom: '10px' };
-const passwordInput = { ...inputStyle, marginBottom: '0' };
-const iconStyle = { position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: '#888', display: 'flex' };
-
-// Forgot Password Styles
-const forgotPasswordContainer = { width: '100%', textAlign: 'right', marginBottom: '20px' };
-const forgotLink = { fontSize: '10px', color: '#888', cursor: 'pointer', letterSpacing: '1px', textTransform: 'uppercase' };
-
-const btnStyle = { width: '100%', padding: '15px', backgroundColor: '#000', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold', letterSpacing: '2px' };
-const footerText = { fontSize: '12px', marginTop: '20px', color: '#666' };
-const link = { textDecoration: 'underline', cursor: 'pointer', color: '#000', fontWeight: 'bold' };
 
 export default SignIn;

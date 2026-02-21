@@ -23,28 +23,27 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div style={containerStyle}>
-      <form onSubmit={handleSubmit} style={boxStyle}>
-        <h2 style={titleStyle}>RESET PASSWORD</h2>
-        <input 
-          type="email" placeholder="EMAIL ADDRESS" required 
-          value={email} onChange={(e) => setEmail(e.target.value)} 
-          style={inputStyle} 
+    <div className="h-[80vh] flex justify-center items-center px-4">
+      <form onSubmit={handleSubmit} className="w-full max-w-[400px] text-center p-12 border border-[#eee]">
+        <h2 className="tracking-[5px] font-light mb-5">RESET PASSWORD</h2>
+        <input
+          type="email" placeholder="EMAIL ADDRESS" required
+          value={email} onChange={(e) => setEmail(e.target.value)}
+          className="w-full p-4 mb-4 border border-[#ddd] outline-none text-sm box-border"
         />
-        <button type="submit" style={btnStyle} disabled={loading}>
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full p-4 bg-black text-white border-none cursor-pointer font-bold tracking-[2px] hover:bg-gray-800 transition-colors disabled:opacity-60"
+        >
           {loading ? "SENDING..." : "SEND RESET LINK"}
         </button>
-        {message && <p style={successMsgStyle}>{message}</p>}
+        {message && (
+          <p className="text-green-600 text-xs mt-4">{message}</p>
+        )}
       </form>
     </div>
   );
 };
-
-const containerStyle = { height: '80vh', display: 'flex', justifyContent: 'center', alignItems: 'center' };
-const boxStyle = { width: '400px', textAlign: 'center', padding: '50px', border: '1px solid #eee' };
-const titleStyle = { letterSpacing: '5px', fontWeight: '300', marginBottom: '20px' };
-const inputStyle = { width: '100%', padding: '15px', marginBottom: '15px', border: '1px solid #ddd' };
-const btnStyle = { width: '100%', padding: '15px', backgroundColor: '#000', color: '#fff', cursor: 'pointer' };
-const successMsgStyle = { color: 'green', fontSize: '12px', marginTop: '15px' };
 
 export default ForgotPassword;
