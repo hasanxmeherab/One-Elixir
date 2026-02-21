@@ -20,41 +20,57 @@ const Shop = () => {
     fetchProducts();
   }, []);
 
-  const filteredPerfumes = perfumes.filter(p => 
+  const filteredPerfumes = perfumes.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div style={container}>
+    <div className="px-[5%] pt-24 pb-20 max-w-[1300px] mx-auto min-h-screen">
       {/* Header Section */}
-      <div style={header}>
-        <h1 style={title}>OUR ELIXIRS</h1>
-        <p style={subtitle}>Bespoke fragrances, crafted in small batches.</p>
-        
-        <input 
-          type="text" 
-          placeholder="Search for a scent..." 
-          style={searchStyle} 
+      <div className="text-center mb-20">
+        <h1 className="text-4xl md:text-5xl font-light tracking-[10px] mb-4">OUR ELIXIRS</h1>
+        <p className="text-[11px] text-[#888] tracking-[2px] uppercase mb-8">
+          Bespoke fragrances, crafted in small batches.
+        </p>
+        <input
+          type="text"
+          placeholder="Search for a scent..."
+          className="px-5 py-3 border border-[#eee] w-full max-w-[400px] text-center outline-none text-[13px] tracking-wider"
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
 
       {/* Product Grid */}
-      <div style={productGrid}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10 md:gap-6">
         {filteredPerfumes.map(p => (
-          <div key={p._id} style={card} onClick={() => navigate(`/product/${p._id}`)}>
-            <div style={imageBox}>
-              <img src={p.image} alt={p.name} style={imgStyle} />
-              {p.stock === 0 && <div style={soldOutBadge}>SOLD OUT</div>}
-              {p.stock > 0 && p.stock <= 5 && <div style={lowStockBadge}>LIMITED</div>}
+          <div
+            key={p._id}
+            className="cursor-pointer transition-transform duration-400 ease-in-out text-center hover:-translate-y-2"
+            onClick={() => navigate(`/product/${p._id}`)}
+          >
+            {/* Image Box */}
+            <div className="relative w-full h-[380px] sm:h-[280px] md:h-[380px] bg-[#fcfcfc] mb-5 overflow-hidden">
+              <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+              {p.stock === 0 && (
+                <div className="absolute top-4 right-4 bg-black text-white px-3 py-1 text-[9px] font-bold tracking-[2px]">
+                  SOLD OUT
+                </div>
+              )}
+              {p.stock > 0 && p.stock <= 5 && (
+                <div className="absolute top-4 right-4 bg-[#f39c12] text-white px-3 py-1 text-[9px] font-bold tracking-[2px]">
+                  LIMITED
+                </div>
+              )}
             </div>
 
-            <div style={details}>
-              <h3 style={pName}>{p.name.toUpperCase()}</h3>
-              <p style={pPrice}>{p.price.toLocaleString()} TK</p>
-              <p style={pNotes}>{p.scentProfile.join(' • ')}</p>
-              
-              <button style={viewBtn}>
+            {/* Details */}
+            <div className="px-2.5">
+              <h3 className="text-[15px] tracking-[3px] mb-2 font-bold">{p.name.toUpperCase()}</h3>
+              <p className="text-sm mb-3 text-[#333]">{p.price.toLocaleString()} TK</p>
+              <p className="text-[10px] text-[#999] mb-5 italic tracking-wider">
+                {p.scentProfile.join(' • ')}
+              </p>
+              <button className="bg-transparent border border-black px-8 py-3 text-[10px] font-bold tracking-[2px] cursor-pointer w-full hover:bg-black hover:text-white transition-colors duration-300">
                 {p.stock > 0 ? 'VIEW ELIXIR' : 'OUT OF STOCK'}
               </button>
             </div>
@@ -64,26 +80,5 @@ const Shop = () => {
     </div>
   );
 };
-
-// --- Styles (OneElixir Client Theme) ---
-const container = { padding: '100px 5%', maxWidth: '1300px', margin: '0 auto', minHeight: '100vh' };
-const header = { textAlign: 'center', marginBottom: '80px' };
-const title = { fontSize: '40px', fontWeight: '300', letterSpacing: '10px', marginBottom: '15px' };
-const subtitle = { fontSize: '11px', color: '#888', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '30px' };
-const searchStyle = { padding: '12px 20px', border: '1px solid #eee', width: '100%', maxWidth: '400px', textAlign: 'center', outline: 'none', fontSize: '13px', letterSpacing: '1px' };
-
-const productGrid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '50px' };
-const card = { cursor: 'pointer', transition: '0.4s transform ease', textAlign: 'center' };
-const imageBox = { position: 'relative', width: '100%', height: '380px', backgroundColor: '#fcfcfc', marginBottom: '20px', overflow: 'hidden' };
-const imgStyle = { width: '100%', height: '100%', objectFit: 'cover' };
-
-const soldOutBadge = { position: 'absolute', top: '15px', right: '15px', backgroundColor: '#000', color: '#fff', padding: '5px 12px', fontSize: '9px', fontWeight: 'bold', letterSpacing: '2px' };
-const lowStockBadge = { ...soldOutBadge, backgroundColor: '#f39c12' };
-
-const details = { padding: '0 10px' };
-const pName = { fontSize: '15px', letterSpacing: '3px', marginBottom: '8px', fontWeight: 'bold' };
-const pPrice = { fontSize: '14px', marginBottom: '12px', color: '#333' };
-const pNotes = { fontSize: '10px', color: '#999', marginBottom: '20px', fontStyle: 'italic', letterSpacing: '1px' };
-const viewBtn = { background: 'none', border: '1px solid #000', padding: '12px 30px', fontSize: '10px', fontWeight: 'bold', letterSpacing: '2px', cursor: 'pointer', width: '100%' };
 
 export default Shop;

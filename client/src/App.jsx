@@ -39,7 +39,7 @@ const AppContent = () => {
     <>
       {!isHideNavbar && <Navbar onCartClick={() => console.log("Cart Open")} />}
       
-      <div className="container" style={{ minHeight: '80vh' }}>
+      <div style={{ minHeight: '80vh' }}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/product/:id" element={<ProductDetails />} />

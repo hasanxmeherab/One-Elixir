@@ -1,4 +1,4 @@
-/* Minimalist Luxury Theme */
+@import "tailwindcss";
 :root {
   --gold: #D4AF37;
   --black: #1a1a1a;
