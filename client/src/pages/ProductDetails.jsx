@@ -3,7 +3,6 @@ import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 
-// 1. Added { openCart } to the component props
 const ProductDetails = ({ openCart }) => { 
   const { id } = useParams();
   const navigate = useNavigate();
@@ -24,93 +23,99 @@ const ProductDetails = ({ openCart }) => {
     fetchProduct();
   }, [id]);
 
-  if (!product) return <div style={loadingStyle}>AWAKENING THE SCENT...</div>;
+  if (!product) return (
+    <div className="h-screen flex justify-center items-center tracking-[5px]">
+      AWAKENING THE SCENT...
+    </div>
+  );
 
   const handleAddToCart = () => {
     addToCart(product, quantity);
-    // 2. Corrected call from props.openCart() to openCart()
     if (openCart) openCart(); 
   };
 
   return (
-    <div style={container}>
+    <div className="flex min-h-screen px-[8%] pt-28 pb-20 gap-20 flex-wrap">
+      
       {/* Left: Product Image */}
-      <div style={imageSection}>
-        <img src={product.image} alt={product.name} style={mainImg} />
+      <div className="flex-1 min-w-[300px] md:min-w-[400px] bg-[#fcfcfc]">
+        <img src={product.image} alt={product.name} className="w-full h-auto object-cover" />
       </div>
 
       {/* Right: Product Info */}
-      <div style={infoSection}>
-        <button onClick={() => navigate('/shop')} style={backBtn}>← BACK TO COLLECTION</button>
-        
-        <h1 style={title}>{product.name.toUpperCase()}</h1>
-        <p style={price}>{product.price.toLocaleString()} TK</p>
-        
-        <div style={divider}></div>
+      <div className="flex-1 min-w-[300px] md:min-w-[400px] flex flex-col justify-center">
+        <button
+          onClick={() => navigate('/shop')}
+          className="bg-transparent border-none text-[10px] tracking-[2px] cursor-pointer mb-8 text-left p-0 hover:opacity-50 transition-opacity"
+        >
+          ← BACK TO COLLECTION
+        </button>
 
-        <p style={description}>{product.description}</p>
+        <h1 className="text-4xl md:text-5xl font-light tracking-[12px] mb-2">
+          {product.name.toUpperCase()}
+        </h1>
+        <p className="text-xl text-[#555] mb-8">{product.price.toLocaleString()} TK</p>
 
-        {/* Scent Architecture Section */}
-        <div style={notesSection}>
-          <p style={sectionLabel}>SCENT ARCHITECTURE</p>
-          <div style={notesGrid}>
+        <div className="h-px bg-[#eee] w-16 mb-8"></div>
+
+        <p className="text-[15px] leading-relaxed text-[#444] mb-10">{product.description}</p>
+
+        {/* Scent Architecture */}
+        <div className="mb-12">
+          <p className="text-[10px] tracking-[3px] font-bold mb-4 text-[#888]">SCENT ARCHITECTURE</p>
+          <div className="flex gap-2.5 flex-wrap mb-12">
             {product.scentProfile.map((note, index) => (
-              <span key={index} style={noteTag}>{note}</span>
+              <span
+                key={index}
+                className="px-4 py-2 border border-[#ddd] text-xs tracking-wider hover:border-black transition-colors"
+              >
+                {note}
+              </span>
             ))}
           </div>
         </div>
 
         {/* Purchase Actions */}
-        <div style={purchaseSection}>
+        <div className="flex gap-5 mb-5 flex-wrap">
           {product.stock > 0 ? (
             <>
-              <div style={qtyWrapper}>
-                <button 
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))} 
-                  style={qtyBtn}
+              {/* Quantity Selector */}
+              <div className="flex items-center border border-black">
+                <button
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  className="px-4 py-2.5 bg-transparent border-none cursor-pointer text-lg hover:bg-gray-50 transition-colors"
                 >-</button>
-                <span style={qtyDisplay}>{quantity}</span>
-                <button 
-                  onClick={() => setQuantity(Math.min(product.stock, quantity + 1))} 
-                  style={qtyBtn}
+                <span className="px-5 font-bold">{quantity}</span>
+                <button
+                  onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
+                  className="px-4 py-2.5 bg-transparent border-none cursor-pointer text-lg hover:bg-gray-50 transition-colors"
                 >+</button>
               </div>
-              <button onClick={handleAddToCart} style={addBtn}>ADD TO COLLECTION</button>
+
+              {/* Add to Cart Button */}
+              <button
+                onClick={handleAddToCart}
+                className="flex-1 bg-black text-white border-none font-bold tracking-[2px] cursor-pointer text-xs hover:bg-gray-800 transition-colors px-6 py-3"
+              >
+                ADD TO COLLECTION
+              </button>
             </>
           ) : (
-            <button disabled style={outBtn}>CURRENTLY UNAVAILABLE</button>
+            <button
+              disabled
+              className="flex-1 bg-[#eee] text-[#888] border-none cursor-not-allowed tracking-[2px] py-3"
+            >
+              CURRENTLY UNAVAILABLE
+            </button>
           )}
         </div>
-        
-        <p style={stockInfo}>
+
+        <p className="text-[11px] text-[#aaa] italic">
           {product.stock > 0 ? `Inventory: ${product.stock} units available` : 'Restocking soon.'}
         </p>
       </div>
     </div>
   );
 };
-
-// --- Styles (Matching OneElixir Luxury Aesthetic) ---
-const container = { display: 'flex', minHeight: '100vh', padding: '120px 8%', gap: '80px', flexWrap: 'wrap' };
-const imageSection = { flex: '1', minWidth: '400px', backgroundColor: '#fcfcfc' };
-const mainImg = { width: '100%', height: 'auto', objectFit: 'cover' };
-const infoSection = { flex: '1', minWidth: '400px', display: 'flex', flexDirection: 'column', justifyContent: 'center' };
-const backBtn = { background: 'none', border: 'none', fontSize: '10px', letterSpacing: '2px', cursor: 'pointer', marginBottom: '30px', textAlign: 'left', padding: 0 };
-const title = { fontSize: '48px', fontWeight: '300', letterSpacing: '12px', marginBottom: '10px' };
-const price = { fontSize: '20px', color: '#555', marginBottom: '30px' };
-const divider = { height: '1px', backgroundColor: '#eee', width: '60px', marginBottom: '30px' };
-const description = { fontSize: '15px', lineHeight: '1.8', color: '#444', marginBottom: '40px' };
-const notesSection = { marginBottom: '50px' };
-const sectionLabel = { fontSize: '10px', letterSpacing: '3px', fontWeight: 'bold', marginBottom: '15px', color: '#888' };
-const notesGrid = { display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '50px' };
-const noteTag = { padding: '8px 15px', border: '1px solid #ddd', fontSize: '12px', letterSpacing: '1px' };
-const purchaseSection = { display: 'flex', gap: '20px', marginBottom: '20px' };
-const qtyWrapper = { display: 'flex', alignItems: 'center', border: '1px solid #000' };
-const qtyBtn = { padding: '10px 15px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' };
-const qtyDisplay = { padding: '0 20px', fontWeight: 'bold' };
-const addBtn = { flex: 1, backgroundColor: '#000', color: '#fff', border: 'none', fontWeight: 'bold', letterSpacing: '2px', cursor: 'pointer', fontSize: '12px' };
-const outBtn = { flex: 1, backgroundColor: '#eee', color: '#888', border: 'none', cursor: 'not-allowed', letterSpacing: '2px' };
-const stockInfo = { fontSize: '11px', color: '#aaa', fontStyle: 'italic' };
-const loadingStyle = { height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', letterSpacing: '5px' };
 
 export default ProductDetails;

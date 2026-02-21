@@ -10,12 +10,12 @@ const OrderList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('ALL');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('ALL');
-  const [selectedPayment, setSelectedPayment] = useState(null); 
+  const [selectedPayment, setSelectedPayment] = useState(null);
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   if (!orders) {
-    return <div style={{ padding: '40px', textAlign: 'center' }}>Loading Order Data...</div>;
+    return <div className="p-10 text-center">Loading Order Data...</div>;
   }
 
   const updatePaymentStatus = async (id, paymentStatus) => {
@@ -42,9 +42,8 @@ const OrderList = () => {
       doc.setFontSize(9);
       doc.setTextColor(100);
       doc.text("Ashulia, Dhaka, Bangladesh", 105, 33, { align: "center" });
-      doc.text("Phone: +880 1690-272870", 105, 38, { align: "center" }); 
+      doc.text("Phone: +880 1690-272870", 105, 38, { align: "center" });
       doc.line(20, 43, 190, 43);
-
       doc.setTextColor(0);
       doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
@@ -53,15 +52,10 @@ const OrderList = () => {
       doc.text(`${order.customerName}`, 20, 59);
       doc.text(`Phone: ${order.phone}`, 20, 65);
       if (order.address) doc.text(`Address: ${order.address}`, 20, 71);
-
       doc.text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`, 140, 59);
       doc.text(`Order ID: #${order._id.slice(-6).toUpperCase()}`, 140, 65);
       doc.text(`Payment Method: ${order.paymentMethod}`, 20, 77);
-      
-      if (order.createdBy) {
-        doc.text(`Processed By: ${order.createdBy}`, 20, 83);
-      }
-
+      if (order.createdBy) doc.text(`Processed By: ${order.createdBy}`, 20, 83);
       const tableColumn = ["Item", "Qty", "Price", "Discount", "Total"];
       const tableRows = order.items.map(item => {
         const itemPrice = item.price || 0;
@@ -69,12 +63,11 @@ const OrderList = () => {
         let discLabel = "0 TK";
         if (item.discountType === 'percentage') discLabel = `${item.discountValue}%`;
         else if (item.discountType === 'fixed') discLabel = `${item.discountValue} TK`;
-        const finalPrice = item.finalItemPrice || (item.discountType === 'percentage' 
-          ? itemPrice - (itemPrice * item.discountValue / 100) 
+        const finalPrice = item.finalItemPrice || (item.discountType === 'percentage'
+          ? itemPrice - (itemPrice * item.discountValue / 100)
           : itemPrice - (item.discountValue || 0));
-        return [item.name, qty, `${itemPrice.toLocaleString()} TK`, discLabel, `${(finalPrice * qty).toLocaleString()} TK` ];
+        return [item.name, qty, `${itemPrice.toLocaleString()} TK`, discLabel, `${(finalPrice * qty).toLocaleString()} TK`];
       });
-
       autoTable(doc, {
         startY: order.createdBy ? 90 : 85,
         head: [tableColumn],
@@ -83,20 +76,17 @@ const OrderList = () => {
         headStyles: { fillColor: [0, 0, 0] },
         styles: { fontSize: 10, cellPadding: 5 }
       });
-
       const finalY = doc.lastAutoTable.finalY + 15;
       doc.setFontSize(11);
       const subtotal = order.items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
       doc.text("Subtotal:", 135, finalY);
       doc.text(`${subtotal.toLocaleString()} TK`, 190, finalY, { align: "right" });
-
       let currentY = finalY + 8;
       if (order.shippingCost > 0) {
         doc.text("Shipping Fee:", 135, currentY);
         doc.text(`${order.shippingCost.toLocaleString()} TK`, 190, currentY, { align: "right" });
         currentY += 8;
       }
-
       const totalSavings = subtotal - (order.totalAmount - (order.shippingCost || 0));
       if (totalSavings > 0) {
         doc.setTextColor(200, 0, 0);
@@ -104,19 +94,16 @@ const OrderList = () => {
         doc.text(`-${totalSavings.toLocaleString()} TK`, 190, currentY, { align: "right" });
         currentY += 8;
       }
-
       doc.setTextColor(0);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(14);
-      doc.text("GRAND TOTAL:", 120, currentY + 5); 
+      doc.text("GRAND TOTAL:", 120, currentY + 5);
       doc.text(`${order.totalAmount.toLocaleString()} TK`, 190, currentY + 5, { align: "right" });
-
       doc.save(`OneElixir_Receipt_${order.customerName.replace(/\s+/g, '_')}.pdf`);
     } catch (error) { console.error("PDF Error:", error); }
   };
 
   const baseFiltered = orders.filter(order => showArchived ? order.status === 'Canceled' : order.status !== 'Canceled');
-  
   const displayedOrders = baseFiltered.filter(order => {
     const search = searchTerm.toLowerCase();
     const matchesSearch = order.customerName.toLowerCase().includes(search) || order.phone.includes(search);
@@ -125,145 +112,174 @@ const OrderList = () => {
     return matchesSearch && matchesStatus && matchesMethod;
   });
 
+  const getStatusClass = (status) => {
+    const base = 'px-2 py-0.5 rounded-sm text-[10px] font-bold';
+    if (status === 'Delivered') return `${base} bg-green-100 text-green-800`;
+    if (status === 'Canceled') return `${base} bg-red-100 text-red-800`;
+    if (status === 'Processing') return `${base} bg-blue-100 text-blue-800`;
+    return `${base} bg-yellow-100 text-yellow-800`;
+  };
+
+  const getPaymentSelectClass = (status) =>
+    `p-1 text-[10px] font-bold border border-[#ddd] cursor-pointer ${status === 'Paid' ? 'text-green-800 bg-green-100' : 'text-red-800 bg-red-100'}`;
+
   return (
-    <div style={containerStyle}>
-      <div style={headerRow}>
-        <h3 style={{ letterSpacing: '2px', margin: 0 }}>{showArchived ? 'ARCHIVED ORDERS' : 'ACTIVE ORDERS'}</h3>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <input type="text" placeholder="Search customer..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={searchStyle} />
-          <select value={paymentStatusFilter} onChange={(e) => setPaymentStatusFilter(e.target.value)} style={filterDropdownStyle}>
+    <div className="w-full">
+      {/* Header Row */}
+      <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
+        <h3 className="tracking-[2px] m-0 font-bold">
+          {showArchived ? 'ARCHIVED ORDERS' : 'ACTIVE ORDERS'}
+        </h3>
+        <div className="flex gap-2.5 flex-wrap items-center">
+          <input
+            type="text" placeholder="Search customer..."
+            value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+            className="px-3 py-2 border border-[#ddd] text-xs w-[150px] outline-none"
+          />
+          <select
+            value={paymentStatusFilter} onChange={(e) => setPaymentStatusFilter(e.target.value)}
+            className="p-2 border border-[#ddd] text-[11px] outline-none cursor-pointer font-bold"
+          >
             <option value="ALL">ALL PAYMENT</option>
             <option value="Paid">PAID</option>
             <option value="Unpaid">UNPAID</option>
           </select>
-          <select value={paymentMethodFilter} onChange={(e) => setPaymentMethodFilter(e.target.value)} style={filterDropdownStyle}>
+          <select
+            value={paymentMethodFilter} onChange={(e) => setPaymentMethodFilter(e.target.value)}
+            className="p-2 border border-[#ddd] text-[11px] outline-none cursor-pointer font-bold"
+          >
             <option value="ALL">ALL METHODS</option>
             <option value="Cash on Delivery">COD</option>
             <option value="Full Payment">FULL PAYMENT</option>
           </select>
-          <button onClick={() => { setShowArchived(!showArchived); setSearchTerm(''); }} style={showArchived ? activeToggleBtn : toggleBtn}>
+          <button
+            onClick={() => { setShowArchived(!showArchived); setSearchTerm(''); }}
+            className={`px-3 py-2 text-[10px] font-bold tracking-wider cursor-pointer border transition-colors ${showArchived ? 'bg-black text-white border-black' : 'bg-[#f0f0f0] text-black border-[#ddd] hover:bg-gray-200'}`}
+          >
             {showArchived ? '← BACK' : 'ARCHIVED'}
           </button>
         </div>
       </div>
 
-      <table style={tableStyle}>
-        <thead>
-          <tr style={headerStyle}>
-            <th>DATE</th>
-            <th>CUSTOMER</th>
-            <th>ADDRESS</th>
-            <th>ITEMS</th>
-            <th>SHIPPING</th>
-            <th>TOTAL</th>
-            <th>PAYMENT</th>
-            <th>INFO</th>
-            <th>CREATED BY</th>
-            <th>STATUS</th>
-            <th>ACTIONS</th>
-            <th>PDF</th>
-          </tr>
-        </thead>
-        <tbody>
-          {displayedOrders.length > 0 ? displayedOrders.map(order => (
-            <tr key={order._id} style={rowStyle}>
-              <td>{new Date(order.createdAt).toLocaleDateString()}</td>
-              <td>
-                <div style={{ fontWeight: 'bold' }}>{order.customerName}</div>
-                <div style={{ fontSize: '11px', color: '#666' }}>{order.phone}</div>
-              </td>
-              <td style={{ maxWidth: '150px' }}>
-                <div style={{ fontSize: '11px' }}>{order.address?.split(',').slice(-2).join(',')}</div>
-              </td>
-              <td>
-                <div style={{ fontSize: '11px' }}>
-                  {order.items.map((item, i) => <div key={i}>{item.quantity}x {item.name}</div>)}
-                </div>
-              </td>
-              <td style={{ fontSize: '11px' }}>{order.shippingCost} TK</td>
-              <td style={{ fontWeight: 'bold' }}>{order.totalAmount.toLocaleString()} TK</td>
-              <td>
-                <div style={{ fontSize: '10px', marginBottom: '3px' }}>{order.paymentMethod}</div>
-                <select value={order.paymentStatus || 'Unpaid'} onChange={(e) => updatePaymentStatus(order._id, e.target.value)} style={paymentSelectStyle(order.paymentStatus)}>
-                  <option value="Unpaid">Unpaid</option>
-                  <option value="Paid">Paid</option>
-                </select>
-              </td>
-              <td>
-                {order.paymentDetails?.transactionId ? (
-                  <button onClick={() => setSelectedPayment(order.paymentDetails)} style={infoBtnStyle}>INFO</button>
-                ) : '-'}
-              </td>
-              <td style={{ fontSize: '11px', color: '#666' }}>{order.createdBy || 'Customer'}</td>
-              <td><span style={getStatusStyle(order.status)}>{order.status.toUpperCase()}</span></td>
-              <td>
-                {order.status !== 'Canceled' ? (
-                  <select onChange={(e) => updateStatus(order._id, e.target.value)} value={order.status} style={selectStyle}>
-                    <option value="Pending">Pending</option>
-                    <option value="Processing">Processing</option>
-                    <option value="Delivered">Delivered</option>
-                    <option value="Canceled">Cancel Order</option>
-                  </select>
-                ) : (
-                  <button onClick={() => updateStatus(order._id, 'Pending')} style={restoreBtn}>RESTORE</button>
-                )}
-              </td>
-              <td><button onClick={() => downloadReceipt(order)} style={downloadBtn}>📄</button></td>
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-left text-xs">
+          <thead>
+            <tr className="border-b-2 border-black">
+              {['DATE','CUSTOMER','ADDRESS','ITEMS','SHIPPING','TOTAL','PAYMENT','INFO','CREATED BY','STATUS','ACTIONS','PDF'].map(h => (
+                <th key={h} className="p-2.5 whitespace-nowrap">{h}</th>
+              ))}
             </tr>
-          )) : (
-            <tr><td colSpan="12" style={{ textAlign: 'center', padding: '50px', color: '#999' }}>No orders found.</td></tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {displayedOrders.length > 0 ? displayedOrders.map(order => (
+              <tr key={order._id} className="border-b border-[#eee]">
+                <td className="p-2.5 whitespace-nowrap">{new Date(order.createdAt).toLocaleDateString()}</td>
+                <td className="p-2.5">
+                  <div className="font-bold">{order.customerName}</div>
+                  <div className="text-[11px] text-[#666]">{order.phone}</div>
+                </td>
+                <td className="p-2.5 max-w-[120px]">
+                  <div className="text-[11px]">{order.address?.split(',').slice(-2).join(',')}</div>
+                </td>
+                <td className="p-2.5">
+                  <div className="text-[11px]">
+                    {order.items.map((item, i) => <div key={i}>{item.quantity}x {item.name}</div>)}
+                  </div>
+                </td>
+                <td className="p-2.5 text-[11px]">{order.shippingCost} TK</td>
+                <td className="p-2.5 font-bold whitespace-nowrap">{order.totalAmount.toLocaleString()} TK</td>
+                <td className="p-2.5">
+                  <div className="text-[10px] mb-1">{order.paymentMethod}</div>
+                  <select
+                    value={order.paymentStatus || 'Unpaid'}
+                    onChange={(e) => updatePaymentStatus(order._id, e.target.value)}
+                    className={getPaymentSelectClass(order.paymentStatus)}
+                  >
+                    <option value="Unpaid">Unpaid</option>
+                    <option value="Paid">Paid</option>
+                  </select>
+                </td>
+                <td className="p-2.5">
+                  {order.paymentDetails?.transactionId ? (
+                    <button
+                      onClick={() => setSelectedPayment(order.paymentDetails)}
+                      className="bg-black text-white border-none px-2 py-1 text-[9px] cursor-pointer font-bold hover:bg-gray-800 transition-colors"
+                    >
+                      INFO
+                    </button>
+                  ) : '-'}
+                </td>
+                <td className="p-2.5 text-[11px] text-[#666]">{order.createdBy || 'Customer'}</td>
+                <td className="p-2.5">
+                  <span className={getStatusClass(order.status)}>{order.status.toUpperCase()}</span>
+                </td>
+                <td className="p-2.5">
+                  {order.status !== 'Canceled' ? (
+                    <select
+                      onChange={(e) => updateStatus(order._id, e.target.value)}
+                      value={order.status}
+                      className="p-1 text-[10px] border border-[#ddd] cursor-pointer"
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="Processing">Processing</option>
+                      <option value="Delivered">Delivered</option>
+                      <option value="Canceled">Cancel Order</option>
+                    </select>
+                  ) : (
+                    <button
+                      onClick={() => updateStatus(order._id, 'Pending')}
+                      className="bg-[#222] text-white border-none px-3 py-1 cursor-pointer text-[10px] hover:bg-gray-700 transition-colors"
+                    >
+                      RESTORE
+                    </button>
+                  )}
+                </td>
+                <td className="p-2.5">
+                  <button
+                    onClick={() => downloadReceipt(order)}
+                    className="bg-white border border-black px-2 py-1 cursor-pointer text-xs font-bold hover:bg-black hover:text-white transition-colors"
+                  >
+                    📄
+                  </button>
+                </td>
+              </tr>
+            )) : (
+              <tr>
+                <td colSpan="12" className="text-center py-12 text-[#999]">No orders found.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
-      {/* --- ADMIN PAYMENT INFO MODAL --- */}
+      {/* Payment Info Modal */}
       {selectedPayment && (
-        <div style={adminModalOverlay}>
-          <div style={adminModalContent}>
-            <h3 style={{fontSize:'14px', letterSpacing:'1px'}}>PAYMENT VERIFICATION</h3>
-            <p style={{fontSize:'13px'}}><b>Paid Amount:</b> <span style={{color:'green', fontWeight:'bold'}}>{selectedPayment.amountPaid} TK</span></p>
-            <p style={{fontSize:'13px'}}><b>Platform:</b> {selectedPayment.platform}</p>
-            <p style={{fontSize:'13px'}}><b>Sender:</b> {selectedPayment.senderNumber}</p>
-            <p style={{fontSize:'13px'}}><b>TrxID:</b> {selectedPayment.transactionId}</p>
-            <p style={{fontSize:'13px'}}><b>Screenshot:</b></p>
+        <div className="fixed top-0 left-0 w-full h-full bg-black/80 flex justify-center items-center z-[3000]">
+          <div className="bg-white p-8 w-[90%] max-w-[350px] flex flex-col gap-2.5">
+            <h3 className="text-sm tracking-wider font-bold">PAYMENT VERIFICATION</h3>
+            <p className="text-sm"><b>Paid Amount:</b> <span className="text-green-600 font-bold">{selectedPayment.amountPaid} TK</span></p>
+            <p className="text-sm"><b>Platform:</b> {selectedPayment.platform}</p>
+            <p className="text-sm"><b>Sender:</b> {selectedPayment.senderNumber}</p>
+            <p className="text-sm"><b>TrxID:</b> {selectedPayment.transactionId}</p>
+            <p className="text-sm font-bold">Screenshot:</p>
             <a href={selectedPayment.screenshot} target="_blank" rel="noreferrer">
-                <img src={selectedPayment.screenshot} alt="Payment" style={{width:'100%', maxHeight:'300px', objectFit:'contain', border:'1px solid #ddd'}} />
+              <img
+                src={selectedPayment.screenshot} alt="Payment"
+                className="w-full max-h-[300px] object-contain border border-[#ddd]"
+              />
             </a>
-            <button onClick={() => setSelectedPayment(null)} style={closeBtnStyle}>CLOSE</button>
+            <button
+              onClick={() => setSelectedPayment(null)}
+              className="bg-black text-white border-none p-2.5 cursor-pointer font-bold mt-2.5 hover:bg-gray-800 transition-colors"
+            >
+              CLOSE
+            </button>
           </div>
         </div>
       )}
     </div>
   );
-};
-
-const containerStyle = { width: '100%' };
-const headerRow = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' };
-const searchStyle = { padding: '8px 12px', border: '1px solid #ddd', fontSize: '12px', width: '150px', outline: 'none' };
-const filterDropdownStyle = { padding: '8px', border: '1px solid #ddd', fontSize: '11px', outline: 'none', cursor: 'pointer', fontWeight: 'bold' };
-const tableStyle = { width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' };
-const headerStyle = { borderBottom: '2px solid #000', padding: '10px' };
-const rowStyle = { borderBottom: '1px solid #eee' };
-const selectStyle = { padding: '5px', fontSize: '10px', border: '1px solid #ddd' };
-const toggleBtn = { backgroundColor: '#f0f0f0', border: '1px solid #ddd', padding: '8px 12px', cursor: 'pointer', fontSize: '10px', fontWeight: 'bold', letterSpacing: '1px' };
-const activeToggleBtn = { ...toggleBtn, backgroundColor: '#000', color: '#fff' };
-const restoreBtn = { backgroundColor: '#222', color: '#fff', border: 'none', padding: '5px 12px', cursor: 'pointer', fontSize: '10px' };
-const downloadBtn = { backgroundColor: '#fff', border: '1px solid #000', padding: '5px 8px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' };
-const infoBtnStyle = { background: '#000', color: '#fff', border: 'none', padding: '4px 8px', fontSize: '9px', cursor: 'pointer', fontWeight: 'bold' };
-const adminModalOverlay = { position: 'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.8)', display:'flex', justifyContent:'center', alignItems:'center', zIndex:3000 };
-const adminModalContent = { background:'#fff', padding:'30px', width:'350px', display:'flex', flexDirection:'column', gap:'10px' };
-const closeBtnStyle = { background:'#000', color:'#fff', border:'none', padding:'10px', cursor:'pointer', fontWeight:'bold', marginTop:'10px' };
-
-const paymentSelectStyle = (status) => ({
-  padding: '4px', fontSize: '10px', fontWeight: 'bold', border: '1px solid #ddd', color: status === 'Paid' ? '#065f46' : '#991b1b', backgroundColor: status === 'Paid' ? '#d1fae5' : '#fee2e2', cursor: 'pointer'
-});
-
-const getStatusStyle = (status) => {
-  const base = { padding: '3px 8px', borderRadius: '2px', fontSize: '10px', fontWeight: 'bold' };
-  if (status === 'Delivered') return { ...base, backgroundColor: '#d1fae5', color: '#065f46' };
-  if (status === 'Canceled') return { ...base, backgroundColor: '#fee2e2', color: '#991b1b' };
-  if (status === 'Processing') return { ...base, backgroundColor: '#dbeafe', color: '#1e40af' };
-  return { ...base, backgroundColor: '#fef3c7', color: '#92400e' };
 };
 
 export default OrderList;
