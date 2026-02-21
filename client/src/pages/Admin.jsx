@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'; // Added useNavigate
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import AdminNavbar from '../components/AdminNavbar';
 
 const Admin = () => {
   const [perfumes, setPerfumes] = useState([]);
   const [orders, setOrders] = useState([]);
   const [investments, setInvestments] = useState([]);
-  const location = useLocation(); 
-  const navigate = useNavigate(); // Initialize navigate for logout
-  
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   const fetchData = async () => {
@@ -27,7 +27,6 @@ const Admin = () => {
 
   useEffect(() => { fetchData(); }, []);
 
-  // --- NEW: LOGOUT LOGIC ---
   const handleAdminLogout = () => {
     localStorage.removeItem('isAdminAuthenticated');
     localStorage.removeItem('adminToken');
@@ -35,120 +34,52 @@ const Admin = () => {
     navigate('/admin-login');
   };
 
-  // Helper to check if a link is active for styling
   const isActive = (path) => location.pathname === path;
 
+  const linkClass = (path) =>
+    `no-underline text-left px-4 py-3 text-xs font-bold tracking-wider block transition-colors duration-200 rounded ${
+      isActive(path)
+        ? 'bg-black text-white'
+        : 'bg-transparent text-[#555] hover:bg-gray-100'
+    }`;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <div className="flex flex-col min-h-screen">
       <AdminNavbar />
-      
-      <div style={{ display: 'flex', flex: 1 }}>
-        {/* SIDEBAR WITH DEDICATED LINKS */}
-        <div style={sidebarStyle}>
-          <p style={sidebarLabel}>COMMAND CENTER</p>
-          
-          <Link to="/admin" style={isActive('/admin') ? activeBtn : menuBtn}>
-            DASHBOARD
-          </Link>
-          
-          <Link to="/admin/inventory" style={isActive('/admin/inventory') ? activeBtn : menuBtn}>
-            INVENTORY
-          </Link>
-          
-          <Link to="/admin/manual-order" style={isActive('/admin/manual-order') ? activeBtn : menuBtn}>
-            MANUAL ORDER
-          </Link>
-          
-          <Link to="/admin/order-list" style={isActive('/admin/order-list') ? activeBtn : menuBtn}>
-            ORDER LIST
-          </Link>
-          
-          <Link to="/admin/expenses" style={isActive('/admin/expenses') ? activeBtn : menuBtn}>
-            EXPENSES
-          </Link>
-          
-          <Link to="/admin/investment" style={isActive('/admin/investment') ? activeBtn : menuBtn}>
-            INVESTMENT
-          </Link>
 
-          <Link to="/admin/admins" style={isActive('/admin/admins') ? activeBtn : menuBtn}>
-            ADMIN MANAGEMENT
-          </Link>
-          
-          <Link to="/admin/coupons" style={isActive('/admin/coupons') ? activeBtn : menuBtn}>
-            COUPONS
-          </Link>
-          
-          <Link to="/admin/banners" style={isActive('/admin/banners') ? activeBtn : menuBtn}>
-            BANNERS
-          </Link>
+      <div className="flex flex-1">
+        {/* SIDEBAR */}
+        <div className="w-[260px] bg-[#f9f9f9] border-r border-[#eee] px-4 py-8 flex flex-col gap-1 shrink-0">
+          <p className="text-[10px] tracking-[2px] text-[#888] font-bold mb-5 pl-2.5">
+            COMMAND CENTER
+          </p>
 
-          {/* --- NEW: LOGOUT BUTTON AT BOTTOM --- */}
-          <button onClick={handleAdminLogout} style={logoutBtnStyle}>
+          <Link to="/admin" className={linkClass('/admin')}>DASHBOARD</Link>
+          <Link to="/admin/inventory" className={linkClass('/admin/inventory')}>INVENTORY</Link>
+          <Link to="/admin/manual-order" className={linkClass('/admin/manual-order')}>MANUAL ORDER</Link>
+          <Link to="/admin/order-list" className={linkClass('/admin/order-list')}>ORDER LIST</Link>
+          <Link to="/admin/expenses" className={linkClass('/admin/expenses')}>EXPENSES</Link>
+          <Link to="/admin/investment" className={linkClass('/admin/investment')}>INVESTMENT</Link>
+          <Link to="/admin/admins" className={linkClass('/admin/admins')}>ADMIN MANAGEMENT</Link>
+          <Link to="/admin/coupons" className={linkClass('/admin/coupons')}>COUPONS</Link>
+          <Link to="/admin/banners" className={linkClass('/admin/banners')}>BANNERS</Link>
+
+          {/* Logout at bottom */}
+          <button
+            onClick={handleAdminLogout}
+            className="mt-auto text-center px-4 py-3 text-xs font-bold tracking-wider text-[#991b1b] bg-white border border-[#fee2e2] rounded cursor-pointer hover:bg-[#fee2e2] transition-colors"
+          >
             LOGOUT SYSTEM
           </button>
         </div>
 
-        {/* DEDICATED PAGE CONTENT AREA */}
-        <div style={{ flex: 1, padding: '40px', backgroundColor: '#fff' }}>
+        {/* MAIN CONTENT */}
+        <div className="flex-1 p-10 bg-white overflow-auto">
           <Outlet context={{ perfumes, orders, investments, fetchData }} />
         </div>
       </div>
     </div>
   );
-};
-
-// --- Styles (Maintained & Luxury Feel) ---
-const sidebarStyle = { 
-  width: '260px', 
-  backgroundColor: '#f9f9f9', 
-  borderRight: '1px solid #eee', 
-  padding: '30px 15px', 
-  display: 'flex', 
-  flexDirection: 'column', 
-  gap: '5px' 
-};
-
-const sidebarLabel = { 
-  fontSize: '10px', 
-  letterSpacing: '2px', 
-  color: '#888', 
-  fontWeight: 'bold', 
-  marginBottom: '20px', 
-  paddingLeft: '10px' 
-};
-
-const menuBtn = { 
-  textDecoration: 'none',
-  textAlign: 'left', 
-  padding: '12px 15px', 
-  backgroundColor: 'transparent', 
-  border: 'none', 
-  cursor: 'pointer', 
-  fontSize: '12px', 
-  fontWeight: 'bold', 
-  letterSpacing: '1px', 
-  color: '#555', 
-  transition: '0.2s',
-  display: 'block' 
-};
-
-const activeBtn = { 
-  ...menuBtn, 
-  backgroundColor: '#000', 
-  color: '#fff', 
-  borderRadius: '4px' 
-};
-
-// --- NEW: LOGOUT STYLE ---
-const logoutBtnStyle = {
-  ...menuBtn,
-  marginTop: 'auto', // Pushes button to the bottom
-  color: '#991b1b', // Dark red for danger/logout action
-  backgroundColor: '#fff',
-  border: '1px solid #fee2e2',
-  borderRadius: '4px',
-  textAlign: 'center'
 };
 
 export default Admin;
