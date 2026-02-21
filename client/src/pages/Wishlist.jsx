@@ -3,26 +3,21 @@ import { Link } from 'react-router-dom';
 
 const Wishlist = () => {
   return (
-    <div style={containerStyle}>
-      <h2 style={titleStyle}>WISHLIST</h2>
-      <div style={lineStyle}></div>
-      
-      <div style={emptyContent}>
-        <p style={{ letterSpacing: '2px', color: '#888', fontSize: '12px' }}>YOUR WISHLIST IS CURRENTLY EMPTY</p>
-        <Link to="/shop" style={shopBtn}>EXPLORE COLLECTION</Link>
+    <div className="px-[5%] pt-24 pb-20 text-center min-h-[70vh]">
+      <h2 className="tracking-[10px] text-2xl font-bold">WISHLIST</h2>
+      <div className="w-10 h-0.5 bg-black mx-auto mt-5 mb-16"></div>
+
+      <div className="mt-20">
+        <p className="tracking-[2px] text-[#888] text-xs">YOUR WISHLIST IS CURRENTLY EMPTY</p>
+        <Link
+          to="/shop"
+          className="inline-block mt-10 px-12 py-5 bg-black text-white no-underline text-[11px] font-bold tracking-[3px] hover:bg-gray-800 transition-colors"
+        >
+          EXPLORE COLLECTION
+        </Link>
       </div>
     </div>
   );
-};
-
-const containerStyle = { padding: '100px 5%', textAlign: 'center', minHeight: '70vh' };
-const titleStyle = { letterSpacing: '10px', fontSize: '26px', fontWeight: 'bold' };
-const lineStyle = { width: '40px', height: '2px', backgroundColor: '#000', margin: '20px auto 60px' };
-const emptyContent = { marginTop: '80px' };
-const shopBtn = {
-  display: 'inline-block', marginTop: '40px', padding: '18px 50px',
-  backgroundColor: '#000', color: '#fff', textDecoration: 'none',
-  fontSize: '11px', fontWeight: 'bold', letterSpacing: '3px', transition: '0.3s'
 };
 
 export default Wishlist;

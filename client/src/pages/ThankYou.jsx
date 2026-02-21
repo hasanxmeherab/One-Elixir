@@ -6,27 +6,30 @@ const ThankYou = () => {
   const { setCart } = useCart();
 
   useEffect(() => {
-    // Only call if setCart exists to prevent crashing
     if (setCart) {
-      setCart([]); 
+      setCart([]);
     }
   }, [setCart]);
 
   return (
-    <div style={thankYouStyle}>
-      <h1 style={{ letterSpacing: '10px', fontSize: '3rem' }}>Thank You for Your Order</h1>
-      <p style={{ color: '#888', letterSpacing: '2px' }}>YOUR ORDER IS BEING PREPARED</p>
-      <div style={{ height: '1px', width: '50px', background: '#000', margin: '30px auto' }}></div>
-      <p style={{ marginBottom: '40px', lineHeight: '1.6' }}>
+    <div className="h-[80vh] flex flex-col items-center justify-center text-center px-4">
+      <h1 className="tracking-[10px] text-4xl md:text-5xl font-light mb-4">
+        Thank You for Your Order
+      </h1>
+      <p className="text-[#888] tracking-[2px] text-sm">YOUR ORDER IS BEING PREPARED</p>
+      <div className="h-px w-12 bg-black my-8 mx-auto"></div>
+      <p className="mb-10 leading-relaxed text-sm">
         Confirmation has been sent to your email. <br />
         We hope you enjoy your new Elixir.
       </p>
-      <Link to="/" style={homeBtnStyle}>RETURN TO SHOP</Link>
+      <Link
+        to="/"
+        className="bg-black text-white px-9 py-4 no-underline font-bold tracking-[2px] hover:bg-gray-800 transition-colors"
+      >
+        RETURN TO SHOP
+      </Link>
     </div>
   );
 };
-
-const thankYouStyle = { height: '80vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' };
-const homeBtnStyle = { backgroundColor: '#000', color: '#fff', padding: '15px 35px', textDecoration: 'none', fontWeight: 'bold' };
 
 export default ThankYou;

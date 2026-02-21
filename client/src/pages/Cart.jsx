@@ -4,7 +4,7 @@ import { useUser } from '../context/UserContext';
 import { Link, useNavigate } from 'react-router-dom';
 
 const Cart = () => {
-  const { cart, removeFromCart, addToCart, cartTotal } = useCart(); // Changed updateQuantity back to addToCart to match your Context
+  const { cart, removeFromCart, addToCart, cartTotal } = useCart();
   const { user } = useUser();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -19,104 +19,105 @@ const Cart = () => {
       setTimeout(() => {
         setLoading(false);
         navigate('/checkout');
-      }, 800); 
+      }, 800);
     }
   };
 
   return (
-    <div style={pageWrapper}>
-      <div style={containerStyle}>
-        <h2 style={cartHeaderStyle}>YOUR SELECTION ({cart.reduce((a, b) => a + (Number(b.quantity) || 0), 0)})</h2>
-        
+    <div className="min-h-[80vh] bg-white pt-10">
+      <div className="max-w-[1200px] mx-auto px-5">
+
+        {/* Header */}
+        <h2 className="tracking-[5px] text-left mb-10 border-b border-[#eee] pb-5">
+          YOUR SELECTION ({cart.reduce((a, b) => a + (Number(b.quantity) || 0), 0)})
+        </h2>
+
         {cart.length === 0 ? (
-          <div style={{ textAlign: 'center', marginTop: '50px' }}>
+          <div className="text-center mt-12">
             <p>Your OneElixir collection is currently empty.</p>
-            <Link to="/" style={shopLinkStyle}>BROWSE FRAGRANCES</Link>
+            <Link to="/" className="inline-block mt-5 text-black font-bold underline">
+              BROWSE FRAGRANCES
+            </Link>
           </div>
         ) : (
-          <div style={contentLayout}>
-            {/* LEFT SIDE: PRODUCT LIST */}
-            <div style={cartListStyle}>
+          <div className="flex gap-16 items-start flex-wrap">
+
+            {/* LEFT: PRODUCT LIST */}
+            <div className="flex-[2] min-w-[300px] md:min-w-[350px]">
               {cart.map((item) => (
-                <div key={item._id} style={cartItemStyle}>
-                  <div style={itemInfoStyle}>
-                    <img src={item.image} alt={item.name} style={cartThumbStyle} />
+                <div key={item._id} className="flex justify-between items-center py-6 border-b border-[#f1f1f1] flex-wrap gap-4">
+                  
+                  {/* Item Info */}
+                  <div className="flex gap-5 items-center flex-1">
+                    <img src={item.image} alt={item.name} className="w-[100px] h-[130px] object-cover bg-[#f9f9f9]" />
                     <div>
-                      <h4 style={itemNameStyle}>{item.name?.toUpperCase()}</h4>
-                      <p style={itemPriceStyle}>{item.price} TK</p>
-                      <button onClick={() => removeFromCart(item._id)} style={removeBtnStyle}>REMOVE</button>
+                      <h4 className="m-0 mb-1 text-sm tracking-wider font-bold">{item.name?.toUpperCase()}</h4>
+                      <p className="m-0 mb-2.5 text-[#666] text-[13px]">{item.price} TK</p>
+                      <button
+                        onClick={() => removeFromCart(item._id)}
+                        className="bg-transparent border-none text-[#999] text-[10px] underline cursor-pointer p-0"
+                      >
+                        REMOVE
+                      </button>
                     </div>
                   </div>
-                  
-                  <div style={quantityControlsStyle}>
-                    <button onClick={() => addToCart(item, -1)} style={qtyBtnStyle}>−</button>
-                    <span style={qtyValueStyle}>{item.quantity}</span>
-                    <button onClick={() => addToCart(item, 1)} style={qtyBtnStyle}>+</button>
+
+                  {/* Quantity Controls */}
+                  <div className="flex items-center border border-[#ddd] p-1">
+                    <button
+                      onClick={() => addToCart(item, -1)}
+                      className="border-none bg-transparent px-4 cursor-pointer text-lg"
+                    >−</button>
+                    <span className="text-sm min-w-[20px] text-center">{item.quantity}</span>
+                    <button
+                      onClick={() => addToCart(item, 1)}
+                      className="border-none bg-transparent px-4 cursor-pointer text-lg"
+                    >+</button>
                   </div>
 
-                  <div style={itemTotalStyle}>
+                  {/* Item Total */}
+                  <div className="w-[120px] text-right font-bold text-[15px]">
                     {(Number(item.price) * (Number(item.quantity) || 0)).toFixed(2)} TK
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* RIGHT SIDE: SUMMARY BOX (Now fully visible on the page) */}
-            <div style={summarySidebar}>
-              <h3 style={summaryTitle}>ORDER SUMMARY</h3>
-              <div style={totalRowStyle}>
+            {/* RIGHT: ORDER SUMMARY */}
+            <div className="flex-1 min-w-[280px] bg-[#fbfbfb] p-10 border border-[#eee]">
+              <h3 className="text-base tracking-[2px] mb-8">ORDER SUMMARY</h3>
+
+              <div className="flex justify-between font-bold mb-4 border-b border-[#ddd] pb-4">
                 <span>SUBTOTAL</span>
                 <span>{cartTotal.toFixed(2)} TK</span>
               </div>
-              <div style={shippingRow}>
+
+              <div className="flex justify-between text-[11px] text-[#888] mb-8">
                 <span>SHIPPING</span>
                 <span>CALCULATED AT CHECKOUT</span>
               </div>
-              <button 
-                onClick={handleCheckout} 
+
+              <button
+                onClick={handleCheckout}
                 disabled={loading}
-                style={{...checkoutBtnStyle, opacity: loading ? 0.7 : 1}}
+                className={`w-full bg-black text-white py-5 border-none font-bold tracking-[2px] cursor-pointer mb-5 transition-opacity ${loading ? 'opacity-70' : 'opacity-100 hover:bg-gray-800'}`}
               >
                 {loading ? "PROCESSING..." : "PROCEED TO CHECKOUT"}
               </button>
-              <Link to="/" style={continueShoppingStyle}>← CONTINUE SHOPPING</Link>
+
+              <Link
+                to="/"
+                className="block text-center text-[11px] text-black no-underline font-bold opacity-60 hover:opacity-100 transition-opacity"
+              >
+                ← CONTINUE SHOPPING
+              </Link>
             </div>
+
           </div>
         )}
       </div>
     </div>
   );
 };
-
-// --- Full Page Styles ---
-const pageWrapper = { minHeight: '80vh', backgroundColor: '#fff', paddingTop: '40px' };
-const containerStyle = { maxWidth: '1200px', margin: '0 auto', padding: '0 20px' };
-const cartHeaderStyle = { letterSpacing: '5px', textAlign: 'left', marginBottom: '40px', borderBottom: '1px solid #eee', paddingBottom: '20px' };
-
-// Flex Layout for Page
-const contentLayout = { display: 'flex', gap: '60px', alignItems: 'flex-start', flexWrap: 'wrap' };
-const cartListStyle = { flex: '2', minWidth: '350px' };
-
-// Item Styles
-const cartItemStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '25px 0', borderBottom: '1px solid #f1f1f1' };
-const itemInfoStyle = { display: 'flex', gap: '20px', alignItems: 'center', flex: 1 };
-const cartThumbStyle = { width: '100px', height: '130px', objectFit: 'cover', backgroundColor: '#f9f9f9' };
-const itemNameStyle = { margin: '0 0 5px 0', fontSize: '14px', letterSpacing: '1px', fontWeight: 'bold' };
-const itemPriceStyle = { margin: '0 0 10px 0', color: '#666', fontSize: '13px' };
-
-const quantityControlsStyle = { display: 'flex', alignItems: 'center', border: '1px solid #ddd', padding: '5px' };
-const qtyBtnStyle = { border: 'none', background: 'none', padding: '0 15px', cursor: 'pointer', fontSize: '18px' };
-const qtyValueStyle = { fontSize: '14px', minWidth: '20px', textAlign: 'center' };
-const itemTotalStyle = { width: '120px', textAlign: 'right', fontWeight: 'bold', fontSize: '15px' };
-const removeBtnStyle = { background: 'none', border: 'none', color: '#999', fontSize: '10px', textDecoration: 'underline', cursor: 'pointer', padding: 0 };
-
-// Summary Sidebar
-const summarySidebar = { flex: '1', minWidth: '300px', backgroundColor: '#fbfbfb', padding: '40px', border: '1px solid #eee' };
-const summaryTitle = { fontSize: '16px', letterSpacing: '2px', marginBottom: '30px' };
-const totalRowStyle = { display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', marginBottom: '15px', borderBottom: '1px solid #ddd', paddingBottom: '15px' };
-const shippingRow = { display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#888', marginBottom: '30px' };
-const checkoutBtnStyle = { width: '100%', backgroundColor: '#000', color: '#fff', padding: '20px', border: 'none', fontWeight: 'bold', letterSpacing: '2px', cursor: 'pointer', marginBottom: '20px' };
-const continueShoppingStyle = { display: 'block', textAlign: 'center', fontSize: '11px', color: '#000', textDecoration: 'none', fontWeight: 'bold', opacity: 0.6 };
-const shopLinkStyle = { display: 'inline-block', marginTop: '20px', color: '#000', fontWeight: 'bold', textDecoration: 'underline' };
 
 export default Cart;

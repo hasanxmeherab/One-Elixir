@@ -40,48 +40,73 @@ const Account = () => {
     }
   };
 
-  if (loading) return <div style={centerMsg}>RETRIEVING YOUR COLLECTION...</div>;
+  if (loading) return (
+    <div className="h-[80vh] flex items-center justify-center tracking-[2px]">
+      RETRIEVING YOUR COLLECTION...
+    </div>
+  );
 
   return (
-    <div style={container}>
-      <header style={header}>
-        <h1 style={title}>WELCOME, {user?.name?.toUpperCase()}</h1>
-        <p style={subtitle}>Manage your details and track your OneElixir orders.</p>
+    <div className="px-[10%] py-20 min-h-[80vh]">
+
+      {/* Header */}
+      <header className="mb-12 text-center">
+        <h1 className="tracking-[5px] text-3xl md:text-4xl font-bold">
+          WELCOME, {user?.name?.toUpperCase()}
+        </h1>
+        <p className="text-[#888] text-xs mt-2.5">
+          Manage your details and track your OneElixir orders.
+        </p>
       </header>
 
-      <section style={orderSection}>
-        <h2 style={sectionTitle}>ORDER HISTORY</h2>
+      {/* Order History */}
+      <section className="mt-10">
+        <h2 className="text-sm tracking-[3px] border-b border-black pb-2.5 mb-5">
+          ORDER HISTORY
+        </h2>
+
         {orders.length === 0 ? (
-          <p style={emptyMsg}>No elixirs secured yet.</p>
+          <p className="text-center text-[#888] mt-12 italic">No elixirs secured yet.</p>
         ) : (
-          <table style={tableStyle}>
-            <thead>
-              <tr style={thRow}>
-                <th style={th}>DATE</th>
-                <th style={th}>ITEMS</th>
-                <th style={th}>TOTAL</th>
-                <th style={th}>STATUS</th>
-                <th style={th}>ACTION</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map(order => (
-                <tr key={order._id} style={trStyle}>
-                  <td style={td}>{new Date(order.createdAt).toLocaleDateString()}</td>
-                  <td style={td}>{order.items.map(i => `${i.name} (x${i.quantity})`).join(', ')}</td>
-                  <td style={td}>{order.totalAmount} TK</td>
-                  <td style={{ ...td, color: getStatusColor(order.status) }}>
-                    {order.status.toUpperCase()}
-                  </td>
-                  <td style={td}>
-                    {order.status.toLowerCase() === 'pending' && (
-                      <button onClick={() => handleCancel(order._id)} style={cancelBtn}>CANCEL</button>
-                    )}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b-2 border-[#eee]">
+                  <th className="py-4 px-2.5 text-[11px] text-[#999] font-bold">DATE</th>
+                  <th className="py-4 px-2.5 text-[11px] text-[#999] font-bold">ITEMS</th>
+                  <th className="py-4 px-2.5 text-[11px] text-[#999] font-bold">TOTAL</th>
+                  <th className="py-4 px-2.5 text-[11px] text-[#999] font-bold">STATUS</th>
+                  <th className="py-4 px-2.5 text-[11px] text-[#999] font-bold">ACTION</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {orders.map(order => (
+                  <tr key={order._id} className="border-b border-[#f9f9f9]">
+                    <td className="py-5 px-2.5 text-sm">
+                      {new Date(order.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="py-5 px-2.5 text-sm max-w-[200px]">
+                      {order.items.map(i => `${i.name} (x${i.quantity})`).join(', ')}
+                    </td>
+                    <td className="py-5 px-2.5 text-sm">{order.totalAmount} TK</td>
+                    <td className="py-5 px-2.5 text-sm font-bold" style={{ color: getStatusColor(order.status) }}>
+                      {order.status.toUpperCase()}
+                    </td>
+                    <td className="py-5 px-2.5 text-sm">
+                      {order.status.toLowerCase() === 'pending' && (
+                        <button
+                          onClick={() => handleCancel(order._id)}
+                          className="bg-transparent border border-[#e74c3c] text-[#e74c3c] px-2.5 py-1 text-[10px] cursor-pointer hover:bg-[#e74c3c] hover:text-white transition-colors"
+                        >
+                          CANCEL
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>
@@ -95,21 +120,5 @@ const getStatusColor = (status) => {
   if (s === 'cancelled') return '#e74c3c';
   return '#888';
 };
-
-// Styles
-const container = { padding: '80px 10%', minHeight: '80vh' };
-const header = { marginBottom: '50px', textAlign: 'center' };
-const title = { letterSpacing: '5px', fontSize: '2rem', fontWeight: 'bold' };
-const subtitle = { color: '#888', fontSize: '12px', marginTop: '10px' };
-const orderSection = { marginTop: '40px' };
-const sectionTitle = { fontSize: '14px', letterSpacing: '3px', borderBottom: '1px solid #000', paddingBottom: '10px', marginBottom: '20px' };
-const tableStyle = { width: '100%', borderCollapse: 'collapse', textAlign: 'left' };
-const thRow = { borderBottom: '2px solid #eee' };
-const th = { padding: '15px 10px', fontSize: '11px', color: '#999', fontWeight: 'bold' };
-const trStyle = { borderBottom: '1px solid #f9f9f9' };
-const td = { padding: '20px 10px', fontSize: '13px' };
-const centerMsg = { height: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: '2px' };
-const emptyMsg = { textAlign: 'center', color: '#888', marginTop: '50px', fontStyle: 'italic' };
-const cancelBtn = { background: 'none', border: '1px solid #e74c3c', color: '#e74c3c', padding: '5px 10px', fontSize: '10px', cursor: 'pointer' };
 
 export default Account;
