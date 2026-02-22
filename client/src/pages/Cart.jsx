@@ -66,7 +66,8 @@ const Cart = () => {
                   <div className="flex items-center border border-[#ddd] p-1">
                     <button
                       onClick={() => addToCart(item, -1)}
-                      className="border-none bg-transparent px-4 cursor-pointer text-lg"
+                      disabled={item.quantity <= 1}
+                      className="border-none bg-transparent px-4 cursor-pointer text-lg disabled:opacity-30 disabled:cursor-not-allowed"
                     >−</button>
                     <span className="text-sm min-w-[20px] text-center">{item.quantity}</span>
                     <button
