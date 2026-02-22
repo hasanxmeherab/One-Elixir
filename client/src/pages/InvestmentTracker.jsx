@@ -75,16 +75,16 @@ const InvestmentTracker = () => {
         {/* Investor List & Create */}
         <div className="bg-white border border-[#eee] p-8">
           <span className="block text-[10px] text-[#888] font-bold tracking-[2px] mb-4">INVESTOR LIST & CREATE</span>
-          <div className="flex gap-2.5 mb-4">
+          <div className="flex gap-2.5 mb-4 items-stretch w-full">
             <input
               value={newInvestorName}
               onChange={e => setNewInvestorName(e.target.value)}
               placeholder="Name"
-              className="flex-1 p-2 border border-[#ddd] outline-none text-sm"
+              className="flex-1 min-w-0 p-2 border border-[#ddd] outline-none text-sm"
             />
             <button
               onClick={handleAddInvestor}
-              className="bg-black text-white border-none px-4 cursor-pointer font-bold text-xs hover:bg-gray-800 transition-colors"
+              className="shrink-0 bg-black text-white border-none px-4 py-2 cursor-pointer font-bold text-xs hover:bg-gray-800 transition-colors whitespace-nowrap"
             >
               ADD
             </button>

@@ -161,11 +161,11 @@ const ManualOrder = () => {
 
           return (
             <div key={index} className="border-b border-[#f0f0f0] pb-4 mb-1">
-              <div className="flex gap-2.5 items-center">
+              <div className="flex gap-2.5 items-center flex-wrap">
                 <select
                   value={item.perfumeId} required
                   onChange={e => updateItemRow(index, 'perfumeId', e.target.value)}
-                  className="flex-[3] p-3 border border-[#ddd] outline-none text-sm"
+                  className="flex-[3] min-w-[140px] p-3 border border-[#ddd] outline-none text-sm"
                 >
                   <option value="" disabled hidden>-- PICK PERFUME --</option>
                   {perfumes.map(p => !otherSelectedIds.includes(p._id) && (
@@ -178,7 +178,7 @@ const ManualOrder = () => {
                   type="number" placeholder="Qty" min="1" required
                   value={item.quantity}
                   onChange={e => updateItemRow(index, 'quantity', parseInt(e.target.value))}
-                  className="flex-1 p-3 border border-[#ddd] outline-none text-sm"
+                  className="w-[70px] p-3 border border-[#ddd] outline-none text-sm"
                 />
                 {selectedItems.length > 1 && (
                   <button
@@ -268,7 +268,7 @@ const ManualOrder = () => {
 
         {/* COUPON */}
         <p className="text-[10px] font-bold text-[#888] tracking-wider mt-2.5">APPLY COUPON (OPTIONAL)</p>
-        <div className="flex gap-2.5">
+        <div className="flex gap-2.5 items-stretch max-w-[320px]">
           <input
             type="text" placeholder="COUPON CODE"
             value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase())}
@@ -277,7 +277,7 @@ const ManualOrder = () => {
           <button
             type="button" onClick={handleApplyCoupon}
             disabled={couponLoading || !couponCode}
-            className="px-5 bg-[#444] text-white border-none cursor-pointer text-xs font-bold hover:bg-gray-600 transition-colors disabled:opacity-50"
+            className="px-5 py-3 bg-[#444] text-white border-none cursor-pointer text-xs font-bold hover:bg-gray-600 transition-colors disabled:opacity-50 whitespace-nowrap"
           >
             {couponLoading ? '...' : 'APPLY'}
           </button>
