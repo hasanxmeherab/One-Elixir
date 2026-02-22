@@ -10,7 +10,7 @@ const InventoryManager = () => {
   const [editId, setEditId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
-    name: '', price: '', description: '', scentProfile: '', image: '', stock: 0
+    name: '', price: '', description: '', scentProfile: '', image: '', stock: ''
   });
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -36,7 +36,7 @@ const InventoryManager = () => {
 
   const cancelEdit = () => {
     setEditId(null);
-    setFormData({ name: '', price: '', description: '', scentProfile: '', image: '', stock: 0 });
+    setFormData({ name: '', price: '', description: '', scentProfile: '', image: '', stock: '' });
     setFile(null);
   };
 
@@ -90,14 +90,14 @@ const InventoryManager = () => {
           value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
           className="p-3 border border-[#ddd] outline-none text-sm"
         />
-        <div className="flex gap-2.5">
+        <div className="flex flex-col sm:flex-row gap-2.5">
           <input
             type="number" placeholder="Price (TK)" required
             value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})}
             className="flex-1 p-3 border border-[#ddd] outline-none text-sm"
           />
           <input
-            type="number" placeholder="Stock" required
+            type="number" placeholder="Quantity" required min="0"
             value={formData.stock} onChange={e => setFormData({...formData, stock: e.target.value})}
             className="flex-1 p-3 border border-[#ddd] outline-none text-sm"
           />
@@ -112,13 +112,23 @@ const InventoryManager = () => {
           value={formData.scentProfile} onChange={e => setFormData({...formData, scentProfile: e.target.value})}
           className="p-3 border border-[#ddd] outline-none text-sm"
         />
-        <input
-          type="file"
-          onChange={(e) => setFile(e.target.files[0])}
-          required={!editId}
-          className="text-sm"
-        />
-        <div className="flex gap-2.5">
+        <label className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded cursor-pointer transition-colors p-6 ${file ? 'border-black bg-gray-50' : 'border-[#ddd] hover:border-black hover:bg-gray-50'}`}>
+          <span className="text-2xl">{file ? '✓' : '📁'}</span>
+          <span className="text-xs font-bold tracking-wider text-black">
+            {file ? 'IMAGE SELECTED' : 'CLICK TO UPLOAD IMAGE'}
+          </span>
+          <span className="text-[10px] text-[#aaa] truncate max-w-full px-2 text-center">
+            {file ? file.name : 'JPG, PNG, WEBP supported'}
+          </span>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setFile(e.target.files[0])}
+            required={!editId}
+            className="hidden"
+          />
+        </label>
+        <div className="flex flex-col sm:flex-row gap-2.5">
           <button
             type="submit" disabled={uploading}
             className="px-6 py-4 bg-black text-white border-none cursor-pointer font-bold hover:bg-gray-800 transition-colors disabled:opacity-60"
