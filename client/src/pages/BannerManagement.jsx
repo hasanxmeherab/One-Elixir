@@ -91,12 +91,16 @@ const BannerManagement = ({ isAdmin }) => {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 bg-[#f9f9f9] p-8 border border-[#eee] mb-10">
           {/* Upload Box */}
-          <div className="border-2 border-dashed border-[#ddd] p-5 text-center bg-white">
-            <label className="block text-[10px] font-bold mb-2.5 tracking-wider">UPLOAD IMAGE</label>
-            <input type="file" onChange={handleFileUpload} accept="image/*" className="text-sm" />
-            {uploading && <p className="text-[10px] text-blue-500 mt-1">Uploading...</p>}
-            {formData.imageUrl && <p className="text-[10px] text-green-500 mt-1">✓ Ready</p>}
-          </div>
+          <label className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded cursor-pointer transition-colors p-6 ${formData.imageUrl ? 'border-black bg-gray-50' : 'border-[#ddd] hover:border-black hover:bg-gray-50'}`}>
+            <span className="text-2xl">{uploading ? '⏳' : formData.imageUrl ? '✓' : '📁'}</span>
+            <span className="text-xs font-bold tracking-wider text-black">
+              {uploading ? 'UPLOADING...' : formData.imageUrl ? 'IMAGE READY' : 'CLICK TO UPLOAD IMAGE'}
+            </span>
+            <span className="text-[10px] text-[#aaa] text-center">
+              {uploading ? 'Please wait...' : formData.imageUrl ? '✓ Uploaded successfully' : 'JPG, PNG, WEBP supported'}
+            </span>
+            <input type="file" onChange={handleFileUpload} accept="image/*" className="hidden" />
+          </label>
 
           <input
             placeholder="Title"
@@ -138,55 +142,58 @@ const BannerManagement = ({ isAdmin }) => {
   if (!banners || banners.length === 0) return null;
 
   return (
-    <div className={`relative w-full overflow-hidden bg-black ${isMobile ? 'h-[40vh]' : 'h-[70vh]'}`}>
+    <div className="relative w-full overflow-hidden bg-black" style={{ paddingBottom: 'clamp(220px, 50vw, 70vh)', height: 0 }}>
+      <div className="absolute inset-0">
 
-      {/* Navigation Arrows */}
-      {!isMobile && (
-        <>
-          <button
-            onClick={prevSlide}
-            className="absolute left-5 top-1/2 -translate-y-1/2 bg-white/20 text-white border-none p-4 cursor-pointer z-10 text-xl rounded-full hover:bg-white/40 transition-colors"
-          >❮</button>
-          <button
-            onClick={nextSlide}
-            className="absolute right-5 top-1/2 -translate-y-1/2 bg-white/20 text-white border-none p-4 cursor-pointer z-10 text-xl rounded-full hover:bg-white/40 transition-colors"
-          >❯</button>
-        </>
-      )}
+        {/* Navigation Arrows */}
+        <button
+          onClick={prevSlide}
+          className="hidden sm:block absolute left-3 md:left-6 top-1/2 -translate-y-1/2 bg-white/20 text-white border-none p-2 md:p-4 cursor-pointer z-10 text-base md:text-xl rounded-full hover:bg-white/40 transition-colors"
+        >❮</button>
+        <button
+          onClick={nextSlide}
+          className="hidden sm:block absolute right-3 md:right-6 top-1/2 -translate-y-1/2 bg-white/20 text-white border-none p-2 md:p-4 cursor-pointer z-10 text-base md:text-xl rounded-full hover:bg-white/40 transition-colors"
+        >❯</button>
 
-      {/* Slides Wrapper */}
-      <div
-        className="flex w-full h-full transition-transform duration-700 ease-in-out"
-        style={{ transform: `translateX(-${current * 100}%)` }}
-      >
-        {banners.map((slide) => (
-          <div
-            key={slide._id}
-            className="min-w-full h-full bg-cover bg-center relative"
-            style={{ backgroundImage: `url(${slide.imageUrl})` }}
-          >
-            <div className={`text-center text-white h-full flex flex-col justify-center bg-black/30 ${isMobile ? 'px-5' : ''}`}>
-              <h1 className={`m-0 font-bold ${isMobile ? 'text-[1.8rem] tracking-[4px]' : 'text-[3.5rem] tracking-[12px]'}`}>
-                {slide.title?.toUpperCase()}
-              </h1>
-              <p className={`mt-2.5 ${isMobile ? 'text-[0.8rem] tracking-[2px]' : 'text-[1.2rem] tracking-[5px]'}`}>
-                {slide.subtitle}
-              </p>
+        {/* Slides Wrapper */}
+        <div
+          className="flex w-full h-full transition-transform duration-700 ease-in-out"
+          style={{ transform: `translateX(-${current * 100}%)` }}
+        >
+          {banners.map((slide) => (
+            <div
+              key={slide._id}
+              className="min-w-full h-full bg-cover bg-center"
+              style={{ backgroundImage: `url(${slide.imageUrl})` }}
+            >
+              <div className="text-center text-white h-full flex flex-col justify-center bg-black/30 px-4 sm:px-8">
+                <h1 className="m-0 font-bold
+                  text-[clamp(1.2rem,5vw,3.5rem)]
+                  tracking-[clamp(2px,1.5vw,12px)]">
+                  {slide.title?.toUpperCase()}
+                </h1>
+                <p className="mt-2
+                  text-[clamp(0.65rem,2vw,1.2rem)]
+                  tracking-[clamp(1px,1vw,5px)]">
+                  {slide.subtitle}
+                </p>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      {/* Pagination Dots */}
-      <div className="absolute bottom-5 w-full flex justify-center gap-2.5 z-10">
-        {banners.map((_, i) => (
-          <div
-            key={i}
-            onClick={() => { setCurrent(i); startTimer(); }}
-            className="w-2 h-2 rounded-full cursor-pointer transition-all duration-300"
-            style={{ backgroundColor: i === current ? '#fff' : 'rgba(255,255,255,0.4)' }}
-          />
-        ))}
+        {/* Pagination Dots */}
+        <div className="absolute bottom-3 sm:bottom-5 w-full flex justify-center gap-2 z-10">
+          {banners.map((_, i) => (
+            <div
+              key={i}
+              onClick={() => { setCurrent(i); startTimer(); }}
+              className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full cursor-pointer transition-all duration-300"
+              style={{ backgroundColor: i === current ? '#fff' : 'rgba(255,255,255,0.4)' }}
+            />
+          ))}
+        </div>
+
       </div>
     </div>
   );
