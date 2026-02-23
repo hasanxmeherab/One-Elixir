@@ -19,6 +19,7 @@ export const UserProvider = ({ children }) => {
 
   const login = (userData) => {
     localStorage.setItem('userToken', userData.token);
+    localStorage.setItem('userRefreshToken', userData.refreshToken || '');
     localStorage.setItem('userName', userData.user.name);
     localStorage.setItem('userEmail', userData.user.email); // Save email
     
@@ -31,6 +32,7 @@ export const UserProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('userToken');
+    localStorage.removeItem('userRefreshToken');
     localStorage.removeItem('userName');
     localStorage.removeItem('userEmail'); // Remove email
     setUser(null);

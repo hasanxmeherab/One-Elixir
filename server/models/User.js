@@ -7,6 +7,7 @@ const userSchema = new mongoose.Schema({
   role: { type: String, default: 'customer' },
   resetPasswordToken: String,
   resetPasswordExpires: Date,
+  refreshToken: { type: String, default: null },
   wishlist: [
     {
       type: mongoose.Schema.Types.ObjectId,
