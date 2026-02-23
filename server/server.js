@@ -28,6 +28,9 @@ app.use('/api/investments', require('./routes/investmentRoutes'));
 app.use('/api/banners', require('./routes/bannerRoutes'));
 app.use('/api/coupons', require('./routes/couponRoutes'));
 app.use('/api/admins', require('./routes/adminRoutes'));
+app.use('/api/reviews', require('./routes/reviewRoutes'));
+app.use('/api/wishlist', require('./routes/wishlistRoutes'));
+
 
 // Connect to MongoDB using env variable
 mongoose.connect(process.env.MONGO_URI)
