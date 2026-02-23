@@ -53,6 +53,7 @@ const Admin = () => {
     { to: '/admin/investment', label: 'INVESTMENT' },
     { to: '/admin/admins', label: 'ADMIN MANAGEMENT' },
     { to: '/admin/coupons', label: 'COUPONS' },
+    { to: '/admin/logs', label: 'ACTIVITY LOGS' },
     { to: '/admin/banners', label: 'BANNERS' },
   ];
 
