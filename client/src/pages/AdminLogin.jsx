@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { useToast } from '../context/ToastContext';
 
 const AdminLogin = () => {
+  const toast = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -14,12 +16,14 @@ const AdminLogin = () => {
     setLoading(true);
     try {
       const res = await axios.post(`${API_URL}/api/admins/login`, { email, password });
-      localStorage.setItem('adminToken', res.data.token);
+      localStorage.setItem('adminToken', res.data.accessToken);
+      localStorage.setItem('adminRefreshToken', res.data.refreshToken);
       localStorage.setItem('adminData', JSON.stringify(res.data.admin));
+      localStorage.setItem('adminRole', res.data.admin.role);
       localStorage.setItem('isAdminAuthenticated', 'true');
       navigate('/admin');
     } catch (err) {
-      alert(err.response?.data?.message || 'Login failed. Please check your credentials.');
+      toast.error(err.response?.data?.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }

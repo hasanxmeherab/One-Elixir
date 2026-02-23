@@ -5,20 +5,32 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
 
+// Helper — generate both tokens
+const generateTokens = (user) => {
+  const payload = { id: user._id };
+  const accessToken  = jwt.sign(payload, process.env.JWT_SECRET,         { expiresIn: '15m' });
+  const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
+  return { accessToken, refreshToken };
+};
+
 // SIGN UP
 router.post('/signup', async (req, res) => {
   try {
     const { name, email, password } = req.body;
     const existingUser = await User.findOne({ email });
-    if (existingUser) return res.status(400).json({ message: "Email already registered" });
+    if (existingUser) return res.status(400).json({ message: 'Email already registered' });
 
     const hashed = await bcrypt.hash(password, 10);
     const user = await User.create({ name, email, password: hashed });
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
+    const { accessToken, refreshToken } = generateTokens(user);
 
-    res.status(201).json({ token, user: { name: user.name, email: user.email } });
-  } catch (err) { 
-    res.status(400).json({ message: "Registration failed", error: err.message }); 
+    // Store hashed refresh token
+    user.refreshToken = await bcrypt.hash(refreshToken, 8);
+    await user.save();
+
+    res.status(201).json({ token: accessToken, refreshToken, user: { name: user.name, email: user.email } });
+  } catch (err) {
+    res.status(400).json({ message: 'Registration failed', error: err.message });
   }
 });
 
@@ -27,34 +39,64 @@ router.post('/signin', async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
-    if (user && await bcrypt.compare(password, user.password)) {
-      const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
-      res.json({ token, user: { name: user.name, email: user.email } });
-    } else {
-      res.status(401).json("Invalid credentials");
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json('Invalid credentials');
     }
+
+    const { accessToken, refreshToken } = generateTokens(user);
+    user.refreshToken = await bcrypt.hash(refreshToken, 8);
+    await user.save();
+
+    res.json({ token: accessToken, refreshToken, user: { name: user.name, email: user.email } });
   } catch (err) {
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
-// --- FORGOT PASSWORD ---
+// REFRESH TOKEN — get new accessToken using valid refreshToken
+router.post('/refresh', async (req, res) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) return res.status(401).json({ message: 'No refresh token' });
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const user = await User.findById(decoded.id);
+    if (!user || !user.refreshToken) return res.status(403).json({ message: 'Invalid refresh token' });
+
+    const valid = await bcrypt.compare(refreshToken, user.refreshToken);
+    if (!valid) return res.status(403).json({ message: 'Refresh token mismatch' });
+
+    const newAccessToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '15m' });
+    res.json({ token: newAccessToken });
+  } catch {
+    res.status(403).json({ message: 'Expired or invalid refresh token. Please sign in again.' });
+  }
+});
+
+// LOGOUT — invalidate refresh token
+router.post('/logout', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) return res.json({ message: 'Logged out' });
+    const decoded = jwt.decode(refreshToken);
+    if (decoded?.id) await User.findByIdAndUpdate(decoded.id, { refreshToken: null });
+    res.json({ message: 'Logged out successfully' });
+  } catch {
+    res.json({ message: 'Logged out' });
+  }
+});
+
+// FORGOT PASSWORD (unchanged)
 router.post('/forgot-password', async (req, res) => {
   try {
     const user = await User.findOne({ email: req.body.email.toLowerCase() });
-    if (!user) return res.status(404).json({ message: "No account found with that email." });
+    if (!user) return res.status(404).json({ message: 'No account found with that email.' });
 
-    // Generate Token
     const resetToken = crypto.randomBytes(32).toString('hex');
-    
-    // Save to User Document
     user.resetPasswordToken = resetToken;
-    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    user.resetPasswordExpires = Date.now() + 3600000;
     await user.save();
 
-    // Construct URL
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
-
     const htmlMessage = `
     <div style="font-family: 'Playfair Display', serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 40px; text-align: center; color: #1a1a1a;">
       <h1 style="letter-spacing: 8px; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #D4AF37; display: inline-block; padding-bottom: 10px;">ONEELIXIR</h1>
@@ -71,32 +113,30 @@ router.post('/forgot-password', async (req, res) => {
       html: htmlMessage
     });
 
-    res.json({ message: "Reset link sent to your email." });
+    res.json({ message: 'Reset link sent to your email.' });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Error sending reset email." });
+    res.status(500).json({ message: 'Error sending reset email.' });
   }
 });
 
-// --- RESET PASSWORD ---
+// RESET PASSWORD (unchanged)
 router.post('/reset-password/:token', async (req, res) => {
   try {
     const user = await User.findOne({
       resetPasswordToken: req.params.token,
       resetPasswordExpires: { $gt: Date.now() }
     });
+    if (!user) return res.status(400).json({ message: 'Invalid or expired token.' });
 
-    if (!user) return res.status(400).json({ message: "Invalid or expired token." });
-
-    // Hash new password and clear token fields
     user.password = await bcrypt.hash(req.body.password, 10);
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();
 
-    res.json({ message: "Password updated successfully!" });
+    res.json({ message: 'Password updated successfully!' });
   } catch (err) {
-    res.status(500).json({ message: "Error resetting password." });
+    res.status(500).json({ message: 'Error resetting password.' });
   }
 });
 
