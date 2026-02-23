@@ -13,6 +13,7 @@ import Checkout from './pages/Checkout';
 import Account from './pages/Account';
 import Wishlist from './pages/Wishlist';
 import OrderTracking from './pages/OrderTracking';
+import ActivityLogs from './pages/ActivityLogs';
 
 // --- COMPONENTS ---
 import Navbar from './pages/Navbar';
@@ -74,6 +75,7 @@ const AppContent = () => {
             <Route path="coupons" element={<CouponManagement />} />
             <Route path="banners" element={<BannerManagement isAdmin={true} />} />
             <Route path="admins" element={<AdminManagement />} />
+            <Route path="logs" element={<ActivityLogs />} />
           </Route>
 
           <Route path="/admin-login" element={<AdminLogin />} />
