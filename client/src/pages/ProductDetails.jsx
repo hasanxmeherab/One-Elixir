@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useWishlist } from '../context/WishlistContext';
+import { Heart } from 'lucide-react';
 
 const ProductDetails = ({ openCart }) => { 
   const { id } = useParams();
@@ -10,6 +12,7 @@ const ProductDetails = ({ openCart }) => {
   const [quantity, setQuantity] = useState(1);
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const { addToCart } = useCart();
+  const { isWishlisted, toggleWishlist } = useWishlist();
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -99,14 +102,40 @@ const ProductDetails = ({ openCart }) => {
               >
                 ADD TO COLLECTION
               </button>
+
+              {/* Wishlist Button */}
+              <button
+                onClick={() => toggleWishlist(product)}
+                className={`flex items-center gap-2 px-5 py-3 border font-bold text-xs tracking-wider transition-colors ${
+                  isWishlisted(product._id)
+                    ? 'border-red-300 bg-red-50 text-red-500 hover:bg-red-100'
+                    : 'border-black text-black hover:bg-gray-50'
+                }`}
+              >
+                <Heart size={14} className={isWishlisted(product._id) ? 'fill-red-500' : ''} />
+                {isWishlisted(product._id) ? 'WISHLISTED' : 'WISHLIST'}
+              </button>
             </>
           ) : (
-            <button
-              disabled
-              className="flex-1 bg-[#eee] text-[#888] border-none cursor-not-allowed tracking-[2px] py-3"
-            >
-              CURRENTLY UNAVAILABLE
-            </button>
+            <div className="flex gap-3 flex-wrap w-full">
+              <button
+                disabled
+                className="flex-1 bg-[#eee] text-[#888] border-none cursor-not-allowed tracking-[2px] py-3 text-xs"
+              >
+                CURRENTLY UNAVAILABLE
+              </button>
+              <button
+                onClick={() => toggleWishlist(product)}
+                className={`flex items-center gap-2 px-5 py-3 border font-bold text-xs tracking-wider transition-colors ${
+                  isWishlisted(product._id)
+                    ? 'border-red-300 bg-red-50 text-red-500 hover:bg-red-100'
+                    : 'border-black text-black hover:bg-gray-50'
+                }`}
+              >
+                <Heart size={14} className={isWishlisted(product._id) ? 'fill-red-500' : ''} />
+                {isWishlisted(product._id) ? 'WISHLISTED' : 'NOTIFY ME'}
+              </button>
+            </div>
           )}
         </div>
 

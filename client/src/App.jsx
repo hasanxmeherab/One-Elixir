@@ -14,7 +14,7 @@ import Account from './pages/Account';
 import Wishlist from './pages/Wishlist';
 
 // --- COMPONENTS ---
-import Navbar from './pages/Navbar'; // Importing the separated file
+import Navbar from './pages/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // --- ADMIN PAGES ---
@@ -29,6 +29,9 @@ import ExpenseManagement from './pages/ExpenseManagement';
 import InvestmentTracker from './pages/InvestmentTracker';
 import CouponManagement from './pages/CouponManagement';
 import BannerManagement from './pages/BannerManagement';
+
+// --- CONTEXT ---
+import { WishlistProvider } from './context/WishlistContext';
 
 const AppContent = () => {
   const location = useLocation();
@@ -84,12 +87,14 @@ const AppContent = () => {
 
 function App() {
   return (
-    <Router>
-      <AppContent />
-      <footer style={footerStyle}>
-        <p>&copy; 2026 OneElixir Fragrances. Crafted for Elegance.</p>
-      </footer>
-    </Router>
+    <WishlistProvider>
+      <Router>
+        <AppContent />
+        <footer style={footerStyle}>
+          <p>&copy; 2026 OneElixir Fragrances. Crafted for Elegance.</p>
+        </footer>
+      </Router>
+    </WishlistProvider>
   );
 }
 

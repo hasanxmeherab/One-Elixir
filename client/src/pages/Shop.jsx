@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { Heart } from 'lucide-react';
+import { useWishlist } from '../context/WishlistContext';
 
 const Shop = () => {
   const [perfumes, setPerfumes] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
+  const { isWishlisted, toggleWishlist } = useWishlist();
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   useEffect(() => {
@@ -52,15 +55,26 @@ const Shop = () => {
             <div className="relative w-full h-[380px] sm:h-[280px] md:h-[380px] bg-[#fcfcfc] mb-5 overflow-hidden">
               <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
               {p.stock === 0 && (
-                <div className="absolute top-4 right-4 bg-black text-white px-3 py-1 text-[9px] font-bold tracking-[2px]">
+                <div className="absolute top-4 left-4 bg-black text-white px-3 py-1 text-[9px] font-bold tracking-[2px]">
                   SOLD OUT
                 </div>
               )}
               {p.stock > 0 && p.stock <= 5 && (
-                <div className="absolute top-4 right-4 bg-[#f39c12] text-white px-3 py-1 text-[9px] font-bold tracking-[2px]">
+                <div className="absolute top-4 left-4 bg-[#f39c12] text-white px-3 py-1 text-[9px] font-bold tracking-[2px]">
                   LIMITED
                 </div>
               )}
+              {/* Wishlist Heart */}
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleWishlist(p); }}
+                className="absolute top-3 right-3 p-2 bg-white/80 rounded-full hover:bg-white transition-colors shadow-sm"
+                title={isWishlisted(p._id) ? 'Remove from wishlist' : 'Add to wishlist'}
+              >
+                <Heart
+                  size={16}
+                  className={isWishlisted(p._id) ? 'text-red-500 fill-red-500' : 'text-[#888]'}
+                />
+              </button>
             </div>
 
             {/* Details */}
