@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { RefreshCw, Trash2, Filter } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 const ACTION_COLORS = {
   CREATE_PRODUCT: 'bg-green-100 text-green-800',
@@ -13,6 +14,7 @@ const ACTION_COLORS = {
 };
 
 const ActivityLogs = () => {
+  const toast = useToast();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterAction, setFilterAction] = useState('ALL');
@@ -44,7 +46,7 @@ const ActivityLogs = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       setLogs([]);
-    } catch { alert('Failed to clear logs'); }
+    } catch { toast.error('Failed to clear logs'); }
   };
 
   const actionTypes = ['ALL', ...new Set(logs.map(l => l.action))];

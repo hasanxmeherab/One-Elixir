@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useToast } from '../context/ToastContext';
 
 const InvestmentTracker = () => {
+  const toast = useToast();
   const [investments, setInvestments] = useState([]);
   const [newInvestorName, setNewInvestorName] = useState('');
   const [formData, setFormData] = useState({
@@ -38,7 +40,7 @@ const InvestmentTracker = () => {
       await axios.post(`${API_URL}/api/investments/add`, { investorName: newInvestorName, amount: 0, note: 'New Account' });
       setNewInvestorName('');
       fetchData();
-    } catch (err) { alert("Error"); }
+    } catch (err) { toast.error("An error occurred. Please try again."); }
   };
 
   const handleAddInvestment = async (e) => {
@@ -47,8 +49,8 @@ const InvestmentTracker = () => {
       await axios.post(`${API_URL}/api/investments/add`, formData);
       setFormData({ ...formData, investorName: '', amount: '', note: '' });
       fetchData();
-      alert("Investment Recorded!");
-    } catch (err) { alert("Failed"); }
+      toast.success("Investment recorded successfully!");
+    } catch (err) { toast.error("Failed to record investment."); }
   };
 
   const removeTransaction = async (invId, transId) => {
@@ -56,7 +58,7 @@ const InvestmentTracker = () => {
       try {
         await axios.delete(`${API_URL}/api/investments/${invId}/transaction/${transId}`);
         fetchData();
-      } catch (err) { alert("Error"); }
+      } catch (err) { toast.error("An error occurred. Please try again."); }
     }
   };
 

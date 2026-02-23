@@ -3,8 +3,10 @@ import axios from 'axios';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useOutletContext } from 'react-router-dom';
+import { useToast } from '../context/ToastContext';
 
 const OrderList = () => {
+  const toast = useToast();
   const { orders = [], fetchData } = useOutletContext();
   const [showArchived, setShowArchived] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,15 +24,15 @@ const OrderList = () => {
     try {
       await axios.put(`${API_URL}/api/orders/${id}`, { paymentStatus });
       fetchData();
-    } catch (err) { alert("Failed to update payment status"); }
+    } catch (err) { toast.error("Failed to update payment status."); }
   };
 
   const updateStatus = async (id, status) => {
     try {
       await axios.put(`${API_URL}/api/orders/${id}`, { status });
       fetchData();
-      alert(`Order updated to ${status}`);
-    } catch (err) { alert("Failed to update status"); }
+      toast.success(`Order status updated to ${status}.`);
+    } catch (err) { toast.error("Failed to update order status."); }
   };
 
   const downloadReceipt = (order) => {

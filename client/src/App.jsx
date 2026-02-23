@@ -34,6 +34,7 @@ import BannerManagement from './pages/BannerManagement';
 
 // --- CONTEXT ---
 import { WishlistProvider } from './context/WishlistContext';
+import { ToastProvider } from './context/ToastContext';
 
 const AppContent = () => {
   const location = useLocation();
@@ -92,6 +93,7 @@ const AppContent = () => {
 
 function App() {
   return (
+    <ToastProvider>
     <WishlistProvider>
       <Router>
         <AppContent />
@@ -100,6 +102,7 @@ function App() {
         </footer>
       </Router>
     </WishlistProvider>
+    </ToastProvider>
   );
 }
 

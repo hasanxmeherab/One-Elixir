@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useToast } from '../context/ToastContext';
 
 const ExpenseManagement = () => {
+  const toast = useToast();
   const [expenses, setExpenses] = useState([]);
   const [formData, setFormData] = useState({
     title: '', amount: '', quantity: '', unitPrice: '',
@@ -46,8 +48,8 @@ const ExpenseManagement = () => {
         date: new Date().toISOString().split('T')[0]
       });
       fetchExpenses();
-      alert("Expense logged!");
-    } catch (err) { alert("Failed to save expense"); }
+      toast.success("Expense logged successfully!");
+    } catch (err) { toast.error("Failed to save expense."); }
   };
 
   const deleteExpense = async (id) => {

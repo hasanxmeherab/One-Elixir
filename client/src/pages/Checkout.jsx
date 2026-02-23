@@ -5,8 +5,10 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Select from 'react-select'; 
 import locationData from '../data/locationData.json'; 
+import { useToast } from '../context/ToastContext';
 
 const Checkout = () => {
+  const toast = useToast();
   const { cart, cartTotal, clearCart } = useCart();
   const { user } = useUser();
   const navigate = useNavigate();
@@ -51,9 +53,9 @@ const Checkout = () => {
         ? (cartTotal * res.data.discountValue) / 100 
         : res.data.discountValue;
       setDiscount(discountAmount);
-      alert(`Coupon Applied!`);
+      toast.success("Coupon applied successfully!");
     } catch (err) {
-      alert("Invalid coupon.");
+      toast.error("Invalid or expired coupon.");
       setDiscount(0);
     } finally {
       setCouponLoading(false);
@@ -64,14 +66,14 @@ const Checkout = () => {
     if (e) e.preventDefault();
     if (!user) return navigate('/signin', { state: { from: '/checkout' } });
     if (!formData.division || !formData.district || !formData.phone || !formData.address) {
-      return alert("Please complete the shipping details form first.");
+      return toast.warning("Please complete the shipping details form first.");
     }
     setShowModal(true);
   };
 
   const handleFinalOrderSubmit = async () => {
     if (!mobilePayment.senderNumber || !mobilePayment.transactionId || !mobilePayment.screenshot) {
-      return alert("Please fill all payment verification fields and upload the screenshot.");
+      return toast.warning("Please fill all payment fields and upload your screenshot.");
     }
     setLoading(true);
     let screenshotUrl = "";
@@ -84,7 +86,7 @@ const Checkout = () => {
         screenshotUrl = res.data.secure_url;
       } catch (err) {
         setLoading(false);
-        return alert("Screenshot upload failed. Please try again.");
+        return toast.error("Screenshot upload failed. Please try again.");
       }
     }
     const orderData = {
@@ -116,7 +118,7 @@ const Checkout = () => {
       clearCart();
       navigate('/thank-you');
     } catch (err) {
-      alert("Order placement failed.");
+      toast.error("Order placement failed. Please try again.");
     } finally {
       setLoading(false);
     }

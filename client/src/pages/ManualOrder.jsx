@@ -3,8 +3,10 @@ import axios from 'axios';
 import { useOutletContext } from 'react-router-dom';
 import Select from 'react-select';
 import locationData from '../data/locationData.json';
+import { useToast } from '../context/ToastContext';
 
 const ManualOrder = () => {
+  const toast = useToast();
   const { perfumes = [], fetchData } = useOutletContext();
 
   const [orderData, setOrderData] = useState({ customerName: '', phone: '', address: '' });
@@ -51,9 +53,9 @@ const ManualOrder = () => {
         ? (subtotal * res.data.discountValue) / 100
         : res.data.discountValue;
       setCouponDiscount(discountAmount);
-      alert(`Coupon applied! Extra ${discountAmount.toLocaleString()} TK off.`);
+      toast.success(`Coupon applied! ${discountAmount.toLocaleString()} TK discount added.`);
     } catch (err) {
-      alert("Invalid or expired coupon.");
+      toast.error("Invalid or expired coupon.");
       setCouponDiscount(0);
     } finally {
       setCouponLoading(false);
@@ -74,7 +76,7 @@ const ManualOrder = () => {
 
   const handleOrderSubmit = async (e) => {
     e.preventDefault();
-    if (!division || !district) { alert("Please select Division and District."); return; }
+    if (!division || !district) { toast.warning("Please select Division and District."); return; }
 
     const itemsToOrder = [];
     const adminDataString = localStorage.getItem('adminData');
@@ -85,7 +87,7 @@ const ManualOrder = () => {
       if (!item.perfumeId) continue;
       const perfume = perfumes.find(p => p._id === item.perfumeId);
       if (!perfume || perfume.stock < item.quantity) {
-        alert(`Insufficient stock for ${perfume?.name || 'selected item'}`);
+        toast.error(`Insufficient stock for ${perfume?.name || 'selected item'}.`);
         return;
       }
       let finalItemPrice = perfume.price;
@@ -116,9 +118,9 @@ const ManualOrder = () => {
       setCouponDiscount(0); setCouponCode('');
       setPaymentMethod('Cash on Delivery'); setPaymentStatus('Unpaid');
       fetchData();
-      alert("Manual Order Recorded Successfully!");
+      toast.success("Manual order recorded successfully!");
     } catch (err) {
-      alert("Failed to record order.");
+      toast.error("Failed to record order. Please try again.");
     }
   };
 

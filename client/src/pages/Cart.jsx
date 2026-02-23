@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { useCart } from '../context/CartContext';
 import { useUser } from '../context/UserContext';
 import { Link, useNavigate } from 'react-router-dom';
+import { useToast } from '../context/ToastContext';
 
 const Cart = () => {
+  const toast = useToast();
   const { cart, removeFromCart, addToCart, cartTotal } = useCart();
   const { user } = useUser();
   const navigate = useNavigate();
@@ -12,7 +14,7 @@ const Cart = () => {
   const handleCheckout = () => {
     setLoading(true);
     if (!user) {
-      alert("Please Sign In to complete your OneElixir order.");
+      toast.warning("Please sign in to complete your order.");
       setLoading(false);
       navigate('/signin');
     } else {

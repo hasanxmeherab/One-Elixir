@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { useToast } from '../context/ToastContext';
 
 const ResetPassword = () => {
+  const toast = useToast();
   const { token } = useParams();
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
@@ -14,10 +16,10 @@ const ResetPassword = () => {
     setLoading(true);
     try {
       await axios.post(`${API_URL}/api/auth/reset-password/${token}`, { password });
-      alert("Password updated successfully!");
+      toast.success("Password updated! Redirecting to sign in...");
       navigate('/signin');
     } catch (err) {
-      alert("Reset failed. Link may be expired.");
+      toast.error("Reset failed. The link may have expired.");
     } finally {
       setLoading(false);
     }

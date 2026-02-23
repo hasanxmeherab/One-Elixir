@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useToast } from '../context/ToastContext';
 
 const CouponManagement = () => {
+  const toast = useToast();
   const [coupons, setCoupons] = useState([]);
   const [newCoupon, setNewCoupon] = useState({ code: '', discountValue: '', discountType: 'percentage' });
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -21,8 +23,8 @@ const CouponManagement = () => {
       await axios.post(`${API_URL}/api/coupons`, newCoupon);
       setNewCoupon({ code: '', discountValue: '', discountType: 'percentage' });
       fetchCoupons();
-      alert("Coupon created successfully!");
-    } catch (err) { alert("Failed to create coupon."); }
+      toast.success("Coupon created successfully!");
+    } catch (err) { toast.error("Failed to create coupon."); }
   };
 
   const handleDelete = async (id) => {

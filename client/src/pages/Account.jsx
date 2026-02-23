@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useUser } from '../context/UserContext';
 import { useNavigate, Link } from 'react-router-dom';
+import { useToast } from '../context/ToastContext';
 
 const Account = () => {
+  const toast = useToast();
   const { user } = useUser();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +38,7 @@ const Account = () => {
       await axios.put(`${API_URL}/api/orders/${orderId}/cancel`);
       fetchOrderHistory();
     } catch (err) {
-      alert(err.response?.data?.message || "Cancellation failed.");
+      toast.error(err.response?.data?.message || "Cancellation failed.");
     }
   };
 

@@ -3,8 +3,10 @@ import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { Eye, EyeOff, Check, X } from 'lucide-react'; 
+import { useToast } from '../context/ToastContext';
 
 const SignUp = () => {
+  const toast = useToast();
   const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -38,7 +40,7 @@ const SignUp = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (formData.confirmPassword && !passwordsMatch) {
-      alert("Passwords do not match!");
+      toast.error("Passwords do not match!");
       return;
     }
     setLoading(true);
@@ -48,10 +50,10 @@ const SignUp = () => {
         email: formData.email.toLowerCase(),
         password: formData.password
       });
-      alert("A verification link has been sent to your email. Please verify your account to sign in.");
+      toast.success("Account created! Please verify your email to sign in.");
       navigate('/signin'); 
     } catch (err) {
-      alert(err.response?.data?.message || "Registration failed.");
+      toast.error(err.response?.data?.message || "Registration failed.");
     } finally {
       setLoading(false);
     }

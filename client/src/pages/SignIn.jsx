@@ -3,8 +3,10 @@ import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { Eye, EyeOff } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 const SignIn = () => {
+  const toast = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -25,7 +27,7 @@ const SignIn = () => {
       login(res.data);
       navigate(from, { replace: true });
     } catch (err) {
-      alert("Invalid email or password.");
+      toast.error("Invalid email or password.");
     }
   };
 
