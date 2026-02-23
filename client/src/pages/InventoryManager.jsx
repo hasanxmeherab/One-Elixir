@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useOutletContext } from 'react-router-dom';
+import { useToast } from '../context/ToastContext';
 
 const InventoryManager = () => {
+  const toast = useToast();
   const { perfumes = [], fetchData } = useOutletContext();
 
   const [file, setFile] = useState(null);
@@ -15,6 +17,12 @@ const InventoryManager = () => {
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const CLOUD_NAME = "dluvmed0b";
+
+  // Cloudinary image optimizer — adds auto-format + auto-quality + width cap
+  const optimizeCloudinaryUrl = (url, width = 800) => {
+    if (!url || !url.includes('cloudinary.com')) return url;
+    return url.replace('/upload/', `/upload/f_auto,q_auto,w_${width}/`);
+  };
   const UPLOAD_PRESET = "one_elixir_uploads";
 
   if (!perfumes) {
@@ -51,7 +59,7 @@ const InventoryManager = () => {
         data.append("upload_preset", UPLOAD_PRESET);
         data.append("cloud_name", CLOUD_NAME);
         const res = await axios.post(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, data);
-        finalImageUrl = res.data.secure_url;
+        finalImageUrl = optimizeCloudinaryUrl(res.data.secure_url, 1200);
       }
       const payload = {
         ...formData,
@@ -66,7 +74,7 @@ const InventoryManager = () => {
       cancelEdit();
       fetchData();
     } catch (err) {
-      alert('Operation failed');
+      toast.error('Operation failed. Please try again.');
     } finally {
       setUploading(false);
     }

@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { useToast } from '../context/ToastContext';
 
 const BannerManagement = ({ isAdmin }) => {
+  const toast = useToast();
   const [banners, setBanners] = useState([]);
   const [current, setCurrent] = useState(0);
   const [uploading, setUploading] = useState(false);
@@ -10,6 +12,12 @@ const BannerManagement = ({ isAdmin }) => {
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const CLOUD_NAME = "dluvmed0b";
+
+  // Cloudinary image optimizer — adds auto-format + auto-quality + width cap
+  const optimizeCloudinaryUrl = (url, width = 1920) => {
+    if (!url || !url.includes('cloudinary.com')) return url;
+    return url.replace('/upload/', `/upload/f_auto,q_auto,w_${width}/`);
+  };
   const UPLOAD_PRESET = "one_elixir_uploads";
   const timerRef = useRef(null);
 
@@ -59,21 +67,21 @@ const BannerManagement = ({ isAdmin }) => {
     setUploading(true);
     try {
       const res = await axios.post(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, uploadData);
-      setFormData({ ...formData, imageUrl: res.data.secure_url });
+      setFormData({ ...formData, imageUrl: optimizeCloudinaryUrl(res.data.secure_url, 1920) });
       setUploading(false);
-      alert("Image uploaded!");
-    } catch (err) { setUploading(false); alert("Upload failed."); }
+      toast.success("Image uploaded successfully!");
+    } catch (err) { setUploading(false); toast.error("Upload failed. Please try again."); }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.imageUrl) return alert("Upload image first");
+    if (!formData.imageUrl) return toast.warning("Please upload an image first.");
     try {
       await axios.post(`${API_URL}/api/banners`, formData);
       setFormData({ imageUrl: '', title: '', subtitle: '' });
       fetchBanners();
-      alert("Published!");
-    } catch (err) { alert("Save failed"); }
+      toast.success("Banner published successfully!");
+    } catch (err) { toast.error("Failed to save banner."); }
   };
 
   const deleteBanner = async (id) => {
@@ -142,58 +150,57 @@ const BannerManagement = ({ isAdmin }) => {
   if (!banners || banners.length === 0) return null;
 
   return (
-    <div className="relative w-full overflow-hidden bg-black" style={{ paddingBottom: 'clamp(220px, 50vw, 70vh)', height: 0 }}>
-      <div className="absolute inset-0">
+    <div className="relative w-full overflow-hidden bg-black">
 
-        {/* Navigation Arrows */}
-        <button
-          onClick={prevSlide}
-          className="hidden sm:block absolute left-3 md:left-6 top-1/2 -translate-y-1/2 bg-white/20 text-white border-none p-2 md:p-4 cursor-pointer z-10 text-base md:text-xl rounded-full hover:bg-white/40 transition-colors"
-        >❮</button>
-        <button
-          onClick={nextSlide}
-          className="hidden sm:block absolute right-3 md:right-6 top-1/2 -translate-y-1/2 bg-white/20 text-white border-none p-2 md:p-4 cursor-pointer z-10 text-base md:text-xl rounded-full hover:bg-white/40 transition-colors"
-        >❯</button>
+      {/* Navigation Arrows */}
+      <button
+        onClick={prevSlide}
+        className="hidden sm:block absolute left-3 md:left-6 top-1/2 -translate-y-1/2 bg-white/20 text-white border-none p-2 md:p-4 cursor-pointer z-10 text-base md:text-xl rounded-full hover:bg-white/40 transition-colors"
+      >❮</button>
+      <button
+        onClick={nextSlide}
+        className="hidden sm:block absolute right-3 md:right-6 top-1/2 -translate-y-1/2 bg-white/20 text-white border-none p-2 md:p-4 cursor-pointer z-10 text-base md:text-xl rounded-full hover:bg-white/40 transition-colors"
+      >❯</button>
 
-        {/* Slides Wrapper */}
-        <div
-          className="flex w-full h-full transition-transform duration-700 ease-in-out"
-          style={{ transform: `translateX(-${current * 100}%)` }}
-        >
-          {banners.map((slide) => (
-            <div
-              key={slide._id}
-              className="min-w-full h-full bg-cover bg-center"
-              style={{ backgroundImage: `url(${slide.imageUrl})` }}
-            >
-              <div className="text-center text-white h-full flex flex-col justify-center bg-black/30 px-4 sm:px-8">
-                <h1 className="m-0 font-bold
-                  text-[clamp(1.2rem,5vw,3.5rem)]
-                  tracking-[clamp(2px,1.5vw,12px)]">
-                  {slide.title?.toUpperCase()}
-                </h1>
-                <p className="mt-2
-                  text-[clamp(0.65rem,2vw,1.2rem)]
-                  tracking-[clamp(1px,1vw,5px)]">
-                  {slide.subtitle}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Pagination Dots */}
-        <div className="absolute bottom-3 sm:bottom-5 w-full flex justify-center gap-2 z-10">
-          {banners.map((_, i) => (
-            <div
-              key={i}
-              onClick={() => { setCurrent(i); startTimer(); }}
-              className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full cursor-pointer transition-all duration-300"
-              style={{ backgroundColor: i === current ? '#fff' : 'rgba(255,255,255,0.4)' }}
+      {/* Slides Wrapper */}
+      <div
+        className="flex w-full transition-transform duration-700 ease-in-out"
+        style={{ transform: `translateX(-${current * 100}%)` }}
+      >
+        {banners.map((slide) => (
+          <div key={slide._id} className="relative min-w-full">
+            <img
+              src={slide.imageUrl}
+              alt={slide.title}
+              className="w-full block min-h-[200px] max-h-[60vh] object-cover"
             />
-          ))}
-        </div>
+            {/* Text overlay */}
+            <div className="absolute inset-0 flex flex-col justify-center items-center text-center text-white bg-black/30 px-4 sm:px-8">
+              <h1 className="m-0 font-bold
+                text-[clamp(1rem,4vw,3.5rem)]
+                tracking-[clamp(2px,1.2vw,12px)]">
+                {slide.title?.toUpperCase()}
+              </h1>
+              <p className="mt-2
+                text-[clamp(0.6rem,1.8vw,1.2rem)]
+                tracking-[clamp(1px,0.8vw,5px)]">
+                {slide.subtitle}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
 
+      {/* Pagination Dots */}
+      <div className="absolute bottom-3 sm:bottom-5 w-full flex justify-center gap-2 z-10">
+        {banners.map((_, i) => (
+          <div
+            key={i}
+            onClick={() => { setCurrent(i); startTimer(); }}
+            className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full cursor-pointer transition-all duration-300"
+            style={{ backgroundColor: i === current ? '#fff' : 'rgba(255,255,255,0.4)' }}
+          />
+        ))}
       </div>
     </div>
   );
