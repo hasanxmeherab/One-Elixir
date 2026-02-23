@@ -12,6 +12,7 @@ import Shop from './pages/Shop';
 import Checkout from './pages/Checkout';
 import Account from './pages/Account';
 import Wishlist from './pages/Wishlist';
+import OrderTracking from './pages/OrderTracking';
 
 // --- COMPONENTS ---
 import Navbar from './pages/Navbar';
@@ -79,6 +80,8 @@ const AppContent = () => {
           <Route path="/account" element={<Account />} />
           <Route path="/manual-order" element={<ManualOrder />} />
           <Route path="/wishlist" element={<Wishlist />} />
+          <Route path="/track/:orderId" element={<OrderTracking />} />
+          <Route path="/track" element={<OrderTracking />} />
         </Routes>
       </div>
     </>

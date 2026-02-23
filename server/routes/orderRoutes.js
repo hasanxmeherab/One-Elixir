@@ -105,7 +105,7 @@ router.put('/:id/cancel', async (req, res) => {
 
 // 6. PUT update status & payment status (Admin Action)
 router.put('/:id', async (req, res) => {
-  const { status, paymentStatus } = req.body; // Added paymentStatus here
+  const { status, paymentStatus } = req.body;
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
@@ -135,7 +135,7 @@ router.put('/:id', async (req, res) => {
 
     // --- UPDATE FIELDS ---
     if (status) order.status = status;
-    if (paymentStatus) order.paymentStatus = paymentStatus; // Update payment status if provided
+    if (paymentStatus) order.paymentStatus = paymentStatus;
 
     const updatedOrder = await order.save();
     res.json(updatedOrder);
@@ -145,7 +145,18 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// 7. DELETE (Admin Archive)
+// 7. GET single order by ID (for Order Tracking page) --- NEW
+router.get('/:id', async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    res.json(order);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// 8. DELETE (Admin Archive)
 router.delete('/:id', async (req, res) => {
   try {
     const updatedOrder = await Order.findByIdAndUpdate(

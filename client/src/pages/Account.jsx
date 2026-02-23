@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useUser } from '../context/UserContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 const Account = () => {
   const { user } = useUser();
@@ -93,14 +93,22 @@ const Account = () => {
                       {order.status.toUpperCase()}
                     </td>
                     <td className="py-5 px-2.5 text-sm">
-                      {order.status.toLowerCase() === 'pending' && (
-                        <button
-                          onClick={() => handleCancel(order._id)}
-                          className="bg-transparent border border-[#e74c3c] text-[#e74c3c] px-2.5 py-1 text-[10px] cursor-pointer hover:bg-[#e74c3c] hover:text-white transition-colors"
+                      <div className="flex gap-2 flex-wrap">
+                        <Link
+                          to={`/track/${order._id}`}
+                          className="bg-transparent border border-black text-black px-2.5 py-1 text-[10px] cursor-pointer hover:bg-black hover:text-white transition-colors no-underline"
                         >
-                          CANCEL
-                        </button>
-                      )}
+                          TRACK
+                        </Link>
+                        {order.status.toLowerCase() === 'pending' && (
+                          <button
+                            onClick={() => handleCancel(order._id)}
+                            className="bg-transparent border border-[#e74c3c] text-[#e74c3c] px-2.5 py-1 text-[10px] cursor-pointer hover:bg-[#e74c3c] hover:text-white transition-colors"
+                          >
+                            CANCEL
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
