@@ -6,6 +6,8 @@ const AdminManagement = () => {
   const [admins, setAdmins] = useState([]);
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const adminRole = localStorage.getItem('adminRole') || 'admin';
+  const adminToken = localStorage.getItem('adminToken') || '';
 
   const fetchAdmins = async () => {
     try {
@@ -19,7 +21,9 @@ const AdminManagement = () => {
   const deleteAdmin = async (id) => {
     if (window.confirm("Are you sure you want to revoke this admin's access?")) {
       try {
-        await axios.delete(`${API_URL}/api/admins/${id}`);
+        await axios.delete(`${API_URL}/api/admins/${id}`, {
+          headers: { Authorization: `Bearer ${adminToken}` }
+        });
         alert("Admin access revoked");
         fetchAdmins();
       } catch (err) { alert("Failed to delete admin"); }
@@ -29,7 +33,9 @@ const AdminManagement = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${API_URL}/api/admins/register`, formData);
+      await axios.post(`${API_URL}/api/admins/register`, formData, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
       alert("New Admin Created Successfully");
       setFormData({ name: '', email: '', password: '' });
       fetchAdmins();
@@ -101,6 +107,7 @@ const AdminManagement = () => {
                   <td className="py-4 px-4 text-sm">
                     <button
                       onClick={() => deleteAdmin(admin._id)}
+                      disabled={adminRole !== 'superadmin'}
                       className="border-none bg-transparent text-red-500 cursor-pointer hover:opacity-70 transition-opacity"
                       title="Revoke Access"
                     >
