@@ -6,6 +6,7 @@ import axios from 'axios';
 import Select from 'react-select'; 
 import locationData from '../data/locationData.json'; 
 import { useToast } from '../context/ToastContext';
+import { ImagePlus } from 'lucide-react';
 
 const Checkout = () => {
   const toast = useToast();
@@ -146,7 +147,9 @@ const Checkout = () => {
           />
           <input
             type="tel" placeholder="Phone Number" required
-            value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})}
+            value={formData.phone}
+            onChange={e => setFormData({...formData, phone: e.target.value.replace(/\D/g, '')})}
+            inputMode="numeric" maxLength={11}
             className="p-4 border border-[#ddd] outline-none text-sm"
           />
 
@@ -296,9 +299,10 @@ const Checkout = () => {
             </select>
 
             <input
-              type="text" placeholder="Sender Phone Number"
+              type="tel" placeholder="Sender Phone Number"
               className="p-4 border border-[#ddd] outline-none text-sm"
-              onChange={e => setMobilePayment({...mobilePayment, senderNumber: e.target.value})}
+              inputMode="numeric" maxLength={11}
+              onChange={e => setMobilePayment({...mobilePayment, senderNumber: e.target.value.replace(/\D/g, '')})}
             />
             <input
               type="text" placeholder="Transaction ID (TrxID)"
@@ -306,11 +310,19 @@ const Checkout = () => {
               onChange={e => setMobilePayment({...mobilePayment, transactionId: e.target.value})}
             />
 
-            <label className="text-[11px] font-bold">Upload Screenshot:</label>
-            <input
-              type="file" accept="image/*"
-              onChange={e => setMobilePayment({...mobilePayment, screenshot: e.target.files[0]})}
-            />
+            <label className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded cursor-pointer transition-colors p-6 ${mobilePayment.screenshot ? 'border-black bg-gray-50' : 'border-[#ddd] hover:border-black hover:bg-gray-50'}`}>
+              <ImagePlus size={22} className="text-[#888]" />
+              <span className="text-xs font-bold tracking-wider text-black">
+                {mobilePayment.screenshot ? 'SCREENSHOT SELECTED' : 'CLICK TO UPLOAD SCREENSHOT'}
+              </span>
+              <span className="text-[10px] text-[#aaa] text-center">
+                {mobilePayment.screenshot ? mobilePayment.screenshot.name : 'JPG, PNG supported'}
+              </span>
+              <input
+                type="file" accept="image/*" className="hidden"
+                onChange={e => setMobilePayment({...mobilePayment, screenshot: e.target.files[0]})}
+              />
+            </label>
 
             <div className="flex gap-2.5 mt-2">
               <button

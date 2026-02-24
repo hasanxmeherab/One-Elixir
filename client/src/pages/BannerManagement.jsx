@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { ImagePlus } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
 const BannerManagement = ({ isAdmin }) => {
@@ -100,12 +101,12 @@ const BannerManagement = ({ isAdmin }) => {
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 bg-[#f9f9f9] p-8 border border-[#eee] mb-10">
           {/* Upload Box */}
           <label className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded cursor-pointer transition-colors p-6 ${formData.imageUrl ? 'border-black bg-gray-50' : 'border-[#ddd] hover:border-black hover:bg-gray-50'}`}>
-            <span className="text-2xl">{uploading ? '⏳' : formData.imageUrl ? '✓' : '📁'}</span>
+            <ImagePlus size={22} className="text-[#888]" />
             <span className="text-xs font-bold tracking-wider text-black">
-              {uploading ? 'UPLOADING...' : formData.imageUrl ? 'IMAGE READY' : 'CLICK TO UPLOAD IMAGE'}
+              {uploading ? 'UPLOADING...' : formData.imageUrl ? 'BANNER READY' : 'CLICK TO UPLOAD BANNER'}
             </span>
             <span className="text-[10px] text-[#aaa] text-center">
-              {uploading ? 'Please wait...' : formData.imageUrl ? '✓ Uploaded successfully' : 'JPG, PNG, WEBP supported'}
+              {uploading ? 'Please wait...' : formData.imageUrl ? '✓ Uploaded successfully' : 'JPG, PNG, WEBP — recommended 1920×600px'}
             </span>
             <input type="file" onChange={handleFileUpload} accept="image/*" className="hidden" />
           </label>
