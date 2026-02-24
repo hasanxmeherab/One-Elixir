@@ -3,6 +3,7 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const axios = require('axios');
 const sendEmail = require('../utils/sendEmail');
 
 // Helper — generate both tokens
@@ -24,7 +25,6 @@ router.post('/signup', async (req, res) => {
     const user = await User.create({ name, email, password: hashed });
     const { accessToken, refreshToken } = generateTokens(user);
 
-    // Store hashed refresh token
     user.refreshToken = await bcrypt.hash(refreshToken, 8);
     await user.save();
 
@@ -39,7 +39,7 @@ router.post('/signin', async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
-    if (!user || !(await bcrypt.compare(password, user.password))) {
+    if (!user || !user.password || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json('Invalid credentials');
     }
 
@@ -53,7 +53,57 @@ router.post('/signin', async (req, res) => {
   }
 });
 
-// REFRESH TOKEN — get new accessToken using valid refreshToken
+// ── GOOGLE SIGN IN ───────────────────────────────────────────
+// POST /api/auth/google
+// Frontend sends: { credential } — the Google ID token from @react-oauth/google
+router.post('/google', async (req, res) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) return res.status(400).json({ message: 'No credential provided' });
+
+    // Verify Google ID token by calling Google's tokeninfo endpoint
+    const googleRes = await axios.get(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`
+    );
+
+    const { email, name, picture, sub: googleId } = googleRes.data;
+    if (!email) return res.status(400).json({ message: 'Invalid Google token' });
+
+    // Find or create user
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // New user — create without password (Google users don't have one)
+      user = await User.create({
+        name,
+        email,
+        password: await bcrypt.hash(googleId + process.env.JWT_SECRET, 10), // dummy hashed password
+        avatar: picture,
+        googleId
+      });
+    } else {
+      // Existing user — update google info if not set
+      if (!user.googleId) { user.googleId = googleId; }
+      if (picture && !user.avatar) { user.avatar = picture; }
+      await user.save();
+    }
+
+    const { accessToken, refreshToken } = generateTokens(user);
+    user.refreshToken = await bcrypt.hash(refreshToken, 8);
+    await user.save();
+
+    res.json({
+      token: accessToken,
+      refreshToken,
+      user: { name: user.name, email: user.email, avatar: user.avatar }
+    });
+  } catch (err) {
+    console.error('Google auth error:', err.message);
+    res.status(401).json({ message: 'Google authentication failed' });
+  }
+});
+
+// REFRESH TOKEN
 router.post('/refresh', async (req, res) => {
   const { refreshToken } = req.body;
   if (!refreshToken) return res.status(401).json({ message: 'No refresh token' });
@@ -72,7 +122,7 @@ router.post('/refresh', async (req, res) => {
   }
 });
 
-// LOGOUT — invalidate refresh token
+// LOGOUT
 router.post('/logout', async (req, res) => {
   try {
     const { refreshToken } = req.body;
@@ -82,6 +132,35 @@ router.post('/logout', async (req, res) => {
     res.json({ message: 'Logged out successfully' });
   } catch {
     res.json({ message: 'Logged out' });
+  }
+});
+
+// UPDATE PROFILE (name, password, avatar)
+router.put('/profile', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'Unauthorized' });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const { name, currentPassword, newPassword, avatar } = req.body;
+
+    if (name) user.name = name;
+    if (avatar) user.avatar = avatar;
+
+    if (newPassword) {
+      if (!currentPassword) return res.status(400).json({ message: 'Current password required' });
+      const valid = await bcrypt.compare(currentPassword, user.password);
+      if (!valid) return res.status(400).json({ message: 'Current password is incorrect' });
+      user.password = await bcrypt.hash(newPassword, 10);
+    }
+
+    await user.save();
+    res.json({ user: { name: user.name, email: user.email, avatar: user.avatar } });
+  } catch (err) {
+    res.status(500).json({ message: 'Update failed' });
   }
 });
 
