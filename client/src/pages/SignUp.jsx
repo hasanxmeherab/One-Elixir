@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { Eye, EyeOff, Check, X } from 'lucide-react'; 
 import { useToast } from '../context/ToastContext';
+import { GoogleLogin } from '@react-oauth/google';
 
 const SignUp = () => {
   const toast = useToast();
@@ -56,6 +57,18 @@ const SignUp = () => {
       toast.error(err.response?.data?.message || "Registration failed.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    try {
+      const res = await axios.post(`${API_URL}/api/auth/google`, {
+        credential: credentialResponse.credential
+      });
+      login(res.data);
+      navigate(from, { replace: true });
+    } catch (err) {
+      toast.error('Google sign up failed. Please try again.');
     }
   };
 
@@ -148,7 +161,26 @@ const SignUp = () => {
           {loading ? "SENDING EMAIL..." : "REGISTER"}
         </button>
 
-        <p className="text-xs mt-5 text-[#666]">
+        {/* Divider */}
+        <div className="flex items-center gap-3 my-5">
+          <div className="flex-1 h-px bg-[#eee]"></div>
+          <span className="text-[10px] text-[#bbb] tracking-wider">OR</span>
+          <div className="flex-1 h-px bg-[#eee]"></div>
+        </div>
+
+        {/* Google Sign Up */}
+        <div className="flex justify-center mb-5">
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={() => toast.error('Google sign up failed.')}
+            theme="outline"
+            shape="rectangular"
+            width="280"
+            text="signup_with"
+          />
+        </div>
+
+        <p className="text-xs text-[#666]">
           Already have an account?{' '}
           <span
             onClick={() => navigate('/signin', { state: { from } })}

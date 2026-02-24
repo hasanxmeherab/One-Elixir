@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { Eye, EyeOff } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
+import { GoogleLogin } from '@react-oauth/google';
 
 const SignIn = () => {
   const toast = useToast();
@@ -13,28 +14,40 @@ const SignIn = () => {
   const { login } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const from = location.state?.from || '/';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post(`${API_URL}/api/auth/signin`, { 
-        email: email.toLowerCase(), 
-        password 
+      const res = await axios.post(`${API_URL}/api/auth/signin`, {
+        email: email.toLowerCase(),
+        password
       });
       login(res.data);
       navigate(from, { replace: true });
     } catch (err) {
-      toast.error("Invalid email or password.");
+      toast.error('Invalid email or password.');
+    }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    try {
+      const res = await axios.post(`${API_URL}/api/auth/google`, {
+        credential: credentialResponse.credential
+      });
+      login(res.data);
+      navigate(from, { replace: true });
+    } catch (err) {
+      toast.error('Google sign in failed. Please try again.');
     }
   };
 
   return (
     <div className="h-[85vh] flex justify-center items-center px-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-[350px] text-center p-10 border border-[#eee] bg-white">
-        
+      <form onSubmit={handleSubmit} className="w-full max-w-[360px] text-center p-10 border border-[#eee] bg-white">
+
         <h2 className="tracking-[5px] font-light mb-2.5">SIGN IN</h2>
         <p className="text-[10px] text-[#888] mb-8">Welcome back to OneElixir.</p>
 
@@ -45,10 +58,10 @@ const SignIn = () => {
           className="w-full p-4 mb-4 border border-[#ddd] outline-none box-border text-sm"
         />
 
-        {/* Password with Eye Toggle */}
+        {/* Password */}
         <div className="relative w-full mb-2.5">
           <input
-            type={showPassword ? "text" : "password"}
+            type={showPassword ? 'text' : 'password'}
             placeholder="PASSWORD" required
             value={password} onChange={e => setPassword(e.target.value)}
             className="w-full p-4 border border-[#ddd] outline-none box-border text-sm"
@@ -77,6 +90,25 @@ const SignIn = () => {
         >
           LOGIN
         </button>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 my-5">
+          <div className="flex-1 h-px bg-[#eee]"></div>
+          <span className="text-[10px] text-[#bbb] tracking-wider">OR</span>
+          <div className="flex-1 h-px bg-[#eee]"></div>
+        </div>
+
+        {/* Google Sign In */}
+        <div className="flex justify-center">
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={() => toast.error('Google sign in failed.')}
+            theme="outline"
+            shape="rectangular"
+            width="280"
+            text="signin_with"
+          />
+        </div>
 
         <p className="text-xs mt-5 text-[#666]">
           Don't have an account?{' '}

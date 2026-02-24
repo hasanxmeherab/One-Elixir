@@ -34,6 +34,7 @@ import BannerManagement from './pages/BannerManagement';
 
 // --- CONTEXT ---
 import { WishlistProvider } from './context/WishlistContext';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { ToastProvider } from './context/ToastContext';
 
 const AppContent = () => {
@@ -92,6 +93,7 @@ const AppContent = () => {
 
 function App() {
   return (
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
     <ToastProvider>
     <WishlistProvider>
       <Router>
@@ -102,6 +104,7 @@ function App() {
       </Router>
     </WishlistProvider>
     </ToastProvider>
+    </GoogleOAuthProvider>
   );
 }
 
