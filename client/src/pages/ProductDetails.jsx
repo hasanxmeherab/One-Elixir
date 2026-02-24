@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ProductDetailsSkeleton } from '../components/Skeleton';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
@@ -13,6 +14,9 @@ const ProductDetails = ({ openCart }) => {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const { addToCart } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
+
+  // --- IMAGE GALLERY ---
+  const [selectedImage, setSelectedImage] = useState(null);
 
   // --- RELATED PRODUCTS ---
   const [related, setRelated] = useState([]);
@@ -98,6 +102,7 @@ const ProductDetails = ({ openCart }) => {
       try {
         const res = await axios.get(`${API_URL}/api/perfumes/${id}`);
         setProduct(res.data);
+        setSelectedImage(res.data.images?.[0] || res.data.image);
         fetchRelated(res.data);
       } catch (err) {
         console.error("Product not found");
@@ -107,11 +112,7 @@ const ProductDetails = ({ openCart }) => {
     fetchReviews();
   }, [id]);
 
-  if (!product) return (
-    <div className="h-screen flex justify-center items-center tracking-[5px]">
-      AWAKENING THE SCENT...
-    </div>
-  );
+  if (!product) return <ProductDetailsSkeleton />;
 
   const handleAddToCart = () => {
     addToCart(product, quantity);
@@ -120,9 +121,32 @@ const ProductDetails = ({ openCart }) => {
 
   return (
     <div className="flex min-h-screen px-[8%] pt-28 pb-20 gap-20 flex-wrap">      
-      {/* Left: Product Image */}
+      {/* Left: Product Image Gallery */}
       <div className="flex-1 min-w-[300px] md:min-w-[400px] bg-[#fcfcfc]">
-        <img src={product.image} alt={product.name} className="w-full h-auto object-cover" />
+        {/* Main image */}
+        <div className="w-full overflow-hidden bg-[#f8f8f8] mb-3">
+          <img
+            src={selectedImage || product.image}
+            alt={product.name}
+            className="w-full h-[480px] object-cover transition-opacity duration-300"
+          />
+        </div>
+        {/* Thumbnails — only when multiple images */}
+        {product.images?.length > 1 && (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {product.images.map((img, i) => (
+              <button
+                key={i}
+                onClick={() => setSelectedImage(img)}
+                className={`w-16 h-16 shrink-0 overflow-hidden border-2 transition-colors cursor-pointer bg-transparent p-0 ${
+                  selectedImage === img ? 'border-black' : 'border-transparent hover:border-[#ccc]'
+                }`}
+              >
+                <img src={img} alt={`View ${i + 1}`} className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Right: Product Info */}
