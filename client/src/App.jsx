@@ -1,5 +1,8 @@
 import React from 'react'; 
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { Analytics } from "@vercel/analytics/react";
+
+// --- PAGES ---
 import Home from './pages/Home';
 import ProductDetails from './pages/ProductDetails';
 import Cart from './pages/Cart';
@@ -93,18 +96,21 @@ const AppContent = () => {
 
 function App() {
   return (
-    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
-    <ToastProvider>
-    <WishlistProvider>
-      <Router>
-        <AppContent />
-        <footer style={footerStyle}>
-          <p>&copy; 2026 OneElixir Fragrances. Crafted for Elegance.</p>
-        </footer>
-      </Router>
-    </WishlistProvider>
-    </ToastProvider>
-    </GoogleOAuthProvider>
+    <>
+      <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+        <ToastProvider>
+          <WishlistProvider>
+            <Router>
+              <AppContent />
+              <footer style={footerStyle}>
+                <p>&copy; 2026 OneElixir Fragrances. Crafted for Elegance.</p>
+              </footer>
+            </Router>
+          </WishlistProvider>
+        </ToastProvider>
+      </GoogleOAuthProvider>
+      <Analytics />
+    </>
   );
 }
 
