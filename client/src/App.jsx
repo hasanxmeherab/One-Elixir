@@ -42,8 +42,7 @@ const AppContent = () => {
   const isHideNavbar = location.pathname.startsWith('/admin') || location.pathname === '/admin-login';
 
   return (
-    <>
-      {!isHideNavbar && <Navbar onCartClick={() => console.log("Cart Open")} />}
+    <>      {!isHideNavbar && <Navbar onCartClick={() => console.log("Cart Open")} />}
       
       <div style={{ minHeight: '80vh' }}>
         <Routes>

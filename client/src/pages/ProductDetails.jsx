@@ -14,6 +14,27 @@ const ProductDetails = ({ openCart }) => {
   const { addToCart } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
 
+  // --- RELATED PRODUCTS ---
+  const [related, setRelated] = useState([]);
+
+  const fetchRelated = async (currentProduct) => {
+    try {
+      const res = await axios.get(`${API_URL}/api/perfumes`);
+      const all = res.data.filter(p => p._id !== currentProduct._id);
+      // Score by matching scent notes
+      const scored = all.map(p => {
+        const matches = p.scentProfile.filter(note =>
+          currentProduct.scentProfile.includes(note)
+        ).length;
+        return { ...p, score: matches };
+      });
+      const sorted = scored.sort((a, b) => b.score - a.score).slice(0, 4);
+      setRelated(sorted);
+    } catch (err) {
+      console.error('Could not fetch related products');
+    }
+  };
+
   // --- REVIEWS ---
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
@@ -77,6 +98,7 @@ const ProductDetails = ({ openCart }) => {
       try {
         const res = await axios.get(`${API_URL}/api/perfumes/${id}`);
         setProduct(res.data);
+        fetchRelated(res.data);
       } catch (err) {
         console.error("Product not found");
       }
@@ -97,8 +119,7 @@ const ProductDetails = ({ openCart }) => {
   };
 
   return (
-    <div className="flex min-h-screen px-[8%] pt-28 pb-20 gap-20 flex-wrap">
-      
+    <div className="flex min-h-screen px-[8%] pt-28 pb-20 gap-20 flex-wrap">      
       {/* Left: Product Image */}
       <div className="flex-1 min-w-[300px] md:min-w-[400px] bg-[#fcfcfc]">
         <img src={product.image} alt={product.name} className="w-full h-auto object-cover" />
@@ -202,6 +223,42 @@ const ProductDetails = ({ openCart }) => {
           {product.stock > 0 ? `Inventory: ${product.stock} units available` : 'Restocking soon.'}
         </p>
       </div>
+
+      {/* ========== RELATED PRODUCTS ========== */}
+      {related.length > 0 && (
+        <div className="w-full px-[8%] pb-12">
+          <div className="h-px bg-[#eee] mb-12"></div>
+          <p className="text-[10px] tracking-[3px] font-bold text-[#888] mb-8">YOU MAY ALSO LIKE</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {related.map(p => (
+              <div
+                key={p._id}
+                onClick={() => { navigate(`/product/${p._id}`); window.scrollTo(0,0); }}
+                className="cursor-pointer group"
+              >
+                <div className="relative w-full h-[220px] bg-[#fcfcfc] overflow-hidden mb-4">
+                  <img
+                    src={p.image} alt={p.name}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  {p.stock === 0 && (
+                    <div className="absolute top-2 left-2 bg-black text-white px-2 py-0.5 text-[9px] font-bold tracking-wider">
+                      SOLD OUT
+                    </div>
+                  )}
+                </div>
+                <h4 className="text-xs font-bold tracking-wider mb-1 group-hover:underline">
+                  {p.name.toUpperCase()}
+                </h4>
+                <p className="text-xs text-[#555] mb-1">{p.price.toLocaleString()} TK</p>
+                <p className="text-[10px] text-[#aaa] italic">
+                  {p.scentProfile.slice(0, 2).join(' · ')}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ========== REVIEWS SECTION ========== */}
       <div className="w-full px-[8%] pb-20">
