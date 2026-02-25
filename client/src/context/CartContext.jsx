@@ -5,47 +5,52 @@ const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
   const { user } = useUser();
-  const [cart, setCart] = useState([]);
+  
+  const guestKey = 'oneElixirCart_guest';
+  const getActiveKey = () => (user?._id ? `oneElixirCart_${user._id}` : guestKey);
 
-  // Use _id from user object, fall back to localStorage in case context hasn't hydrated yet
-  const getUserId = () => user?._id || localStorage.getItem('userId') || null;
+  // Initial State Load
+  const [cart, setCart] = useState(() => {
+    const initialKey = getActiveKey();
+    const saved = localStorage.getItem(initialKey);
+    return saved ? JSON.parse(saved) : [];
+  });
 
-  const guestKey    = 'oneElixirCart_guest';
-  const getUserKey  = () => getUserId() ? `oneElixirCart_${getUserId()}` : null;
-  const currentKey  = () => getUserKey() || guestKey;
-
-  // LOAD & MERGE when login state changes
+  // Handle Login/Refresh & Guest Merging
   useEffect(() => {
-    const userKey     = getUserKey();
-    const savedUserCart  = userKey ? JSON.parse(localStorage.getItem(userKey)  || '[]') : [];
-    const savedGuestCart =           JSON.parse(localStorage.getItem(guestKey) || '[]');
+    const currentKey = getActiveKey();
+    const savedGuestCart = JSON.parse(localStorage.getItem(guestKey) || '[]');
 
-    if (userKey && savedGuestCart.length > 0) {
-      // Merge guest cart into user cart on login
+    if (user?._id && savedGuestCart.length > 0) {
+      // Merge guest cart into user cart
+      const savedUserCart = JSON.parse(localStorage.getItem(currentKey) || '[]');
       const mergedCart = [...savedUserCart];
+
       savedGuestCart.forEach(guestItem => {
         const existingIndex = mergedCart.findIndex(item => item._id === guestItem._id);
         if (existingIndex > -1) {
           mergedCart[existingIndex].quantity = Math.min(
             mergedCart[existingIndex].quantity + guestItem.quantity,
-            guestItem.stock
+            guestItem.stock || 99
           );
         } else {
           mergedCart.push(guestItem);
         }
       });
+
       setCart(mergedCart);
-      localStorage.setItem(userKey, JSON.stringify(mergedCart));
-      localStorage.removeItem(guestKey);
+      localStorage.setItem(currentKey, JSON.stringify(mergedCart));
+      localStorage.removeItem(guestKey); // Clean up guest cart
     } else {
-      const saved = localStorage.getItem(currentKey());
+      // Just load existing cart for current key
+      const saved = localStorage.getItem(currentKey);
       setCart(saved ? JSON.parse(saved) : []);
     }
-  }, [user?._id]); // Re-run whenever the logged-in user changes
+  }, [user?._id]); 
 
-  // SAVE on every cart change
+  // Auto-save whenever cart changes
   useEffect(() => {
-    localStorage.setItem(currentKey(), JSON.stringify(cart));
+    localStorage.setItem(getActiveKey(), JSON.stringify(cart));
   }, [cart, user?._id]);
 
   const addToCart = (product, quantity = 1) => {
@@ -58,22 +63,19 @@ export const CartProvider = ({ children }) => {
             : item
         );
       }
-      return [...prev, { ...product, quantity: Number(quantity) || 1, price: Number(product.price) || 0 }];
+      return [...prev, { ...product, quantity: Number(quantity) || 1 }];
     });
   };
 
   const removeFromCart = (id) => setCart(prev => prev.filter(item => item._id !== id));
 
   const clearCart = () => {
-    setCart([]);
-    localStorage.removeItem(currentKey());
-  };
+  setCart([]);
+  localStorage.removeItem(getActiveKey());
+};
 
-  const cartTotal = cart.reduce((total, item) =>
-    total + ((Number(item.price) || 0) * (Number(item.quantity) || 0)), 0);
-
-  const cartCount = cart.reduce((count, item) =>
-    count + (Number(item.quantity) || 0), 0);
+  const cartTotal = cart.reduce((total, item) => total + (Number(item.price) * Number(item.quantity)), 0);
+  const cartCount = cart.reduce((count, item) => count + Number(item.quantity), 0);
 
   return (
     <CartContext.Provider value={{ cart, addToCart, removeFromCart, clearCart, cartTotal, cartCount }}>

@@ -17,6 +17,7 @@ const InventoryManager = () => {
   });
 
   const API_URL   = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const authHeader = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } });
   const CLOUD_NAME    = 'dluvmed0b';
   const UPLOAD_PRESET = 'one_elixir_uploads';
 
@@ -84,9 +85,9 @@ const InventoryManager = () => {
       };
 
       if (editId) {
-        await axios.put(`${API_URL}/api/perfumes/${editId}`, payload);
+        await axios.put(`${API_URL}/api/perfumes/${editId}`, payload, authHeader());
       } else {
-        await axios.post(`${API_URL}/api/perfumes`, payload);
+        await axios.post(`${API_URL}/api/perfumes`, payload, authHeader());
       }
       cancelEdit();
       fetchData();
@@ -99,7 +100,7 @@ const InventoryManager = () => {
 
   const deletePerfume = async (id) => {
     if (window.confirm('Remove item from inventory?')) {
-      await axios.delete(`${API_URL}/api/perfumes/${id}`);
+      await axios.delete(`${API_URL}/api/perfumes/${id}`, authHeader());
       fetchData();
     }
   };

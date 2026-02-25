@@ -30,7 +30,10 @@ app.use('/api/coupons',    require('./routes/couponRoutes'));
 app.use('/api/admins',     require('./routes/adminRoutes'));
 app.use('/api/wishlist',   require('./routes/wishlistRoutes'));
 app.use('/api/reviews',    require('./routes/reviewRoutes'));
-app.use('/api/logs',       require('./routes/logRoutes'));     // NEW
+app.use('/api/logs',       require('./routes/logRoutes'));
+app.use('/api/addresses',  require('./routes/addressRoutes'));
+
+
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI)

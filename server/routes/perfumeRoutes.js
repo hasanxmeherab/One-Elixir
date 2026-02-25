@@ -5,10 +5,18 @@ const Log = require('../models/Log');
 const jwt = require('jsonwebtoken');
 
 // Optional auth — extracts admin from token if present, doesn't block if absent
+// Falls back to jwt.decode() if token is expired, so name still appears in logs
 const optionalAuth = (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
-    if (token) req.admin = jwt.verify(token, process.env.JWT_SECRET);
+    if (token) {
+      try {
+        req.admin = jwt.verify(token, process.env.JWT_SECRET);
+      } catch {
+        // Token expired — decode without verification just to get name for logging
+        req.admin = jwt.decode(token);
+      }
+    }
   } catch {}
   next();
 };
@@ -80,6 +88,7 @@ router.post('/', optionalAuth, async (req, res) => {
     description: req.body.description,
     scentProfile: req.body.scentProfile,
     image: req.body.image,
+    images: req.body.images || [],
     stock: req.body.stock || 0
   });
   try {

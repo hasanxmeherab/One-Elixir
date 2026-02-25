@@ -1,16 +1,31 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useUser } from './UserContext'; // Added this to track user state changes
 
 const WishlistContext = createContext();
 
-const getKey = () => {
-  const userId = localStorage.getItem('userId');
-  return userId ? `oneElixirWishlist_${userId}` : 'oneElixirWishlist_guest';
-};
-
 export const WishlistProvider = ({ children }) => {
-  const [wishlist, setWishlist] = useState([]);
+  const { user } = useUser();
 
-  // Load wishlist for current user on mount and when userId changes
+  // Helper to determine the key based on current state
+  const getKey = () => {
+    const userId = user?._id || localStorage.getItem('userId');
+    return userId ? `oneElixirWishlist_${userId}` : 'oneElixirWishlist_guest';
+  };
+
+  // 1. INITIAL LOAD: Use a lazy initializer function
+  // This runs synchronously on the very first render (Fixes refresh issue)
+  const [wishlist, setWishlist] = useState(() => {
+    try {
+      const key = getKey();
+      const saved = localStorage.getItem(key);
+      return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+      console.error("Wishlist initialization error:", error);
+      return [];
+    }
+  });
+
+  // 2. USER SYNC: Reload wishlist when the user object changes (login/logout)
   useEffect(() => {
     const loadWishlist = () => {
       try {
@@ -21,18 +36,19 @@ export const WishlistProvider = ({ children }) => {
         setWishlist([]);
       }
     };
+    
     loadWishlist();
 
-    // Re-load when storage changes (login/logout in another tab)
+    // Listen for storage changes in other tabs
     window.addEventListener('storage', loadWishlist);
     return () => window.removeEventListener('storage', loadWishlist);
-  }, []);
+  }, [user?._id]); // Re-run when user ID changes
 
-  // Persist to correct key whenever wishlist changes
+  // 3. PERSISTENCE: Save to localStorage whenever the wishlist array changes
   useEffect(() => {
     const key = getKey();
     localStorage.setItem(key, JSON.stringify(wishlist));
-  }, [wishlist]);
+  }, [wishlist, user?._id]);
 
   const addToWishlist = (product) => {
     setWishlist(prev => {
@@ -52,7 +68,6 @@ export const WishlistProvider = ({ children }) => {
     else addToWishlist(product);
   };
 
-  // Call this after login to reload wishlist for the newly logged-in user
   const reloadWishlist = () => {
     try {
       const key = getKey();
@@ -64,7 +79,16 @@ export const WishlistProvider = ({ children }) => {
   };
 
   return (
-    <WishlistContext.Provider value={{ wishlist, addToWishlist, removeFromWishlist, isWishlisted, toggleWishlist, reloadWishlist }}>
+    <WishlistContext.Provider 
+      value={{ 
+        wishlist, 
+        addToWishlist, 
+        removeFromWishlist, 
+        isWishlisted, 
+        toggleWishlist, 
+        reloadWishlist 
+      }}
+    >
       {children}
     </WishlistContext.Provider>
   );

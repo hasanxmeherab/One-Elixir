@@ -31,8 +31,7 @@ const Account = () => {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
 
-  const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-  const userId = userData?._id || userData?.id;
+  const userId = user?._id || localStorage.getItem('userId');
 
   useEffect(() => {
     if (user) setProfileForm(f => ({ ...f, name: user.name || '' }));
@@ -50,10 +49,32 @@ const Account = () => {
     }
   };
 
-  const fetchAddresses = async () => {
-    if (!userId) return;
+  // Resolve userId — use from context/localStorage, or fetch from /me as fallback
+  const resolveUserId = async () => {
+    if (userId) return userId;
     try {
-      const res = await axios.get(`${API_URL}/api/addresses/${userId}`);
+      const token = localStorage.getItem('userToken');
+      if (!token) return null;
+      const res = await axios.get(`${API_URL}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const id = res.data._id;
+      localStorage.setItem('userId', id);
+      updateUser({ _id: id, avatar: res.data.avatar });
+      return id;
+    } catch (err) {
+      console.error('Could not resolve userId', err);
+      return null;
+    }
+  };
+
+  const fetchAddresses = async () => {
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) return;
+      const res = await axios.get(`${API_URL}/api/addresses`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setAddresses(res.data);
     } catch (err) { console.error('Address fetch failed', err); }
   };
@@ -137,9 +158,12 @@ const Account = () => {
 
   const handleAddAddress = async (e) => {
     e.preventDefault();
-    if (!userId) return toast.error('Please sign in again.');
+    const token = localStorage.getItem('userToken');
+    if (!token) return toast.error('Please sign in again.');
     try {
-      const res = await axios.post(`${API_URL}/api/addresses/${userId}`, addrForm);
+      const res = await axios.post(`${API_URL}/api/addresses`, addrForm, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setAddresses(res.data);
       setAddrForm({ label: 'Home', fullName: '', phone: '', address: '', city: '', isDefault: false });
       setShowAddForm(false);
@@ -149,7 +173,10 @@ const Account = () => {
 
   const handleSetDefault = async (addressId) => {
     try {
-      const res = await axios.put(`${API_URL}/api/addresses/${userId}/${addressId}/default`);
+      const token = localStorage.getItem('userToken');
+      const res = await axios.put(`${API_URL}/api/addresses/${addressId}/default`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setAddresses(res.data);
       toast.success('Default address updated.');
     } catch { toast.error('Failed to update default address.'); }
@@ -158,7 +185,10 @@ const Account = () => {
   const handleDeleteAddress = async (addressId) => {
     if (!window.confirm('Remove this address?')) return;
     try {
-      const res = await axios.delete(`${API_URL}/api/addresses/${userId}/${addressId}`);
+      const token = localStorage.getItem('userToken');
+      const res = await axios.delete(`${API_URL}/api/addresses/${addressId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setAddresses(res.data);
       toast.success('Address removed.');
     } catch { toast.error('Failed to remove address.'); }
