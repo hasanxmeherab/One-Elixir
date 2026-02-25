@@ -7,76 +7,73 @@ export const CartProvider = ({ children }) => {
   const { user } = useUser();
   const [cart, setCart] = useState([]);
 
-  // Dynamic storage keys
-  const guestKey = 'oneElixirCart_guest';
-  const userKey = user ? `oneElixirCart_${user._id}` : null;
-  const currentKey = user ? userKey : guestKey;
+  // Use _id from user object, fall back to localStorage in case context hasn't hydrated yet
+  const getUserId = () => user?._id || localStorage.getItem('userId') || null;
 
-  // MERGE & LOAD LOGIC
+  const guestKey    = 'oneElixirCart_guest';
+  const getUserKey  = () => getUserId() ? `oneElixirCart_${getUserId()}` : null;
+  const currentKey  = () => getUserKey() || guestKey;
+
+  // LOAD & MERGE when login state changes
   useEffect(() => {
-    const savedUserCart = userKey ? JSON.parse(localStorage.getItem(userKey) || '[]') : [];
-    const savedGuestCart = JSON.parse(localStorage.getItem(guestKey) || '[]');
+    const userKey     = getUserKey();
+    const savedUserCart  = userKey ? JSON.parse(localStorage.getItem(userKey)  || '[]') : [];
+    const savedGuestCart =           JSON.parse(localStorage.getItem(guestKey) || '[]');
 
-    if (user && savedGuestCart.length > 0) {
-      // Merge guest items into user cart, avoiding duplicates by ID
+    if (userKey && savedGuestCart.length > 0) {
+      // Merge guest cart into user cart on login
       const mergedCart = [...savedUserCart];
-      
       savedGuestCart.forEach(guestItem => {
         const existingIndex = mergedCart.findIndex(item => item._id === guestItem._id);
         if (existingIndex > -1) {
-          // If item exists in both, sum the quantities (respecting stock)
           mergedCart[existingIndex].quantity = Math.min(
-            mergedCart[existingIndex].quantity + guestItem.quantity, 
+            mergedCart[existingIndex].quantity + guestItem.quantity,
             guestItem.stock
           );
         } else {
           mergedCart.push(guestItem);
         }
       });
-
       setCart(mergedCart);
-      localStorage.setItem(userKey, JSON.stringify(mergedCart)); // Save merged to user
-      localStorage.removeItem(guestKey); // Wipe guest cart after successful merge
+      localStorage.setItem(userKey, JSON.stringify(mergedCart));
+      localStorage.removeItem(guestKey);
     } else {
-      // Standard load if no merge is needed
-      const savedCart = localStorage.getItem(currentKey);
-      setCart(savedCart ? JSON.parse(savedCart) : []);
+      const saved = localStorage.getItem(currentKey());
+      setCart(saved ? JSON.parse(saved) : []);
     }
-  }, [user, userKey]); // Runs whenever login state changes
+  }, [user?._id]); // Re-run whenever the logged-in user changes
 
-  // SAVE LOGIC
+  // SAVE on every cart change
   useEffect(() => {
-    localStorage.setItem(currentKey, JSON.stringify(cart));
-  }, [cart, currentKey]);
+    localStorage.setItem(currentKey(), JSON.stringify(cart));
+  }, [cart, user?._id]);
 
   const addToCart = (product, quantity = 1) => {
-    setCart(prevCart => {
-      const existingItem = prevCart.find(item => item._id === product._id);
-      if (existingItem) {
-        return prevCart.map(item =>
-          item._id === product._id 
-            ? { ...item, quantity: Math.min((Number(item.quantity) || 0) + (Number(quantity) || 1), product.stock) } 
+    setCart(prev => {
+      const existing = prev.find(item => item._id === product._id);
+      if (existing) {
+        return prev.map(item =>
+          item._id === product._id
+            ? { ...item, quantity: Math.min((Number(item.quantity) || 0) + (Number(quantity) || 1), product.stock) }
             : item
         );
       }
-      return [...prevCart, { ...product, quantity: Number(quantity) || 1, price: Number(product.price) || 0 }];
+      return [...prev, { ...product, quantity: Number(quantity) || 1, price: Number(product.price) || 0 }];
     });
   };
 
-  const removeFromCart = (id) => setCart(prevCart => prevCart.filter(item => item._id !== id));
+  const removeFromCart = (id) => setCart(prev => prev.filter(item => item._id !== id));
 
   const clearCart = () => {
     setCart([]);
-    localStorage.removeItem(currentKey);
+    localStorage.removeItem(currentKey());
   };
 
-  const cartTotal = (cart || []).reduce((total, item) => 
-    total + ((Number(item.price) || 0) * (Number(item.quantity) || 0)), 0
-  );
+  const cartTotal = cart.reduce((total, item) =>
+    total + ((Number(item.price) || 0) * (Number(item.quantity) || 0)), 0);
 
-  const cartCount = (cart || []).reduce((count, item) => 
-    count + (Number(item.quantity) || 0), 0
-  );
+  const cartCount = cart.reduce((count, item) =>
+    count + (Number(item.quantity) || 0), 0);
 
   return (
     <CartContext.Provider value={{ cart, addToCart, removeFromCart, clearCart, cartTotal, cartCount }}>

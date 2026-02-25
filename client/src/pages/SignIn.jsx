@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
+import { useWishlist } from '../context/WishlistContext';
 import { Eye, EyeOff } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { GoogleLogin } from '@react-oauth/google';
@@ -12,6 +13,7 @@ const SignIn = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const { login } = useUser();
+  const { reloadWishlist } = useWishlist();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -26,6 +28,7 @@ const SignIn = () => {
         password
       });
       login(res.data);
+      reloadWishlist();
       navigate(from, { replace: true });
     } catch (err) {
       toast.error('Invalid email or password.');
@@ -38,6 +41,7 @@ const SignIn = () => {
         credential: credentialResponse.credential
       });
       login(res.data);
+      reloadWishlist();
       navigate(from, { replace: true });
     } catch (err) {
       toast.error('Google sign in failed. Please try again.');

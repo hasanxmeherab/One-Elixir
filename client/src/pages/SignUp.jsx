@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
+import { useWishlist } from '../context/WishlistContext';
 import { Eye, EyeOff, Check, X } from 'lucide-react'; 
 import { useToast } from '../context/ToastContext';
 import { GoogleLogin } from '@react-oauth/google';
@@ -12,6 +13,7 @@ const SignUp = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { login } = useUser();
+  const { reloadWishlist } = useWishlist();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -66,6 +68,7 @@ const SignUp = () => {
         credential: credentialResponse.credential
       });
       login(res.data);
+      reloadWishlist();
       navigate(from, { replace: true });
     } catch (err) {
       toast.error('Google sign up failed. Please try again.');
