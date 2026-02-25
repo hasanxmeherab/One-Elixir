@@ -28,7 +28,7 @@ router.post('/signup', async (req, res) => {
     user.refreshToken = await bcrypt.hash(refreshToken, 8);
     await user.save();
 
-    res.status(201).json({ token: accessToken, refreshToken, user: { name: user.name, email: user.email } });
+    res.status(201).json({ token: accessToken, refreshToken, user: { _id: user._id, name: user.name, email: user.email, avatar: user.avatar || '' } });
   } catch (err) {
     res.status(400).json({ message: 'Registration failed', error: err.message });
   }
@@ -47,7 +47,7 @@ router.post('/signin', async (req, res) => {
     user.refreshToken = await bcrypt.hash(refreshToken, 8);
     await user.save();
 
-    res.json({ token: accessToken, refreshToken, user: { name: user.name, email: user.email } });
+    res.json({ token: accessToken, refreshToken, user: { _id: user._id, name: user.name, email: user.email, avatar: user.avatar || '' } });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -132,6 +132,20 @@ router.post('/logout', async (req, res) => {
     res.json({ message: 'Logged out successfully' });
   } catch {
     res.json({ message: 'Logged out' });
+  }
+});
+
+// GET /api/auth/me — returns current user profile from token
+router.get('/me', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'Unauthorized' });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select('-password -refreshToken');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json({ _id: user._id, name: user.name, email: user.email, avatar: user.avatar || '' });
+  } catch (err) {
+    res.status(401).json({ message: 'Invalid token' });
   }
 });
 
