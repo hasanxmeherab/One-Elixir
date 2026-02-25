@@ -58,7 +58,7 @@ const Home = () => {
       {/* 3. COLLECTION SECTION */}
       <section className="collection-container" style={{ padding: '0 10% 80px 10%' }}>
         <div style={sectionHeader}>
-          <h2 style={{ letterSpacing: '8px', fontSize: '24px', margin: 0 }}>THE COLLECTION</h2>
+          <h2 style={{ letterSpacing: '8px', fontSize: '24px', margin: 0 }}>EXCLUSIVE</h2>
           <div style={headerLine}></div>
         </div>
 

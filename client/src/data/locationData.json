@@ -12,7 +12,8 @@
   
   "districtsByDivision": {
     "Dhaka": [
-      { "value": "Dhaka", "label": "Dhaka" }, { "value": "Gazipur", "label": "Gazipur" },
+      { "value": "Dhaka", "label": "Dhaka" }, { "value": "Ashulia", "label": "Ashulia" },
+      { "value": "Gazipur", "label": "Gazipur" },
       { "value": "Narayanganj", "label": "Narayanganj" }, { "value": "Tangail", "label": "Tangail" },
       { "value": "Faridpur", "label": "Faridpur" }, { "value": "Gopalganj", "label": "Gopalganj" },
       { "value": "Kishoreganj", "label": "Kishoreganj" }, { "value": "Madaripur", "label": "Madaripur" },
