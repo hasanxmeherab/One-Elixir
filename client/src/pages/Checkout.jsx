@@ -302,6 +302,7 @@ const Checkout = () => {
               type="tel" placeholder="Sender Phone Number"
               className="p-4 border border-[#ddd] outline-none text-sm"
               inputMode="numeric" maxLength={11}
+              value={mobilePayment.senderNumber}
               onChange={e => setMobilePayment({...mobilePayment, senderNumber: e.target.value.replace(/\D/g, '')})}
             />
             <input
