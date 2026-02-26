@@ -109,10 +109,7 @@ const ManualOrder = () => {
         alert('Please fill sender number and transaction ID.');
         return;
       }
-      if (!onlinePayment.screenshot && !onlinePayment.screenshotUrl) {
-        alert('Please upload the payment screenshot.');
-        return;
-      }
+      // Screenshot is optional — order saves without it if upload fails
     }
 
     const adminData = JSON.parse(localStorage.getItem('adminData') || '{}');
@@ -140,10 +137,14 @@ const ManualOrder = () => {
     try {
       setUploading(true);
 
-      // Upload screenshot if new file selected
+      // Upload screenshot if new file selected (optional — order saves without it if upload fails)
       let screenshotUrl = onlinePayment.screenshotUrl;
       if (isOnlinePayment && onlinePayment.screenshot) {
-        screenshotUrl = await uploadScreenshot(onlinePayment.screenshot);
+        try {
+          screenshotUrl = await uploadScreenshot(onlinePayment.screenshot);
+        } catch (uploadErr) {
+          console.warn('Screenshot upload failed, continuing without it.');
+        }
       }
 
       const authHeader = { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } };
@@ -161,22 +162,16 @@ const ManualOrder = () => {
         isManual: true,
         createdBy: adminName,
         createdAt: orderData.orderDate ? new Date(orderData.orderDate).toISOString() : new Date().toISOString(),
-        // Online payment details
+        // Online payment details — saved to paymentDetails field (same as web checkout)
         ...(isOnlinePayment && {
-          onlinePaymentDetails: {
+          paymentDetails: {
+            platform:      paymentMethod,
             senderNumber:  onlinePayment.senderNumber,
             transactionId: onlinePayment.transactionId,
-            screenshotUrl,
+            screenshot:    screenshotUrl,
           }
         })
       }, authHeader);
-
-      // Deduct stock
-      for (const item of itemsToOrder) {
-        const perfume = perfumes.find(p => p._id === item.perfumeId);
-        await axios.put(`${API_URL}/api/perfumes/${item.perfumeId}`,
-          { stock: perfume.stock - item.quantity }, authHeader);
-      }
 
       // Reset
       setOrderData({ customerName: '', phone: '', address: '', orderDate: new Date().toISOString().split('T')[0] });

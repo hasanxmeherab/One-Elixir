@@ -97,6 +97,12 @@ router.post('/manual', optionalAuth, async (req, res) => {
   const order = new Order({ ...req.body, isManual: true });
   try {
     const newOrder = await order.save();
+
+    // Deduct stock immediately on order placement
+    await Promise.all(newOrder.items.map(item =>
+      Perfume.findByIdAndUpdate(item.perfumeId, { $inc: { stock: -item.quantity } })
+    ));
+
     await writeLog(req, 'CREATE_ORDER', 'Order',
       `Manual order created for ${newOrder.customerName} — ${newOrder.totalAmount} TK`);
     res.status(201).json(newOrder);
@@ -131,14 +137,18 @@ router.put('/:id', optionalAuth, async (req, res) => {
     const oldStatus = order.status?.toLowerCase();
     const newStatus = status?.toLowerCase();
 
-    // Stock adjustment on delivered
-    if (newStatus === 'delivered' && oldStatus !== 'delivered') {
-      await Promise.all(order.items.map(item =>
-        Perfume.findByIdAndUpdate(item.perfumeId, { $inc: { stock: -item.quantity } })
-      ));
-    } else if (oldStatus === 'delivered' && newStatus && newStatus !== 'delivered') {
+    // Restore stock only if order is being CANCELLED (refund stock)
+    if ((newStatus === 'canceled' || newStatus === 'cancelled') &&
+        oldStatus !== 'canceled' && oldStatus !== 'cancelled') {
       await Promise.all(order.items.map(item =>
         Perfume.findByIdAndUpdate(item.perfumeId, { $inc: { stock: item.quantity } })
+      ));
+    }
+    // If restoring a cancelled order back to active — deduct stock again
+    else if ((oldStatus === 'canceled' || oldStatus === 'cancelled') &&
+             newStatus && newStatus !== 'canceled' && newStatus !== 'cancelled') {
+      await Promise.all(order.items.map(item =>
+        Perfume.findByIdAndUpdate(item.perfumeId, { $inc: { stock: -item.quantity } })
       ));
     }
 
@@ -154,6 +164,10 @@ router.put('/:id', optionalAuth, async (req, res) => {
 
     if (status)        order.status        = status;
     if (paymentStatus) order.paymentStatus = paymentStatus;
+    if (req.body.paymentDetails) {
+      order.paymentDetails = req.body.paymentDetails;
+      order.markModified('paymentDetails');
+    }
 
     const updatedOrder = await order.save();
     res.json(updatedOrder);
