@@ -35,6 +35,7 @@ import ExpenseManagement from './pages/ExpenseManagement';
 import InvestmentTracker from './pages/InvestmentTracker';
 import CouponManagement from './pages/CouponManagement';
 import BannerManagement from './pages/BannerManagement';
+import CustomerList from './pages/CustomerList';
 
 // --- CONTEXT ---
 import { WishlistProvider } from './context/WishlistContext';
@@ -81,6 +82,7 @@ const AppContent = () => {
             <Route path="banners" element={<BannerManagement isAdmin={true} />} />
             <Route path="admins" element={<AdminManagement />} />
             <Route path="logs" element={<ActivityLogs />} />
+            <Route path="customers" element={<CustomerList />} />
           </Route>
 
           <Route path="/admin-login" element={<AdminLogin />} />

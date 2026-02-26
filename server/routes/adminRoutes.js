@@ -43,7 +43,7 @@ router.post('/register', verifyAdmin, async (req, res) => {
   }
 });
 
-// ── 2. ADMIN LOGIN — returns accessToken (15m) + refreshToken (7d)
+// ── 2. ADMIN LOGIN — returns accessToken (no expiry) + refreshToken (7d)
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -55,7 +55,7 @@ router.post('/login', async (req, res) => {
 
     const payload = { id: admin._id, role: admin.role, name: admin.name };
 
-    const accessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '15m' });
+    const accessToken = jwt.sign(payload, process.env.JWT_SECRET);
     const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
 
     // Store hashed refresh token on admin document
@@ -91,7 +91,7 @@ router.post('/refresh', async (req, res) => {
     if (!valid) return res.status(403).json({ message: 'Refresh token mismatch' });
 
     const payload = { id: admin._id, role: admin.role, name: admin.name };
-    const newAccessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '15m' });
+    const newAccessToken = jwt.sign(payload, process.env.JWT_SECRET);
     res.json({ accessToken: newAccessToken });
   } catch {
     res.status(403).json({ message: 'Expired or invalid refresh token' });

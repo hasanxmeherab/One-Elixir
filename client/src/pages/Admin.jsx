@@ -1,17 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'; // Added useNavigate
 import AdminNavbar from '../components/AdminNavbar';
-import { X } from 'lucide-react';
 
 const Admin = () => {
   const [perfumes, setPerfumes] = useState([]);
   const [orders, setOrders] = useState([]);
   const [investments, setInvestments] = useState([]);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
-
+  const location = useLocation(); 
+  const navigate = useNavigate(); // Initialize navigate for logout
+  
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   const fetchData = async () => {
@@ -22,12 +20,14 @@ const Admin = () => {
       setPerfumes(pRes.data);
       setOrders(oRes.data);
       setInvestments(iRes.data);
-    } catch (err) { console.error("Fetch failed", err); }
+    } catch (err) {
+      console.error("Fetch failed", err);
+    }
   };
 
   useEffect(() => { fetchData(); }, []);
-  useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
 
+  // --- NEW: LOGOUT LOGIC ---
   const handleAdminLogout = () => {
     localStorage.removeItem('isAdminAuthenticated');
     localStorage.removeItem('adminToken');
@@ -35,87 +35,128 @@ const Admin = () => {
     navigate('/admin-login');
   };
 
+  // Helper to check if a link is active for styling
   const isActive = (path) => location.pathname === path;
 
-  const linkClass = (path) =>
-    `no-underline text-left px-4 py-3 text-xs font-bold tracking-wider block transition-colors duration-200 rounded ${
-      isActive(path)
-        ? 'bg-black text-white'
-        : 'bg-transparent text-[#555] hover:bg-gray-100'
-    }`;
-
-  const navLinks = [
-    { to: '/admin', label: 'DASHBOARD' },
-    { to: '/admin/inventory', label: 'INVENTORY' },
-    { to: '/admin/manual-order', label: 'MANUAL ORDER' },
-    { to: '/admin/order-list', label: 'ORDER LIST' },
-    { to: '/admin/expenses', label: 'EXPENSES' },
-    { to: '/admin/investment', label: 'INVESTMENT' },
-    { to: '/admin/admins', label: 'ADMIN MANAGEMENT' },
-    { to: '/admin/coupons', label: 'COUPONS' },
-    { to: '/admin/logs', label: 'ACTIVITY LOGS' },
-    { to: '/admin/banners', label: 'BANNERS' },
-  ];
-
-  const SidebarLinks = () => (
-    <>
-      <p className="text-[10px] tracking-[2px] text-[#888] font-bold mb-5 pl-2.5">
-        COMMAND CENTER
-      </p>
-      <div className="flex flex-col gap-1 flex-1">
-        {navLinks.map(link => (
-          <Link key={link.to} to={link.to} className={linkClass(link.to)}>
-            {link.label}
-          </Link>
-        ))}
-      </div>
-      <button
-        onClick={handleAdminLogout}
-        className="text-center px-4 py-3 text-xs font-bold tracking-wider text-[#991b1b] bg-white border border-[#fee2e2] rounded cursor-pointer hover:bg-[#fee2e2] transition-colors w-full mt-4"
-      >
-        LOGOUT SYSTEM
-      </button>
-    </>
-  );
-
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* Pass hamburger handler to navbar */}
-      <AdminNavbar onMenuClick={() => setSidebarOpen(true)} />
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <AdminNavbar />
+      
+      <div style={{ display: 'flex', flex: 1 }}>
+        {/* SIDEBAR WITH DEDICATED LINKS */}
+        <div style={sidebarStyle}>
+          <p style={sidebarLabel}>COMMAND CENTER</p>
+          
+          <Link to="/admin" style={isActive('/admin') ? activeBtn : menuBtn}>
+            DASHBOARD
+          </Link>
+          
+          <Link to="/admin/inventory" style={isActive('/admin/inventory') ? activeBtn : menuBtn}>
+            INVENTORY
+          </Link>
+          
+          <Link to="/admin/manual-order" style={isActive('/admin/manual-order') ? activeBtn : menuBtn}>
+            MANUAL ORDER
+          </Link>
+          
+          <Link to="/admin/order-list" style={isActive('/admin/order-list') ? activeBtn : menuBtn}>
+            ORDER LIST
+          </Link>
+          
+          <Link to="/admin/expenses" style={isActive('/admin/expenses') ? activeBtn : menuBtn}>
+            EXPENSES
+          </Link>
+          
+          <Link to="/admin/investment" style={isActive('/admin/investment') ? activeBtn : menuBtn}>
+            INVESTMENT
+          </Link>
 
-      <div className="flex flex-1">
+          <Link to="/admin/customers" style={isActive('/admin/customers') ? activeBtn : menuBtn}>
+            CUSTOMERS
+          </Link>
 
-        {/* DESKTOP SIDEBAR */}
-        <div className="hidden lg:flex flex-col w-[260px] shrink-0 bg-[#f9f9f9] border-r border-[#eee] px-4 py-8">
-          <SidebarLinks />
+          <Link to="/admin/logs" style={isActive('/admin/logs') ? activeBtn : menuBtn}>
+            ACTIVITY LOGS
+          </Link>
+
+          <Link to="/admin/admins" style={isActive('/admin/admins') ? activeBtn : menuBtn}>
+            ADMIN MANAGEMENT
+          </Link>
+          
+          <Link to="/admin/coupons" style={isActive('/admin/coupons') ? activeBtn : menuBtn}>
+            COUPONS
+          </Link>
+          
+          <Link to="/admin/banners" style={isActive('/admin/banners') ? activeBtn : menuBtn}>
+            BANNERS
+          </Link>
+
+          {/* --- NEW: LOGOUT BUTTON AT BOTTOM --- */}
+          <button onClick={handleAdminLogout} style={logoutBtnStyle}>
+            LOGOUT SYSTEM
+          </button>
         </div>
 
-        {/* MOBILE SIDEBAR OVERLAY */}
-        {sidebarOpen && (
-          <>
-            <div
-              className="fixed inset-0 bg-black/50 z-[1400]"
-              onClick={() => setSidebarOpen(false)}
-            />
-            <div className="fixed top-0 left-0 h-full w-[260px] bg-[#f9f9f9] border-r border-[#eee] px-4 py-8 flex flex-col z-[1500]">
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="self-end mb-4 text-gray-500 hover:text-black transition-colors"
-              >
-                <X size={20} />
-              </button>
-              <SidebarLinks />
-            </div>
-          </>
-        )}
-
-        {/* MAIN CONTENT */}
-        <div className="flex-1 p-5 md:p-10 bg-white overflow-auto min-w-0">
+        {/* DEDICATED PAGE CONTENT AREA */}
+        <div style={{ flex: 1, padding: '40px', backgroundColor: '#fff' }}>
           <Outlet context={{ perfumes, orders, investments, fetchData }} />
         </div>
       </div>
     </div>
   );
+};
+
+// --- Styles (Maintained & Luxury Feel) ---
+const sidebarStyle = { 
+  width: '260px', 
+  backgroundColor: '#f9f9f9', 
+  borderRight: '1px solid #eee', 
+  padding: '30px 15px', 
+  display: 'flex', 
+  flexDirection: 'column', 
+  gap: '5px' 
+};
+
+const sidebarLabel = { 
+  fontSize: '10px', 
+  letterSpacing: '2px', 
+  color: '#888', 
+  fontWeight: 'bold', 
+  marginBottom: '20px', 
+  paddingLeft: '10px' 
+};
+
+const menuBtn = { 
+  textDecoration: 'none',
+  textAlign: 'left', 
+  padding: '12px 15px', 
+  backgroundColor: 'transparent', 
+  border: 'none', 
+  cursor: 'pointer', 
+  fontSize: '12px', 
+  fontWeight: 'bold', 
+  letterSpacing: '1px', 
+  color: '#555', 
+  transition: '0.2s',
+  display: 'block' 
+};
+
+const activeBtn = { 
+  ...menuBtn, 
+  backgroundColor: '#000', 
+  color: '#fff', 
+  borderRadius: '4px' 
+};
+
+// --- NEW: LOGOUT STYLE ---
+const logoutBtnStyle = {
+  ...menuBtn,
+  marginTop: 'auto', // Pushes button to the bottom
+  color: '#991b1b', // Dark red for danger/logout action
+  backgroundColor: '#fff',
+  border: '1px solid #fee2e2',
+  borderRadius: '4px',
+  textAlign: 'center'
 };
 
 export default Admin;
