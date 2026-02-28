@@ -9,7 +9,7 @@ const sendEmail = require('../utils/sendEmail');
 // Helper — generate both tokens
 const generateTokens = (user) => {
   const payload = { id: user._id };
-  const accessToken  = jwt.sign(payload, process.env.JWT_SECRET,         { expiresIn: '15m' });
+  const accessToken  = jwt.sign(payload, process.env.JWT_SECRET);
   const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
   return { accessToken, refreshToken };
 };
@@ -115,7 +115,7 @@ router.post('/refresh', async (req, res) => {
     const valid = await bcrypt.compare(refreshToken, user.refreshToken);
     if (!valid) return res.status(403).json({ message: 'Refresh token mismatch' });
 
-    const newAccessToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '15m' });
+    const newAccessToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
     res.json({ token: newAccessToken });
   } catch {
     res.status(403).json({ message: 'Expired or invalid refresh token. Please sign in again.' });
