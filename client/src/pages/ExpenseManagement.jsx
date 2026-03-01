@@ -2,13 +2,52 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useToast } from '../context/ToastContext';
 
+
+
+// Returns today's date in local timezone as YYYY-MM-DD
+const getLocalDate = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+const PAGE_SIZE = 10;
+
+// ── Reusable Pagination ───────────────────────────────────────
+const Pagination = ({ page, totalPages, onPageChange }) => {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex justify-center items-center gap-2 mt-8">
+      <button onClick={() => onPageChange(page - 1)} disabled={page === 1}
+        className="px-4 py-2 border border-[#ddd] text-xs font-bold tracking-wider disabled:opacity-30 hover:border-black transition-colors cursor-pointer bg-white">
+        ← PREV
+      </button>
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+        <button key={n} onClick={() => onPageChange(n)}
+          className={`w-9 h-9 text-xs font-bold border transition-colors cursor-pointer ${
+            n === page ? 'bg-black text-white border-black' : 'bg-white border-[#ddd] hover:border-black'
+          }`}>
+          {n}
+        </button>
+      ))}
+      <button onClick={() => onPageChange(page + 1)} disabled={page === totalPages}
+        className="px-4 py-2 border border-[#ddd] text-xs font-bold tracking-wider disabled:opacity-30 hover:border-black transition-colors cursor-pointer bg-white">
+        NEXT →
+      </button>
+    </div>
+  );
+};
+
 const ExpenseManagement = () => {
   const toast = useToast();
   const [expenses, setExpenses] = useState([]);
+  const [page, setPage] = useState(1);
   const [formData, setFormData] = useState({
     title: '', amount: '', quantity: '', unitPrice: '',
     unit: 'pcs', category: 'Packaging',
-    date: new Date().toISOString().split('T')[0]
+    date: getLocalDate()
   });
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -45,7 +84,7 @@ const ExpenseManagement = () => {
       setFormData({
         title: '', amount: '', quantity: '', unitPrice: '',
         unit: 'pcs', category: 'Packaging',
-        date: new Date().toISOString().split('T')[0]
+        date: getLocalDate()
       });
       fetchExpenses();
       toast.success("Expense logged successfully!");
@@ -58,6 +97,9 @@ const ExpenseManagement = () => {
       fetchExpenses();
     }
   };
+
+  const totalPages       = Math.ceil(expenses.length / PAGE_SIZE);
+  const paginatedExpenses = expenses.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div>
@@ -152,7 +194,7 @@ const ExpenseManagement = () => {
             </tr>
           </thead>
           <tbody>
-            {expenses.map(exp => (
+            {paginatedExpenses.map(exp => (
               <tr key={exp._id} className="border-b border-[#eee]">
                 <td className="py-4 px-2.5 text-sm">{new Date(exp.date).toLocaleDateString()}</td>
                 <td className="py-4 px-2.5 text-sm">{exp.title}</td>
@@ -178,6 +220,7 @@ const ExpenseManagement = () => {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
     </div>
   );
 };

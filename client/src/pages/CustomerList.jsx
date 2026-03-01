@@ -1,12 +1,40 @@
 import React, { useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 
+
+const PAGE_SIZE = 10;
+
+const Pagination = ({ page, totalPages, onPageChange }) => {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex justify-center items-center gap-2 mt-8">
+      <button onClick={() => onPageChange(page - 1)} disabled={page === 1}
+        className="px-4 py-2 border border-[#ddd] text-xs font-bold tracking-wider disabled:opacity-30 hover:border-black transition-colors cursor-pointer bg-white">
+        ← PREV
+      </button>
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+        <button key={n} onClick={() => onPageChange(n)}
+          className={`w-9 h-9 text-xs font-bold border transition-colors cursor-pointer ${
+            n === page ? 'bg-black text-white border-black' : 'bg-white border-[#ddd] hover:border-black'
+          }`}>
+          {n}
+        </button>
+      ))}
+      <button onClick={() => onPageChange(page + 1)} disabled={page === totalPages}
+        className="px-4 py-2 border border-[#ddd] text-xs font-bold tracking-wider disabled:opacity-30 hover:border-black transition-colors cursor-pointer bg-white">
+        NEXT →
+      </button>
+    </div>
+  );
+};
+
 const CustomerList = () => {
   const { orders = [] } = useOutletContext();
   const [search, setSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [orderSearch, setOrderSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [page, setPage] = useState(1);
 
   const customers = useMemo(() => {
     const map = {};
@@ -36,6 +64,9 @@ const CustomerList = () => {
     );
   }, [customers, search]);
 
+  // Reset page on search change
+  React.useEffect(() => { setPage(1); }, [search]);
+
   const customerOrders = useMemo(() => {
     if (!selectedCustomer) return [];
     return selectedCustomer.orders
@@ -59,7 +90,10 @@ const CustomerList = () => {
     return map[status] || 'bg-gray-100 text-gray-600';
   };
 
-  return (
+  const totalPages        = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginatedCustomers = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+    return (
     <div className="w-full">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
@@ -89,7 +123,7 @@ const CustomerList = () => {
             <tbody>
               {filtered.length === 0 ? (
                 <tr><td colSpan="6" className="text-center py-10 text-gray-300">No customers found.</td></tr>
-              ) : filtered.map((c, i) => (
+              ) : paginatedCustomers.map((c, i) => (
                 <tr key={c.phone}
                   className={`border-b border-[#f0f0f0] cursor-pointer hover:bg-[#fafafa] transition-colors ${selectedCustomer?.phone === c.phone ? 'bg-[#f9f9f9]' : 'bg-white'}`}
                   onClick={() => { setSelectedCustomer(c); setOrderSearch(''); setStatusFilter('ALL'); }}
@@ -206,6 +240,7 @@ const CustomerList = () => {
           </div>
         )}
       </div>
+      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
     </div>
   );
 };

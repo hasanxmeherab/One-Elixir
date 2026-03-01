@@ -8,10 +8,17 @@ import { ImagePlus } from 'lucide-react';
 const CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
+
+// Returns today's date in local timezone as YYYY-MM-DD
+const getLocalDate = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
+
 const ManualOrder = () => {
   const { perfumes = [], fetchData } = useOutletContext();
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDate();
   const [orderData, setOrderData]         = useState({ customerName: '', phone: '', address: '', orderDate: today });
   const [division, setDivision]           = useState(null);
   const [district, setDistrict]           = useState(null);
@@ -120,7 +127,7 @@ const ManualOrder = () => {
         ...(isOnlinePayment && { paymentDetails: { platform: paymentMethod, senderNumber: onlinePayment.senderNumber, transactionId: onlinePayment.transactionId, screenshot: screenshotUrl } })
       }, authHeader);
 
-      setOrderData({ customerName: '', phone: '', address: '', orderDate: new Date().toISOString().split('T')[0] });
+      setOrderData({ customerName: '', phone: '', address: '', orderDate: getLocalDate() });
       setDivision(null); setDistrict(null);
       setSelectedItems([{ perfumeId: '', quantity: 1, discountType: 'none', discountValue: 0 }]);
       setCouponDiscount(0); setCouponCode('');
@@ -138,7 +145,7 @@ const ManualOrder = () => {
   };
 
   return (
-    <div className="max-w-3xl">
+    <div className="w-full">
       <h3 className="tracking-[2px] mb-8 font-bold">CREATE MANUAL ORDER</h3>
 
       <form onSubmit={handleOrderSubmit} className="flex flex-col gap-4 bg-[#fcfcfc] p-4 sm:p-8 border border-[#eee]">

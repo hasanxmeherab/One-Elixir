@@ -5,6 +5,33 @@ import autoTable from 'jspdf-autotable';
 import { useOutletContext } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 
+
+const PAGE_SIZE = 15;
+
+const Pagination = ({ page, totalPages, onPageChange }) => {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex justify-center items-center gap-2 mt-8">
+      <button onClick={() => onPageChange(page - 1)} disabled={page === 1}
+        className="px-4 py-2 border border-[#ddd] text-xs font-bold tracking-wider disabled:opacity-30 hover:border-black transition-colors cursor-pointer bg-white">
+        ← PREV
+      </button>
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+        <button key={n} onClick={() => onPageChange(n)}
+          className={`w-9 h-9 text-xs font-bold border transition-colors cursor-pointer ${
+            n === page ? 'bg-black text-white border-black' : 'bg-white border-[#ddd] hover:border-black'
+          }`}>
+          {n}
+        </button>
+      ))}
+      <button onClick={() => onPageChange(page + 1)} disabled={page === totalPages}
+        className="px-4 py-2 border border-[#ddd] text-xs font-bold tracking-wider disabled:opacity-30 hover:border-black transition-colors cursor-pointer bg-white">
+        NEXT →
+      </button>
+    </div>
+  );
+};
+
 const OrderList = () => {
   const { orders = [], fetchData } = useOutletContext();
   const toast = useToast();
@@ -17,6 +44,7 @@ const OrderList = () => {
   const [editPaymentOrder, setEditPaymentOrder]   = useState(null);
   const [editPaymentForm, setEditPaymentForm]     = useState({ senderNumber: '', transactionId: '', screenshot: null, screenshotUrl: '' });
   const [editUploading, setEditUploading]         = useState(false);
+  const [page, setPage]                           = useState(1);
 
   const CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
   const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
@@ -27,6 +55,9 @@ const OrderList = () => {
     const interval = setInterval(() => fetchData(), 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Reset to page 1 when filters change
+  useEffect(() => { setPage(1); }, [searchTerm, paymentStatusFilter, paymentMethodFilter, orderStatusFilter, showArchived]);
 
   if (!orders) return <div className="p-10 text-center">Loading Order Data...</div>;
 
@@ -111,13 +142,15 @@ const OrderList = () => {
   };
 
   const baseFiltered    = orders.filter(o => showArchived ? o.status === 'Canceled' : o.status !== 'Canceled');
-  const displayedOrders = baseFiltered.filter(order => {
+  const allFiltered = baseFiltered.filter(order => {
     const s = searchTerm.toLowerCase();
     return (order.customerName.toLowerCase().includes(s) || order.phone.includes(s))
       && (paymentStatusFilter === 'ALL' || order.paymentStatus === paymentStatusFilter)
       && (paymentMethodFilter === 'ALL' || order.paymentMethod === paymentMethodFilter)
       && (orderStatusFilter   === 'ALL' || order.status       === orderStatusFilter);
   });
+  const totalPages      = Math.ceil(allFiltered.length / PAGE_SIZE);
+  const displayedOrders = allFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const getStatusClass = (status) => {
     if (status === 'Delivered')  return 'bg-emerald-100 text-emerald-800';
@@ -327,6 +360,7 @@ const OrderList = () => {
           </div>
         </div>
       )}
+      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
     </div>
   );
 };
