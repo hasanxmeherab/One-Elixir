@@ -6,6 +6,55 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { Heart, Star } from 'lucide-react';
 
+// ── Flash Sale Countdown Hook ─────────────────────────────────
+const useCountdown = (endsAt) => {
+  const calc = () => {
+    const diff = new Date(endsAt) - new Date();
+    if (diff <= 0) return null;
+    return {
+      h: String(Math.floor(diff / 3600000)).padStart(2, '0'),
+      m: String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0'),
+      s: String(Math.floor((diff % 60000) / 1000)).padStart(2, '0'),
+    };
+  };
+  const [time, setTime] = useState(calc);
+  useEffect(() => {
+    const t = setInterval(() => setTime(calc()), 1000);
+    return () => clearInterval(t);
+  }, [endsAt]);
+  return time;
+};
+
+const FlashSaleBanner = ({ salePrice, originalPrice, endsAt }) => {
+  const time = useCountdown(endsAt);
+  if (!time) return null;
+  const savings = originalPrice - salePrice;
+  return (
+    <div className="bg-red-600 text-white px-5 py-4 mb-8">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <p className="text-[9px] tracking-[2px] opacity-80 mb-1">🔥 FLASH SALE — LIMITED TIME</p>
+          <div className="flex items-baseline gap-3 flex-wrap">
+            <span className="text-2xl font-bold">{salePrice.toLocaleString()} TK</span>
+            <span className="text-sm line-through opacity-60">{originalPrice.toLocaleString()} TK</span>
+            <span className="text-[10px] font-bold bg-white text-red-600 px-2 py-0.5">
+              SAVE {savings.toLocaleString()} TK
+            </span>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          {[['h','HRS'],['m','MIN'],['s','SEC']].map(([key, label]) => (
+            <div key={key} className="flex flex-col items-center bg-white/20 px-3 py-2 min-w-[48px]">
+              <span className="text-xl font-bold leading-none">{time[key]}</span>
+              <span className="text-[8px] tracking-wider opacity-70 mt-0.5">{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ProductDetails = ({ openCart }) => { 
   const { id } = useParams();
   const navigate = useNavigate();
@@ -114,8 +163,12 @@ const ProductDetails = ({ openCart }) => {
 
   if (!product) return <ProductDetailsSkeleton />;
 
+  // ── Flash sale active? ──────────────────────────────────────
+  const flashActive = product.flashSale?.active && product.flashSale?.salePrice && new Date(product.flashSale.endsAt) > new Date();
+  const displayPrice = flashActive ? product.flashSale.salePrice : product.price;
+
   const handleAddToCart = () => {
-    addToCart(product, quantity);
+    addToCart({ ...product, price: displayPrice }, quantity);
     if (openCart) openCart(); 
   };
 
@@ -161,7 +214,17 @@ const ProductDetails = ({ openCart }) => {
         <h1 className="text-4xl md:text-5xl font-light tracking-[12px] mb-2">
           {product.name.toUpperCase()}
         </h1>
-        <p className="text-xl text-[#555] mb-8">{product.price.toLocaleString()} TK</p>
+
+        {/* ── Price: flash sale banner OR normal price ── */}
+        {flashActive ? (
+          <FlashSaleBanner
+            salePrice={product.flashSale.salePrice}
+            originalPrice={product.price}
+            endsAt={product.flashSale.endsAt}
+          />
+        ) : (
+          <p className="text-xl text-[#555] mb-8">{product.price.toLocaleString()} TK</p>
+        )}
 
         <div className="h-px bg-[#eee] w-16 mb-8"></div>
 

@@ -8,7 +8,7 @@ const InventoryManager = () => {
   const toast = useToast();
   const { perfumes = [], fetchData } = useOutletContext();
 
-  const [files, setFiles] = useState([]);          // multiple image files
+  const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [editId, setEditId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -16,7 +16,11 @@ const InventoryManager = () => {
     name: '', price: '', description: '', scentProfile: '', image: '', images: [], stock: ''
   });
 
-  const API_URL   = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  // ── Flash Sale ──────────────────────────────────────────────
+  const [flashEditId, setFlashEditId] = useState(null);
+  const [flashForm, setFlashForm] = useState({ salePrice: '', endsAt: '' });
+
+  const API_URL    = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const authHeader = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } });
   const CLOUD_NAME    = 'dluvmed0b';
   const UPLOAD_PRESET = 'one_elixir_uploads';
@@ -68,22 +72,15 @@ const InventoryManager = () => {
     e.preventDefault();
     try {
       setUploading(true);
-
-      // Upload any new files
-      const newUrls = files.length > 0
-        ? await Promise.all(files.map(uploadSingleFile))
-        : [];
-
+      const newUrls = files.length > 0 ? await Promise.all(files.map(uploadSingleFile)) : [];
       const allImages = [...(formData.images || []), ...newUrls];
       const primaryImage = allImages[0] || formData.image || '';
-
       const payload = {
         ...formData,
         image:        primaryImage,
         images:       allImages,
         scentProfile: formData.scentProfile.split(',').map(s => s.trim())
       };
-
       if (editId) {
         await axios.put(`${API_URL}/api/perfumes/${editId}`, payload, authHeader());
       } else {
@@ -103,6 +100,38 @@ const InventoryManager = () => {
       await axios.delete(`${API_URL}/api/perfumes/${id}`, authHeader());
       fetchData();
     }
+  };
+
+  // ── Flash Sale Handlers ─────────────────────────────────────
+  const openFlashEdit = (p) => {
+    setFlashEditId(p._id);
+    setFlashForm({
+      salePrice: p.flashSale?.salePrice || '',
+      endsAt: p.flashSale?.endsAt ? new Date(p.flashSale.endsAt).toISOString().slice(0, 16) : '',
+    });
+  };
+
+  const saveFlashSale = async (id) => {
+    if (!flashForm.salePrice || !flashForm.endsAt) {
+      toast.error('Fill in sale price and end date/time.');
+      return;
+    }
+    try {
+      await axios.put(`${API_URL}/api/perfumes/${id}`, {
+        flashSale: { active: true, salePrice: Number(flashForm.salePrice), endsAt: new Date(flashForm.endsAt) }
+      }, authHeader());
+      toast.success('Flash sale activated!');
+      setFlashEditId(null);
+      fetchData();
+    } catch { toast.error('Failed to save flash sale.'); }
+  };
+
+  const endFlashSale = async (id) => {
+    try {
+      await axios.put(`${API_URL}/api/perfumes/${id}`, { flashSale: { active: false } }, authHeader());
+      toast.success('Flash sale ended.');
+      fetchData();
+    } catch { toast.error('Failed to end flash sale.'); }
   };
 
   return (
@@ -232,43 +261,100 @@ const InventoryManager = () => {
               <th className="p-2.5 text-xs tracking-wider">IMAGES</th>
               <th className="p-2.5 text-xs tracking-wider">PRICE</th>
               <th className="p-2.5 text-xs tracking-wider">STOCK</th>
+              <th className="p-2.5 text-xs tracking-wider">FLASH SALE</th>
               <th className="p-2.5 text-xs tracking-wider">ACTIONS</th>
             </tr>
           </thead>
           <tbody>
-            {filteredPerfumes.length > 0 ? (
-              filteredPerfumes.map(p => (
-                <tr key={p._id} className="border-b border-[#eee]">
-                  <td className="p-2.5 text-sm">{p.name}</td>
-                  <td className="p-2.5">
-                    <div className="flex gap-1">
-                      {(p.images?.length > 0 ? p.images : [p.image]).filter(Boolean).slice(0, 3).map((img, i) => (
-                        <img key={i} src={img} alt="" className="w-8 h-8 object-cover border border-[#eee]" />
-                      ))}
-                      {(p.images?.length || 0) > 3 && (
-                        <div className="w-8 h-8 bg-[#f5f5f5] border border-[#eee] flex items-center justify-center text-[9px] font-bold text-[#888]">
-                          +{p.images.length - 3}
+            {filteredPerfumes.length > 0 ? filteredPerfumes.map(p => {
+              const saleActive = p.flashSale?.active && p.flashSale?.endsAt && new Date(p.flashSale.endsAt) > new Date();
+              return (
+                <React.Fragment key={p._id}>
+                  <tr className="border-b border-[#eee]">
+                    <td className="p-2.5 text-sm">{p.name}</td>
+                    <td className="p-2.5">
+                      <div className="flex gap-1">
+                        {(p.images?.length > 0 ? p.images : [p.image]).filter(Boolean).slice(0, 3).map((img, i) => (
+                          <img key={i} src={img} alt="" className="w-8 h-8 object-cover border border-[#eee]" />
+                        ))}
+                        {(p.images?.length || 0) > 3 && (
+                          <div className="w-8 h-8 bg-[#f5f5f5] border border-[#eee] flex items-center justify-center text-[9px] font-bold text-[#888]">
+                            +{p.images.length - 3}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-2.5 text-sm">{p.price} TK</td>
+                    <td className={`p-2.5 text-sm font-bold ${p.stock < 5 ? 'text-red-500' : 'text-black'}`}>{p.stock}</td>
+
+                    {/* ── Flash Sale Column ── */}
+                    <td className="p-2.5 text-sm">
+                      {saleActive ? (
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[11px] font-bold text-red-600">🔥 {p.flashSale.salePrice} TK</span>
+                          <span className="text-[10px] text-[#888]">
+                            Ends {new Date(p.flashSale.endsAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <button onClick={() => endFlashSale(p._id)}
+                            className="text-[9px] text-red-500 underline bg-transparent border-none cursor-pointer p-0 text-left hover:opacity-60">
+                            END SALE
+                          </button>
                         </div>
+                      ) : (
+                        <button onClick={() => openFlashEdit(p)}
+                          className="text-[11px] font-bold text-amber-500 underline bg-transparent border-none cursor-pointer p-0 hover:opacity-60">
+                          + SET SALE
+                        </button>
                       )}
-                    </div>
-                  </td>
-                  <td className="p-2.5 text-sm">{p.price} TK</td>
-                  <td className={`p-2.5 text-sm font-bold ${p.stock < 5 ? 'text-red-500' : 'text-black'}`}>{p.stock}</td>
-                  <td className="p-2.5 text-sm">
-                    <button onClick={() => handleEditClick(p)}
-                      className="bg-transparent border-none text-black cursor-pointer font-bold underline mr-2.5 hover:opacity-60 transition-opacity">
-                      EDIT
-                    </button>
-                    <button onClick={() => deletePerfume(p._id)}
-                      className="bg-transparent border-none text-red-500 cursor-pointer font-bold underline hover:opacity-60 transition-opacity">
-                      DELETE
-                    </button>
-                  </td>
-                </tr>
-              ))
-            ) : (
+                    </td>
+
+                    <td className="p-2.5 text-sm">
+                      <button onClick={() => handleEditClick(p)}
+                        className="bg-transparent border-none text-black cursor-pointer font-bold underline mr-2.5 hover:opacity-60 transition-opacity">
+                        EDIT
+                      </button>
+                      <button onClick={() => deletePerfume(p._id)}
+                        className="bg-transparent border-none text-red-500 cursor-pointer font-bold underline hover:opacity-60 transition-opacity">
+                        DELETE
+                      </button>
+                    </td>
+                  </tr>
+
+                  {/* ── Inline Flash Sale Form ── */}
+                  {flashEditId === p._id && (
+                    <tr className="border-b border-[#eee] bg-amber-50">
+                      <td colSpan="6" className="px-3 py-3">
+                        <div className="flex flex-wrap gap-2.5 items-center">
+                          <span className="text-[10px] font-bold tracking-wider text-amber-600">🔥 FLASH SALE</span>
+                          <input
+                            type="number" placeholder="Sale Price (TK)"
+                            value={flashForm.salePrice}
+                            onChange={e => setFlashForm({...flashForm, salePrice: e.target.value})}
+                            className="p-2 border border-[#ddd] outline-none text-sm w-36"
+                          />
+                          <input
+                            type="datetime-local"
+                            value={flashForm.endsAt}
+                            onChange={e => setFlashForm({...flashForm, endsAt: e.target.value})}
+                            className="p-2 border border-[#ddd] outline-none text-sm"
+                          />
+                          <button onClick={() => saveFlashSale(p._id)}
+                            className="px-4 py-2 bg-amber-500 text-white border-none cursor-pointer text-xs font-bold tracking-wider hover:bg-amber-600 transition-colors">
+                            ACTIVATE
+                          </button>
+                          <button onClick={() => setFlashEditId(null)}
+                            className="px-4 py-2 bg-white text-black border border-[#ddd] cursor-pointer text-xs font-bold tracking-wider hover:bg-gray-50 transition-colors">
+                            CANCEL
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            }) : (
               <tr>
-                <td colSpan="5" className="p-5 text-center text-[#888]">
+                <td colSpan="6" className="p-5 text-center text-[#888]">
                   No perfumes found matching "{searchTerm}"
                 </td>
               </tr>

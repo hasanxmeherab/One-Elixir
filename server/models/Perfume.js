@@ -5,9 +5,15 @@ const perfumeSchema = new mongoose.Schema({
   price:        { type: Number, required: true },
   description:  String,
   scentProfile: [String],
-  image:        String,          // primary image (kept for backwards compat)
-  images:       [String],        // full gallery array
-  stock:        { type: Number, default: 0 }
-}, { timestamps: true });
+  image:        String,
+  stock:        { type: Number, default: 0 },
+
+  // ── Flash Sale ──────────────────────────────────────────────
+  flashSale: {
+    active:    { type: Boolean, default: false },
+    salePrice: { type: Number },           // discounted price during sale
+    endsAt:    { type: Date },             // countdown target
+  },
+});
 
 module.exports = mongoose.model('Perfume', perfumeSchema);
