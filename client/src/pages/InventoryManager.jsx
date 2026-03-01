@@ -4,6 +4,108 @@ import { useOutletContext } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import { Plus, X, ImagePlus } from 'lucide-react';
 
+// ── Stock display cell (edit full quantity) ───────────────────
+const StockCell = ({ p, API_URL, authHeader, fetchData, toast }) => {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue]     = useState(p.stock);
+  const [saving, setSaving]   = useState(false);
+
+  const save = async () => {
+    if (Number(value) === p.stock) { setEditing(false); return; }
+    try {
+      setSaving(true);
+      await axios.put(`${API_URL}/api/perfumes/${p._id}`, { stock: Number(value) }, authHeader());
+      toast.success(`Stock set to ${value}`);
+      fetchData();
+      setEditing(false);
+    } catch { toast.error('Failed to update stock.'); }
+    finally { setSaving(false); }
+  };
+
+  const onKey = (e) => {
+    if (e.key === 'Enter') save();
+    if (e.key === 'Escape') { setValue(p.stock); setEditing(false); }
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <input type="number" min="0" autoFocus
+          value={value} onChange={e => setValue(e.target.value)} onKeyDown={onKey}
+          className="w-16 p-1 border border-black outline-none text-sm font-bold text-center" />
+        <button onClick={save} disabled={saving}
+          className="px-2 py-1 bg-black text-white text-[9px] font-bold border-none cursor-pointer hover:bg-gray-800 disabled:opacity-50">
+          {saving ? '...' : 'OK'}
+        </button>
+        <button onClick={() => { setValue(p.stock); setEditing(false); }}
+          className="px-2 py-0.5 bg-white text-black text-[9px] font-bold border border-[#ddd] cursor-pointer hover:bg-gray-50">
+          ✕
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <span className={`text-sm font-bold ${p.stock < 5 ? 'text-red-500' : 'text-black'}`}>
+      {p.stock}
+    </span>
+  );
+};
+
+// ── Add stock cell (sums on top of existing quantity) ─────────
+const AddStockCell = ({ p, API_URL, authHeader, fetchData, toast }) => {
+  const [open, setOpen]     = useState(false);
+  const [qty, setQty]       = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    const add = parseInt(qty);
+    if (!qty || isNaN(add) || add <= 0) { toast.error('Enter a valid quantity.'); return; }
+    try {
+      setSaving(true);
+      const newStock = p.stock + add;
+      await axios.put(`${API_URL}/api/perfumes/${p._id}`, { stock: newStock }, authHeader());
+      toast.success(`+${add} added → stock is now ${newStock}`);
+      setQty('');
+      setOpen(false);
+      fetchData();
+    } catch { toast.error('Failed to add stock.'); }
+    finally { setSaving(false); }
+  };
+
+  const onKey = (e) => {
+    if (e.key === 'Enter') save();
+    if (e.key === 'Escape') { setQty(''); setOpen(false); }
+  };
+
+  if (open) {
+    return (
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] text-gray-400 font-bold">+</span>
+        <input type="number" min="1" autoFocus placeholder="Qty"
+          value={qty} onChange={e => setQty(e.target.value)} onKeyDown={onKey}
+          className="w-16 p-1 border border-emerald-500 outline-none text-sm font-bold text-center" />
+        <button onClick={save} disabled={saving}
+          className="px-2 py-1 bg-emerald-600 text-white text-[9px] font-bold border-none cursor-pointer hover:bg-emerald-700 disabled:opacity-50">
+          {saving ? '...' : 'ADD'}
+        </button>
+        <button onClick={() => { setQty(''); setOpen(false); }}
+          className="px-2 py-0.5 bg-white text-black text-[9px] font-bold border border-[#ddd] cursor-pointer hover:bg-gray-50">
+          ✕
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button onClick={() => setOpen(true)}
+      className="px-2 py-0.5 bg-emerald-600 text-white text-[9px] font-bold border-none cursor-pointer hover:bg-emerald-700 transition-colors tracking-wider">
+      + ADD STOCK
+    </button>
+  );
+};
+
+
 const InventoryManager = () => {
   const toast = useToast();
   const { perfumes = [], fetchData } = useOutletContext();
@@ -261,6 +363,7 @@ const InventoryManager = () => {
               <th className="p-2.5 text-xs tracking-wider">IMAGES</th>
               <th className="p-2.5 text-xs tracking-wider">PRICE</th>
               <th className="p-2.5 text-xs tracking-wider">STOCK</th>
+              <th className="p-2.5 text-xs tracking-wider">ADD STOCK</th>
               <th className="p-2.5 text-xs tracking-wider">FLASH SALE</th>
               <th className="p-2.5 text-xs tracking-wider">ACTIONS</th>
             </tr>
@@ -285,7 +388,15 @@ const InventoryManager = () => {
                       </div>
                     </td>
                     <td className="p-2.5 text-sm">{p.price} TK</td>
-                    <td className={`p-2.5 text-sm font-bold ${p.stock < 5 ? 'text-red-500' : 'text-black'}`}>{p.stock}</td>
+                    <td className="p-2.5">
+                      <StockCell p={p} API_URL={API_URL} authHeader={authHeader} fetchData={fetchData} toast={toast} />
+                    </td>
+
+                    {/* ── Add Stock Column ── */}
+                    <td className="p-2.5">
+                      <AddStockCell p={p} API_URL={API_URL} authHeader={authHeader} fetchData={fetchData} toast={toast} />
+                    </td>
+
 
                     {/* ── Flash Sale Column ── */}
                     <td className="p-2.5 text-sm">
@@ -323,7 +434,7 @@ const InventoryManager = () => {
                   {/* ── Inline Flash Sale Form ── */}
                   {flashEditId === p._id && (
                     <tr className="border-b border-[#eee] bg-amber-50">
-                      <td colSpan="6" className="px-3 py-3">
+                      <td colSpan="7" className="px-3 py-3">
                         <div className="flex flex-wrap gap-2.5 items-center">
                           <span className="text-[10px] font-bold tracking-wider text-amber-600">🔥 FLASH SALE</span>
                           <input
@@ -354,7 +465,7 @@ const InventoryManager = () => {
               );
             }) : (
               <tr>
-                <td colSpan="6" className="p-5 text-center text-[#888]">
+                <td colSpan="7" className="p-5 text-center text-[#888]">
                   No perfumes found matching "{searchTerm}"
                 </td>
               </tr>
