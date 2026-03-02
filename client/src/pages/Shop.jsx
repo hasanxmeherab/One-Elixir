@@ -134,7 +134,7 @@ const Shop = () => {
             const salePrice = getActivePrice(p);
             return (
               <div key={p._id} className="cursor-pointer group text-center"
-                onClick={() => navigate(`/product/${p._id}`)}>
+                onClick={() => navigate(`/product/${p.slug || p._id}`)}>
                 <div className="relative w-full h-[380px] bg-[#fcfcfc] mb-5 overflow-hidden">
                   <img src={p.image} alt={p.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                   {p.stock === 0 && (

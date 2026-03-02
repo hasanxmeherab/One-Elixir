@@ -67,7 +67,7 @@ const Home = () => {
             <div key={p._id} style={cardStyle} className="product-card">
               {p.stock === 0 && <div style={badgeStyle}>SOLD OUT</div>}
               
-              <Link to={`/product/${p._id}`} style={{ textDecoration: 'none' }}>
+              <Link to={`/product/${p.slug || p._id}`} style={{ textDecoration: 'none' }}>
                 <div style={imageContainer} className="image-container">
                   <img src={p.image} alt={p.name} style={{ 
                     width: '100%', 

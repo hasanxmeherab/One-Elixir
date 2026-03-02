@@ -56,7 +56,7 @@ const FlashSaleBanner = ({ salePrice, originalPrice, endsAt }) => {
 };
 
 const ProductDetails = ({ openCart }) => { 
-  const { id } = useParams();
+  const { slug } = useParams();                        // ← changed from id
   const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
@@ -97,10 +97,10 @@ const ProductDetails = ({ openCart }) => {
   const [reviewError, setReviewError] = useState('');
   const [reviewSuccess, setReviewSuccess] = useState(false);
 
-  const fetchReviews = async () => {
+  const fetchReviews = async (productId) => {           // ← accepts productId param
     try {
       setReviewsLoading(true);
-      const res = await axios.get(`${API_URL}/api/reviews/${id}`);
+      const res = await axios.get(`${API_URL}/api/reviews/${productId}`);
       setReviews(res.data);
     } catch (err) {
       console.error('Could not fetch reviews');
@@ -129,7 +129,7 @@ const ProductDetails = ({ openCart }) => {
       setSubmitLoading(true);
       const userData = JSON.parse(localStorage.getItem('userData') || '{}');
       await axios.post(`${API_URL}/api/reviews`, {
-        perfumeId: id,
+        perfumeId: product._id,                        // ← changed from id
         userId: userData._id || null,
         userName: reviewForm.userName,
         rating: reviewForm.rating,
@@ -137,7 +137,7 @@ const ProductDetails = ({ openCart }) => {
       });
       setReviewForm({ userName: '', rating: 0, comment: '' });
       setReviewSuccess(true);
-      fetchReviews();
+      fetchReviews(product._id);                       // ← pass product._id
       setTimeout(() => setReviewSuccess(false), 4000);
     } catch (err) {
       setReviewError(err.response?.data?.message || 'Failed to submit review.');
@@ -149,17 +149,17 @@ const ProductDetails = ({ openCart }) => {
   useEffect(() => {
     const fetchProduct = async () => {
       try {
-        const res = await axios.get(`${API_URL}/api/perfumes/${id}`);
+        const res = await axios.get(`${API_URL}/api/perfumes/slug/${slug}`);  // ← changed
         setProduct(res.data);
         setSelectedImage(res.data.images?.[0] || res.data.image);
         fetchRelated(res.data);
+        fetchReviews(res.data._id);                    // ← pass _id after fetch
       } catch (err) {
         console.error("Product not found");
       }
     };
     fetchProduct();
-    fetchReviews();
-  }, [id]);
+  }, [slug]);                                           // ← changed from id
 
   if (!product) return <ProductDetailsSkeleton />;
 
@@ -320,7 +320,7 @@ const ProductDetails = ({ openCart }) => {
             {related.map(p => (
               <div
                 key={p._id}
-                onClick={() => { navigate(`/product/${p._id}`); window.scrollTo(0,0); }}
+                onClick={() => { navigate(`/product/${p.slug || p._id}`); window.scrollTo(0,0); }}
                 className="cursor-pointer group"
               >
                 <div className="relative w-full h-[220px] bg-[#fcfcfc] overflow-hidden mb-4">

@@ -4,8 +4,6 @@ const Perfume = require('../models/Perfume');
 const Log = require('../models/Log');
 const jwt = require('jsonwebtoken');
 
-// Optional auth — extracts admin from token if present, doesn't block if absent
-// Falls back to jwt.decode() if token is expired, so name still appears in logs
 const optionalAuth = (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -13,7 +11,6 @@ const optionalAuth = (req, res, next) => {
       try {
         req.admin = jwt.verify(token, process.env.JWT_SECRET);
       } catch {
-        // Token expired — decode without verification just to get name for logging
         req.admin = jwt.decode(token);
       }
     }
@@ -21,7 +18,6 @@ const optionalAuth = (req, res, next) => {
   next();
 };
 
-// Helper — write activity log silently
 const writeLog = async (req, action, target, detail) => {
   try {
     await Log.create({
@@ -35,7 +31,7 @@ const writeLog = async (req, action, target, detail) => {
   }
 };
 
-// GET all perfumes with search support (public)
+// GET all perfumes
 router.get('/', async (req, res) => {
   try {
     const { search } = req.query;
@@ -56,13 +52,10 @@ router.put('/restore-stock', optionalAuth, async (req, res) => {
     const { id, quantity } = req.body;
     const perfume = await Perfume.findById(id);
     if (!perfume) return res.status(404).json({ message: 'Perfume not found' });
-
     perfume.stock = (Number(perfume.stock) || 0) + Number(quantity);
     await perfume.save();
-
     await writeLog(req, 'RESTORE_STOCK', 'Perfume',
       `Restored ${quantity} units of "${perfume.name}" (new stock: ${perfume.stock})`);
-
     res.json({ message: 'Stock successfully restored', newStock: perfume.stock });
   } catch (err) {
     res.status(500).json({ message: 'Error restoring stock', error: err.message });
@@ -70,10 +63,11 @@ router.put('/restore-stock', optionalAuth, async (req, res) => {
 });
 
 
-// GET single perfume by slug (public) — used by ProductDetails page
+// GET by slug — falls back to _id for old products without slug
 router.get('/slug/:slug', async (req, res) => {
   try {
-    const perfume = await Perfume.findOne({ slug: req.params.slug });
+    let perfume = await Perfume.findOne({ slug: req.params.slug });
+    if (!perfume) perfume = await Perfume.findById(req.params.slug).catch(() => null);
     if (!perfume) return res.status(404).json({ message: 'Elixir not found' });
     res.json(perfume);
   } catch (err) {
@@ -81,7 +75,7 @@ router.get('/slug/:slug', async (req, res) => {
   }
 });
 
-// GET single perfume by ID (public)
+// GET by ID — must be LAST among GET routes
 router.get('/:id', async (req, res) => {
   try {
     const perfume = await Perfume.findById(req.params.id);
@@ -102,7 +96,6 @@ router.post('/', optionalAuth, async (req, res) => {
     image:        req.body.image,
     images:       req.body.images || [],
     stock:        req.body.stock || 0,
-    // ── Flash Sale ──────────────────────────────────────────
     flashSale: {
       active:    req.body.flashSale?.active    || false,
       salePrice: req.body.flashSale?.salePrice || null,
@@ -124,11 +117,8 @@ router.delete('/:id', optionalAuth, async (req, res) => {
   try {
     const perfume = await Perfume.findById(req.params.id);
     if (!perfume) return res.status(404).json({ message: 'Perfume not found' });
-
     await Perfume.findByIdAndDelete(req.params.id);
-    await writeLog(req, 'DELETE_PRODUCT', 'Perfume',
-      `Deleted perfume "${perfume.name}"`);
-
+    await writeLog(req, 'DELETE_PRODUCT', 'Perfume', `Deleted perfume "${perfume.name}"`);
     res.json({ message: 'Product removed' });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -140,8 +130,6 @@ router.put('/:id', optionalAuth, async (req, res) => {
   try {
     const before = await Perfume.findById(req.params.id);
     const updatedPerfume = await Perfume.findByIdAndUpdate(req.params.id, req.body, { new: true });
-
-    // Build a specific detail message about what changed
     const changes = [];
     if (req.body.price !== undefined && before.price !== req.body.price)
       changes.push(`price ${before.price} → ${req.body.price} TK`);
@@ -149,16 +137,13 @@ router.put('/:id', optionalAuth, async (req, res) => {
       changes.push(`stock ${before.stock} → ${req.body.stock}`);
     if (req.body.name !== undefined && before.name !== req.body.name)
       changes.push(`name "${before.name}" → "${req.body.name}"`);
-    // ── Flash Sale log ──────────────────────────────────────
     if (req.body.flashSale?.active === true)
       changes.push(`flash sale activated at ${req.body.flashSale.salePrice} TK`);
     if (req.body.flashSale?.active === false)
       changes.push(`flash sale ended`);
-
     const detail = changes.length
       ? `Updated "${before.name}": ${changes.join(', ')}`
       : `Updated "${before.name}"`;
-
     await writeLog(req, 'UPDATE_PRODUCT', 'Perfume', detail);
     res.json(updatedPerfume);
   } catch (err) {
