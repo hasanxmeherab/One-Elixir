@@ -115,9 +115,10 @@ const Checkout = () => {
       isManual: false 
     };
     try {
-      await axios.post(`${API_URL}/api/orders`, orderData);
+      const res = await axios.post(`${API_URL}/api/orders`, orderData);
       clearCart();
-      navigate('/thank-you');
+      // ── Pass order data to ThankYou page ──
+      navigate('/thank-you', { state: { order: { ...orderData, _id: res.data._id || res.data.order?._id } } });
     } catch (err) {
       toast.error("Order placement failed. Please try again.");
     } finally {

@@ -69,7 +69,19 @@ router.put('/restore-stock', optionalAuth, async (req, res) => {
   }
 });
 
-// GET single perfume (public)
+
+// GET single perfume by slug (public) — used by ProductDetails page
+router.get('/slug/:slug', async (req, res) => {
+  try {
+    const perfume = await Perfume.findOne({ slug: req.params.slug });
+    if (!perfume) return res.status(404).json({ message: 'Elixir not found' });
+    res.json(perfume);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET single perfume by ID (public)
 router.get('/:id', async (req, res) => {
   try {
     const perfume = await Perfume.findById(req.params.id);
@@ -83,13 +95,19 @@ router.get('/:id', async (req, res) => {
 // POST new perfume
 router.post('/', optionalAuth, async (req, res) => {
   const perfume = new Perfume({
-    name: req.body.name,
-    price: req.body.price,
-    description: req.body.description,
+    name:         req.body.name,
+    price:        req.body.price,
+    description:  req.body.description,
     scentProfile: req.body.scentProfile,
-    image: req.body.image,
-    images: req.body.images || [],
-    stock: req.body.stock || 0
+    image:        req.body.image,
+    images:       req.body.images || [],
+    stock:        req.body.stock || 0,
+    // ── Flash Sale ──────────────────────────────────────────
+    flashSale: {
+      active:    req.body.flashSale?.active    || false,
+      salePrice: req.body.flashSale?.salePrice || null,
+      endsAt:    req.body.flashSale?.endsAt    || null,
+    },
   });
   try {
     const newPerfume = await perfume.save();
@@ -131,6 +149,11 @@ router.put('/:id', optionalAuth, async (req, res) => {
       changes.push(`stock ${before.stock} → ${req.body.stock}`);
     if (req.body.name !== undefined && before.name !== req.body.name)
       changes.push(`name "${before.name}" → "${req.body.name}"`);
+    // ── Flash Sale log ──────────────────────────────────────
+    if (req.body.flashSale?.active === true)
+      changes.push(`flash sale activated at ${req.body.flashSale.salePrice} TK`);
+    if (req.body.flashSale?.active === false)
+      changes.push(`flash sale ended`);
 
     const detail = changes.length
       ? `Updated "${before.name}": ${changes.join(', ')}`
