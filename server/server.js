@@ -4,6 +4,7 @@ dns.setServers(['8.8.8.8', '8.8.4.4']);
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const costRoutes = require('./routes/costRoutes');
 
 require('dotenv').config();
 
@@ -32,6 +33,9 @@ app.use('/api/wishlist',   require('./routes/wishlistRoutes'));
 app.use('/api/reviews',    require('./routes/reviewRoutes'));
 app.use('/api/logs',       require('./routes/logRoutes'));
 app.use('/api/addresses',  require('./routes/addressRoutes'));
+
+// Cost calculation routes
+app.use('/api/costs', costRoutes);
 
 
 

@@ -36,6 +36,7 @@ import InvestmentTracker from './pages/InvestmentTracker';
 import CouponManagement from './pages/CouponManagement';
 import BannerManagement from './pages/BannerManagement';
 import CustomerList from './pages/CustomerList';
+import CostCalculator from './pages/CostCalculator';
 
 // --- CONTEXT ---
 import { WishlistProvider } from './context/WishlistContext';
@@ -83,6 +84,7 @@ const AppContent = () => {
             <Route path="admins" element={<AdminManagement />} />
             <Route path="logs" element={<ActivityLogs />} />
             <Route path="customers" element={<CustomerList />} />
+            <Route path="/admin/costs" element={<CostCalculator />} />
           </Route>
 
           <Route path="/admin-login" element={<AdminLogin />} />

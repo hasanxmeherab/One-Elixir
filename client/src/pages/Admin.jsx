@@ -14,7 +14,9 @@ const LINKS = [
   { to: '/admin/coupons',      label: 'COUPONS' },
   { to: '/admin/banners',      label: 'BANNERS' },
   { to: '/admin/logs',         label: 'ACTIVITY LOGS' },
+  { to: '/admin/costs',        label: 'COST CALCULATION' },
   { to: '/admin/admins',       label: 'ADMIN MANAGEMENT' },
+  
 ];
 
 const Admin = () => {
