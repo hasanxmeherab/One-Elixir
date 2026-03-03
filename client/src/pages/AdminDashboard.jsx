@@ -1,9 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const CustomTooltip = ({ active, payload, label, suffix = '' }) => {
   if (!active || !payload?.length) return null;
@@ -24,6 +27,15 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const [filterType, setFilterType]    = useState(null);
   const [revenueRange, setRevenueRange] = useState('30');
+
+  // ── Cost records for margin calculation ──────────────────
+  const [costRecords, setCostRecords] = useState([]);
+  useEffect(() => {
+    axios.get(`${API_URL}/api/costs`).then(r => setCostRecords(r.data)).catch(() => {});
+  }, []);
+
+  // ── Product revenue chart tab ─────────────────────────────
+  const [productTab, setProductTab] = useState('revenue');
 
   if (!perfumes || !orders) {
     return <div className="p-10 text-center">Loading Dashboard Data...</div>;
@@ -79,6 +91,36 @@ const AdminDashboard = () => {
     return Object.values(map).sort((a, b) => b.units - a.units).slice(0, 6);
   }, [orders]);
 
+  // ── Product Revenue / Units / Margin data ────────────────────
+  const productRevenueData = useMemo(() => {
+    const map = {};
+    orders
+      .filter(o => o.status?.toLowerCase() === 'delivered' && o.paymentStatus?.toLowerCase() === 'paid')
+      .forEach(o => o.items?.forEach(item => {
+        if (!map[item.name]) map[item.name] = { name: item.name, revenue: 0, units: 0 };
+        map[item.name].units   += item.quantity;
+        map[item.name].revenue += (Number(item.price) || 0) * item.quantity;
+      }));
+
+    // Attach latest margin from cost records
+    const latestMargin = {};
+    costRecords.forEach(r => {
+      if (!latestMargin[r.perfumeName] ||
+          new Date(r.createdAt) > new Date(latestMargin[r.perfumeName].createdAt)) {
+        latestMargin[r.perfumeName] = r;
+      }
+    });
+
+    return Object.values(map)
+      .map(p => ({
+        ...p,
+        margin: latestMargin[p.name] ? parseFloat(latestMargin[p.name].profitMargin.toFixed(1)) : null,
+        shortName: p.name.length > 14 ? p.name.slice(0, 13) + '…' : p.name,
+      }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 8);
+  }, [orders, costRecords]);
+
   // ── Status Breakdown ─────────────────────────────────────────
   const statusData = useMemo(() => {
     const map = {};
@@ -95,7 +137,9 @@ const AdminDashboard = () => {
   const BAR_COLORS = ['#111','#333','#555','#777','#999','#bbb'];
 
   const axisStyle  = { fontSize: 10, fill: '#bbb' };
-  const gridStyle  = { stroke: '#f0f0f0' };
+
+  // margin bar color
+  const marginBarColor = (val) => val >= 60 ? '#16a34a' : val >= 30 ? '#d97706' : '#dc2626';
 
   return (
     <div>
@@ -225,6 +269,110 @@ const AdminDashboard = () => {
             </BarChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      {/* ── NEW: Revenue by Product ── */}
+      <div className="bg-white border border-[#eee] p-6 mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <div>
+            <p className="text-[10px] tracking-[3px] text-[#888] font-bold">REVENUE BY PRODUCT</p>
+            <p className="text-xs text-[#aaa] mt-0.5">Delivered & paid orders only</p>
+          </div>
+          {/* Tab switcher */}
+          <div className="flex gap-2">
+            {[
+              ['revenue', 'REVENUE'],
+              ['units',   'UNITS SOLD'],
+              ['margin',  'MARGIN %'],
+            ].map(([key, label]) => (
+              <button key={key} onClick={() => setProductTab(key)}
+                className={`px-3 py-1.5 text-[10px] font-bold tracking-wider border transition-colors cursor-pointer ${productTab === key ? 'bg-black text-white border-black' : 'bg-white text-[#888] border-[#ddd] hover:border-black'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {productRevenueData.length === 0 ? (
+          <p className="text-xs text-[#aaa] text-center py-10">No delivered orders yet.</p>
+        ) : productTab === 'margin' && productRevenueData.every(p => p.margin === null) ? (
+          <div className="text-center py-10">
+            <p className="text-xs text-[#aaa] mb-2">No cost records found.</p>
+            <p className="text-[10px] text-[#bbb]">Add cost records in the <button onClick={() => navigate('/admin/costs')} className="underline cursor-pointer bg-transparent border-none text-[#bbb]">Cost Calculator</button> to see margins.</p>
+          </div>
+        ) : (
+          <>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart
+                data={productRevenueData}
+                margin={{ top: 5, right: 10, left: 0, bottom: 50 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                <XAxis
+                  dataKey="shortName"
+                  tick={{ fontSize: 9, fill: '#888' }}
+                  tickLine={false}
+                  axisLine={false}
+                  angle={-35}
+                  textAnchor="end"
+                  interval={0}
+                />
+                <YAxis
+                  tick={axisStyle}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={v =>
+                    productTab === 'revenue' && v >= 1000 ? `${(v/1000).toFixed(0)}k`
+                    : productTab === 'margin' ? `${v}%`
+                    : v
+                  }
+                />
+                <Tooltip
+                  content={<CustomTooltip
+                    suffix={productTab === 'revenue' ? ' TK' : productTab === 'margin' ? '%' : ' units'}
+                  />}
+                />
+                <Bar
+                  dataKey={productTab}
+                  name={productTab === 'revenue' ? 'Revenue' : productTab === 'units' ? 'Units Sold' : 'Margin'}
+                  radius={[3, 3, 0, 0]}
+                >
+                  {productRevenueData.map((entry, i) => (
+                    <Cell
+                      key={i}
+                      fill={
+                        productTab === 'margin' && entry.margin !== null
+                          ? marginBarColor(entry.margin)
+                          : BAR_COLORS[i % BAR_COLORS.length]
+                      }
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+
+            {/* ── Summary table below chart ── */}
+            <div className="mt-6 border-t border-[#f5f5f5] pt-4">
+              <div className="grid grid-cols-4 gap-2 mb-2">
+                {['PRODUCT', 'REVENUE', 'UNITS', 'MARGIN'].map(h => (
+                  <span key={h} className="text-[9px] font-bold tracking-wider text-[#aaa]">{h}</span>
+                ))}
+              </div>
+              {productRevenueData.map((p, i) => (
+                <div key={i} className="grid grid-cols-4 gap-2 py-2.5 border-b border-[#f9f9f9]">
+                  <span className="text-[11px] font-medium truncate">{p.name}</span>
+                  <span className="text-[11px]">{p.revenue.toLocaleString()} TK</span>
+                  <span className="text-[11px]">{p.units}</span>
+                  <span className="text-[11px] font-bold" style={{
+                    color: p.margin !== null ? marginBarColor(p.margin) : '#ccc'
+                  }}>
+                    {p.margin !== null ? `${p.margin}%` : '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {/* ── Status Breakdown ── */}
