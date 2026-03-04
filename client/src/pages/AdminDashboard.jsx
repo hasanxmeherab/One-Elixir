@@ -30,8 +30,10 @@ const AdminDashboard = () => {
 
   // ── Cost records for margin calculation ──────────────────
   const [costRecords, setCostRecords] = useState([]);
+  const [expenses, setExpenses] = useState([]);
   useEffect(() => {
     axios.get(`${API_URL}/api/costs`).then(r => setCostRecords(r.data)).catch(() => {});
+    axios.get(`${API_URL}/api/expenses`).then(r => setExpenses(r.data)).catch(() => {});
   }, []);
 
   // ── Product revenue chart tab ─────────────────────────────
@@ -52,6 +54,8 @@ const AdminDashboard = () => {
   const totalInvestment = investments.reduce((a, inv) => {
     const v = parseFloat(inv.totalAmount); return a + (isNaN(v) ? 0 : v);
   }, 0);
+  const totalExpenses  = expenses.reduce((a, e) => a + (Number(e.amount) || 0), 0);
+  const availableMoney = (totalRevenue + totalInvestment) - totalExpenses;
   const totalOrders = orders.length;
 
   // ── Revenue + Volume data ────────────────────────────────────
@@ -150,7 +154,7 @@ const AdminDashboard = () => {
         {[
           { label: 'TOTAL REVENUE',   value: `${totalRevenue.toLocaleString()} TK`,   accent: 'border-l-black' },
           { label: 'TOTAL CAPITAL',   value: `${totalInvestment.toLocaleString()} TK`, accent: 'border-l-black' },
-          { label: 'INVENTORY VALUE', value: `${totalValuation.toLocaleString()} TK`,  accent: 'border-l-black' },
+          { label: 'AVAILABLE MONEY', value: `${availableMoney.toLocaleString()} TK`,  accent: 'border-l-black' },
           { label: 'TOTAL UNITS',     value: totalStock,                                accent: 'border-l-black' },
         ].map(c => (
           <div key={c.label} className={`flex-1 min-w-[150px] p-6 bg-white border border-[#eee] border-l-4 ${c.accent}`}>
