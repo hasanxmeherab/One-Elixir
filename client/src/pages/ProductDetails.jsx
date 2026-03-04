@@ -119,6 +119,8 @@ const ProductDetails = ({ openCart }) => {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [reviewForm, setReviewForm] = useState({ userName: '', rating: 0, comment: '' });
   const [hoverRating, setHoverRating] = useState(0);
+  const [reviewImages, setReviewImages] = useState([]);
+  const [uploadingReview, setUploadingReview] = useState(false);
   const [reviewError, setReviewError] = useState('');
   const [reviewSuccess, setReviewSuccess] = useState(false);
 
@@ -152,15 +154,31 @@ const ProductDetails = ({ openCart }) => {
     if (!reviewForm.userName.trim()) { setReviewError('Please enter your name.'); return; }
     try {
       setSubmitLoading(true);
+      setUploadingReview(reviewImages.length > 0);
+      // Upload photos to Cloudinary
+      const CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'dluvmed0b';
+      const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'one_elixir_uploads';
+      const imageUrls = await Promise.all(
+        reviewImages.map(async (file) => {
+          const data = new FormData();
+          data.append('file', file);
+          data.append('upload_preset', UPLOAD_PRESET);
+          data.append('cloud_name', CLOUD_NAME);
+          const res = await axios.post(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, data);
+          return res.data.secure_url;
+        })
+      );
       const userData = JSON.parse(localStorage.getItem('userData') || '{}');
       await axios.post(`${API_URL}/api/reviews`, {
         perfumeId: product._id,
         userId: userData._id || null,
         userName: reviewForm.userName,
         rating: reviewForm.rating,
-        comment: reviewForm.comment
+        comment: reviewForm.comment,
+        images: imageUrls,
       });
       setReviewForm({ userName: '', rating: 0, comment: '' });
+      setReviewImages([]);
       setReviewSuccess(true);
       fetchReviews(product._id);
       setTimeout(() => setReviewSuccess(false), 4000);
@@ -168,6 +186,7 @@ const ProductDetails = ({ openCart }) => {
       setReviewError(err.response?.data?.message || 'Failed to submit review.');
     } finally {
       setSubmitLoading(false);
+      setUploadingReview(false);
     }
   };
 
@@ -490,6 +509,16 @@ const ProductDetails = ({ openCart }) => {
                       ))}
                     </div>
                     <p className="text-sm text-[#444] leading-relaxed">{review.comment}</p>
+                    {review.images?.length > 0 && (
+                      <div className="flex gap-2 mt-3 flex-wrap">
+                        {review.images.map((img, i) => (
+                          <a key={i} href={img} target="_blank" rel="noreferrer">
+                            <img src={img} alt={`review photo ${i+1}`}
+                              className="w-16 h-16 object-cover border border-[#eee] cursor-zoom-in hover:opacity-80 transition-opacity" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -545,6 +574,30 @@ const ProductDetails = ({ openCart }) => {
                   className="p-3 border border-[#ddd] outline-none text-sm resize-none leading-relaxed"
                 />
 
+                {/* Photo upload */}
+                <div>
+                  <p className="text-[10px] tracking-wider text-[#888] mb-2">ADD PHOTOS <span className="font-normal text-[#bbb]">(optional, up to 3)</span></p>
+                  <label className={`flex items-center gap-3 p-3 border-2 border-dashed cursor-pointer transition-colors ${reviewImages.length > 0 ? 'border-black bg-gray-50' : 'border-[#ddd] hover:border-black'}`}>
+                    <span className="text-lg">📷</span>
+                    <span className="text-[11px] font-bold tracking-wider">
+                      {reviewImages.length > 0 ? `${reviewImages.length} PHOTO${reviewImages.length > 1 ? 'S' : ''} SELECTED` : 'CLICK TO ADD PHOTOS'}
+                    </span>
+                    <input type="file" accept="image/*" multiple className="hidden"
+                      onChange={e => setReviewImages(Array.from(e.target.files).slice(0, 3))} />
+                  </label>
+                  {reviewImages.length > 0 && (
+                    <div className="flex gap-2 mt-2">
+                      {reviewImages.map((f, i) => (
+                        <div key={i} className="relative w-16 h-16 border border-[#ddd] overflow-hidden">
+                          <img src={URL.createObjectURL(f)} alt="" className="w-full h-full object-cover" />
+                          <button type="button" onClick={() => setReviewImages(reviewImages.filter((_, j) => j !== i))}
+                            className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center cursor-pointer border-none p-0 text-[10px]">×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {reviewError && (
                   <p className="text-xs text-red-500 tracking-wider">{reviewError}</p>
                 )}
@@ -556,7 +609,7 @@ const ProductDetails = ({ openCart }) => {
                   type="submit" disabled={submitLoading}
                   className="py-4 bg-black text-white text-xs font-bold tracking-[3px] hover:bg-gray-800 transition-colors disabled:opacity-50 cursor-pointer border-none"
                 >
-                  {submitLoading ? 'SUBMITTING...' : 'SUBMIT REVIEW'}
+                  {uploadingReview ? 'UPLOADING PHOTOS...' : submitLoading ? 'SUBMITTING...' : 'SUBMIT REVIEW'}
                 </button>
               </form>
             </div>

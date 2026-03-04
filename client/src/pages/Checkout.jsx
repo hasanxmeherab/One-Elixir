@@ -95,12 +95,22 @@ const Checkout = () => {
       customerEmail: user.email.toLowerCase(),
       phone: formData.phone,
       address: `${formData.address}, ${formData.district.label}, ${formData.division.label}`,
-      items: cart.map(item => ({
-        perfumeId: item._id,
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price
-      })),
+      items: cart.flatMap(item => {
+        if (item.isBundle && item.bundleProducts) {
+          return item.bundleProducts.map(p => ({
+            perfumeId: p._id,
+            name: `${p.name} (${item.name})`,
+            quantity: item.quantity,
+            price: Math.round(item.price / item.bundleProducts.length),
+          }));
+        }
+        return [{
+          perfumeId: item._id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+        }];
+      }),
       totalAmount: finalAmount,
       shippingCost: shippingCost, 
       discountApplied: discount,

@@ -29,12 +29,13 @@ router.get('/:id', async (req, res) => {
 // POST new cost record
 router.post('/', async (req, res) => {
   try {
-    const { perfumeId, ingredients, bottlesProduced, notes } = req.body;
+    const { perfumeId, ingredients, packaging, bottlesProduced, notes } = req.body;
 
     const perfume = await Perfume.findById(perfumeId);
     if (!perfume) return res.status(404).json({ message: 'Perfume not found' });
 
-    const totalCost       = ingredients.reduce((sum, i) => sum + Number(i.cost), 0);
+    const packagingCost   = (packaging || []).reduce((sum, p) => sum + Number(p.cost || 0), 0);
+    const totalCost       = ingredients.reduce((sum, i) => sum + Number(i.cost), 0) + packagingCost;
     const costPerBottle   = totalCost / bottlesProduced;
     const sellingPrice    = perfume.price;
     const profitPerBottle = sellingPrice - costPerBottle;
@@ -44,6 +45,7 @@ router.post('/', async (req, res) => {
       perfumeId,
       perfumeName:  perfume.name,
       ingredients,
+      packaging: packaging || [],
       bottlesProduced,
       totalCost,
       costPerBottle,

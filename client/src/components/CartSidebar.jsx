@@ -39,7 +39,15 @@ const CartSidebar = ({ isOpen, onClose }) => {
               <div key={item._id} style={cartItem}>
                 <img src={item.image} alt={item.name} style={itemImg} />
                 <div style={itemDetails}>
+                  {item.isBundle && (
+                    <span style={{ display: 'inline-block', background: '#000', color: '#fff', fontSize: '8px', fontWeight: 'bold', letterSpacing: '1px', padding: '1px 5px', marginBottom: '3px' }}>BUNDLE</span>
+                  )}
                   <p style={itemName}>{item.name.toUpperCase()}</p>
+                  {item.isBundle && item.bundleProducts && (
+                    <p style={{ fontSize: '9px', color: '#999', margin: '0 0 3px 0' }}>
+                      {item.bundleProducts.map(p => p.name).join(' + ')}
+                    </p>
+                  )}
                   
                   <div style={qtyContainer}>
                     <button onClick={() => updateQuantity(item, item.quantity - 1)} style={qtySmallBtn}>-</button>

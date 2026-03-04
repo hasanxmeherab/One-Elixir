@@ -18,6 +18,8 @@ import Account from './pages/Account';
 import Wishlist from './pages/Wishlist';
 import OrderTracking from './pages/OrderTracking';
 import ActivityLogs from './pages/ActivityLogs';
+import Bundles from './pages/Bundles';
+import AdminBundles from './pages/AdminBundles';
 
 // --- COMPONENTS ---
 import Navbar from './pages/Navbar';
@@ -85,14 +87,16 @@ const AppContent = () => {
             <Route path="logs" element={<ActivityLogs />} />
             <Route path="customers" element={<CustomerList />} />
             <Route path="/admin/costs" element={<CostCalculator />} />
+            <Route path="bundles" element={<AdminBundles />} />
           </Route>
-
+          
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/account" element={<Account />} />
           <Route path="/manual-order" element={<ManualOrder />} />
           <Route path="/wishlist" element={<Wishlist />} />
           <Route path="/track/:orderId" element={<OrderTracking />} />
           <Route path="/track" element={<OrderTracking />} />
+          <Route path="/bundles" element={<Bundles />} />
         </Routes>
       </div>
     </>

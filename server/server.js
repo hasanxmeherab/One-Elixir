@@ -38,6 +38,7 @@ app.use('/api/reviews',     require('./routes/reviewRoutes'));
 app.use('/api/logs',        require('./routes/logRoutes'));
 app.use('/api/addresses',   require('./routes/addressRoutes'));
 app.use('/api/costs',       costRoutes);
+app.use('/api/bundles',     require('./routes/bundleRoutes'));
 
 // Connect to MongoDB — then generate sitemap on startup
 mongoose.connect(process.env.MONGO_URI)

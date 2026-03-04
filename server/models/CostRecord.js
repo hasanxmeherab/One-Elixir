@@ -1,23 +1,21 @@
 const mongoose = require('mongoose');
 
 const ingredientSchema = new mongoose.Schema({
-  name:     { type: String, required: true },
-  qty:      { type: Number, required: true },
-  unit:     { type: String, default: '' },
-  cost:     { type: Number, required: true },
-});
+  name: String, qty: Number, unit: String, cost: Number
+}, { _id: false });
 
 const costRecordSchema = new mongoose.Schema({
   perfumeId:       { type: mongoose.Schema.Types.ObjectId, ref: 'Perfume', required: true },
-  perfumeName:     { type: String, required: true },
+  perfumeName:     String,
   ingredients:     [ingredientSchema],
+  packaging:       [ingredientSchema], // ← packaging materials
   bottlesProduced: { type: Number, required: true },
-  totalCost:       { type: Number, required: true },
-  costPerBottle:   { type: Number, required: true },
-  sellingPrice:    { type: Number, required: true },
-  profitPerBottle: { type: Number, required: true },
-  profitMargin:    { type: Number, required: true },
-  notes:           { type: String, default: '' },
+  totalCost:       Number,
+  costPerBottle:   Number,
+  sellingPrice:    Number,
+  profitPerBottle: Number,
+  profitMargin:    Number,
+  notes:           String,
 }, { timestamps: true });
 
 module.exports = mongoose.model('CostRecord', costRecordSchema);

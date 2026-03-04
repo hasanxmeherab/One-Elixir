@@ -53,8 +53,18 @@ const Cart = () => {
                   <div className="flex gap-5 items-center flex-1">
                     <img src={item.image} alt={item.name} className="w-[100px] h-[130px] object-cover bg-[#f9f9f9]" />
                     <div>
+                      {item.isBundle && (
+                        <span className="inline-block bg-black text-white text-[8px] font-bold tracking-[1px] px-2 py-0.5 mb-1">BUNDLE</span>
+                      )}
                       <h4 className="m-0 mb-1 text-sm tracking-wider font-bold">{item.name?.toUpperCase()}</h4>
-                      <p className="m-0 mb-2.5 text-[#666] text-[13px]">{item.price} TK</p>
+                      <p className="m-0 mb-1 text-[#666] text-[13px]">{item.price} TK</p>
+                      {item.isBundle && item.bundleProducts && (
+                        <div className="flex flex-wrap gap-1 mb-1">
+                          {item.bundleProducts.map(p => (
+                            <span key={p._id} className="text-[9px] text-[#888] border border-[#eee] px-1.5 py-0.5">{p.name}</span>
+                          ))}
+                        </div>
+                      )}
                       <button
                         onClick={() => removeFromCart(item._id)}
                         className="bg-transparent border-none text-[#999] text-[10px] underline cursor-pointer p-0"

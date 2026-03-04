@@ -135,6 +135,16 @@ const Navbar = () => {
                 </Link>
               </li>
 
+              <li>
+                <Link
+                  to="/bundles"
+                  className="block no-underline text-black text-sm font-bold tracking-[2px] py-4 border-b border-gray-50"
+                  onClick={() => setIsSidebarOpen(false)}
+                >
+                  BUNDLES
+                </Link>
+              </li>
+
               {/* Mobile Wishlist */}
               <li className="md:hidden">
                 <Link
