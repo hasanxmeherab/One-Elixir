@@ -11,6 +11,8 @@ const Shop = () => {
   const [priceRange, setPriceRange] = useState([0, 10000]);
   const [maxPrice, setMaxPrice]     = useState(10000);
   const [page, setPage]             = useState(1);
+  // ── Scent filter ─────────────────────────────────────────
+  const [selectedScents, setSelectedScents] = useState([]);
   const navigate = useNavigate();
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -30,21 +32,35 @@ const Shop = () => {
     fetchProducts();
   }, []);
 
+  // ── All unique scent notes across all products ────────────
+  const allScents = useMemo(() => {
+    const set = new Set();
+    perfumes.forEach(p => p.scentProfile?.forEach(s => set.add(s)));
+    return Array.from(set).sort();
+  }, [perfumes]);
+
+  const toggleScent = (scent) => {
+    setSelectedScents(prev =>
+      prev.includes(scent) ? prev.filter(s => s !== scent) : [...prev, scent]
+    );
+  };
+
   // ── Filter + Sort ─────────────────────────────────────────
   const filtered = useMemo(() => {
     let result = perfumes.filter(p =>
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      p.price >= priceRange[0] && p.price <= priceRange[1]
+      p.price >= priceRange[0] && p.price <= priceRange[1] &&
+      (selectedScents.length === 0 || selectedScents.every(s => p.scentProfile?.includes(s)))
     );
     if (sortBy === 'price-asc')  result = [...result].sort((a, b) => a.price - b.price);
     if (sortBy === 'price-desc') result = [...result].sort((a, b) => b.price - a.price);
     if (sortBy === 'newest')     result = [...result].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     if (sortBy === 'rating')     result = [...result].sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
     return result;
-  }, [perfumes, searchTerm, priceRange, sortBy]);
+  }, [perfumes, searchTerm, priceRange, sortBy, selectedScents]);
 
   // Reset to page 1 on filter change
-  useEffect(() => { setPage(1); }, [searchTerm, priceRange, sortBy]);
+  useEffect(() => { setPage(1); }, [searchTerm, priceRange, sortBy, selectedScents]);
 
   // ── Pagination ────────────────────────────────────────────
   const totalPages   = Math.ceil(filtered.length / PAGE_SIZE);
@@ -70,7 +86,7 @@ const Shop = () => {
       </div>
 
       {/* ── Filter Bar ── */}
-      <div className="flex flex-wrap gap-4 items-end justify-between mb-10 pb-6 border-b border-[#eee]">
+      <div className="flex flex-wrap gap-4 items-end justify-between mb-6 pb-6 border-b border-[#eee]">
 
         {/* Price Range */}
         <div className="flex flex-col gap-2 min-w-[220px] flex-1">
@@ -124,6 +140,31 @@ const Shop = () => {
           </div>
         </div>
       </div>
+
+      {/* ── Scent Profile Filter ── */}
+      {allScents.length > 0 && (
+        <div className="mb-10">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-[10px] text-[#888] font-bold tracking-wider shrink-0">SCENT:</span>
+            {allScents.map(scent => (
+              <button key={scent} onClick={() => toggleScent(scent)}
+                className={`px-3 py-1.5 text-[10px] font-bold tracking-wider border transition-colors cursor-pointer ${
+                  selectedScents.includes(scent)
+                    ? 'bg-black text-white border-black'
+                    : 'bg-white text-[#555] border-[#ddd] hover:border-black'
+                }`}>
+                {scent}
+              </button>
+            ))}
+            {selectedScents.length > 0 && (
+              <button onClick={() => setSelectedScents([])}
+                className="text-[10px] text-[#aaa] hover:text-black transition-colors cursor-pointer bg-transparent border-none underline">
+                CLEAR
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Product Grid ── */}
       {paginated.length === 0 ? (
