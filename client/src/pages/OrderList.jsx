@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useOutletContext } from 'react-router-dom';
@@ -141,6 +142,35 @@ const OrderList = () => {
     } catch (error) { console.error('PDF Error:', error); }
   };
 
+  // ── Excel Export ─────────────────────────────────────────────
+const exportToExcel = () => {
+  const rows = allFiltered.map(order => ({
+    'Date':           new Date(order.createdAt).toLocaleDateString('en-GB'),
+    'Order ID':       order._id.slice(-6).toUpperCase(),
+    'Customer':       order.customerName,
+    'Phone':          order.phone,
+    'Address':        order.address || '',
+    'Items':          order.items.map(i => `${i.quantity}x ${i.name}`).join(', '),
+    'Shipping (TK)':  order.shippingCost || 0,
+    'Total (TK)':     order.totalAmount,
+    'Payment Method': order.paymentMethod,
+    'Payment Status': order.paymentStatus || 'Unpaid',
+    'Order Status':   order.status,
+    'Created By':     order.createdBy || 'Customer',
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [
+    { wch: 12 }, { wch: 10 }, { wch: 20 }, { wch: 15 },
+    { wch: 30 }, { wch: 40 }, { wch: 14 }, { wch: 12 },
+    { wch: 18 }, { wch: 15 }, { wch: 14 }, { wch: 15 },
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Orders');
+  const date = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, `OneElixir_Orders_${date}.xlsx`);
+  toast.success(`Exported ${rows.length} orders to Excel`);
+};
+
   const baseFiltered    = orders.filter(o => showArchived ? o.status === 'Canceled' : o.status !== 'Canceled');
   const allFiltered = baseFiltered.filter(order => {
     const s = searchTerm.toLowerCase();
@@ -193,6 +223,10 @@ const OrderList = () => {
           <button onClick={() => { setShowArchived(!showArchived); setSearchTerm(''); }}
             className={`px-3 py-2 text-[10px] font-bold tracking-wider cursor-pointer border transition-colors ${showArchived ? 'bg-black text-white border-black' : 'bg-[#f0f0f0] text-black border-[#ddd]'}`}>
             {showArchived ? '← BACK' : 'ARCHIVED'}
+          </button>
+          <button onClick={exportToExcel}
+            className="px-3 py-2 text-[10px] font-bold tracking-wider cursor-pointer border border-emerald-600 text-emerald-700 bg-emerald-50 hover:bg-emerald-600 hover:text-white transition-colors">
+            ↓ EXCEL ({allFiltered.length})
           </button>
         </div>
       </div>
