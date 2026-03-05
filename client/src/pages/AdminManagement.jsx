@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import adminAxios from '../utils/adminAxios';
 import { UserPlus, ShieldCheck, Trash2, BadgeCheck } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
@@ -9,7 +9,6 @@ const AdminManagement = () => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const adminRole  = localStorage.getItem('adminRole')  || 'admin';
-  const adminToken = localStorage.getItem('adminToken') || '';
   const adminData  = JSON.parse(localStorage.getItem('adminData') || '{}');
   const loggedInId = adminData?.id || adminData?._id || '';
 
@@ -17,9 +16,7 @@ const AdminManagement = () => {
 
   const fetchAdmins = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/admins/list`, {
-        headers: { Authorization: `Bearer ${adminToken}` }
-      });
+      const res = await adminAxios.get(`${API_URL}/api/admins/list`);
       setAdmins(res.data);
     } catch (err) { console.error('Could not fetch admins'); }
   };
@@ -31,9 +28,7 @@ const AdminManagement = () => {
     if (id === loggedInId) return toast.warning('You cannot delete your own account.');
     if (!window.confirm("Revoke this admin's access?")) return;
     try {
-      await axios.delete(`${API_URL}/api/admins/${id}`, {
-        headers: { Authorization: `Bearer ${adminToken}` }
-      });
+      await adminAxios.delete(`${API_URL}/api/admins/${id}`);
       fetchAdmins();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete admin.');
@@ -43,9 +38,7 @@ const AdminManagement = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${API_URL}/api/admins/register`, formData, {
-        headers: { Authorization: `Bearer ${adminToken}` }
-      });
+      await adminAxios.post(`${API_URL}/api/admins/register`, formData);
       toast.success('New admin created successfully.');
       setFormData({ name: '', email: '', password: '' });
       fetchAdmins();
