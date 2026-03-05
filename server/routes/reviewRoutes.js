@@ -1,6 +1,7 @@
 const express = require('express');
 const router  = express.Router();
 const Review  = require('../models/Review');
+const { verifyAdmin } = require('../middleware/authMiddleware');
 
 // GET all reviews for a product
 router.get('/:perfumeId', async (req, res) => {
@@ -31,8 +32,8 @@ router.post('/', async (req, res) => {
   } catch { res.status(500).json({ message: 'Server error' }); }
 });
 
-// DELETE review (admin)
-router.delete('/:id', async (req, res) => {
+// DELETE review (admin only)
+router.delete('/:id', verifyAdmin, async (req, res) => {
   try {
     await Review.findByIdAndDelete(req.params.id);
     res.json({ message: 'Review deleted' });

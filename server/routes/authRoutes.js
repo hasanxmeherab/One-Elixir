@@ -9,7 +9,7 @@ const sendEmail = require('../utils/sendEmail');
 // Helper — generate both tokens
 const generateTokens = (user) => {
   const payload = { id: user._id };
-  const accessToken  = jwt.sign(payload, process.env.JWT_SECRET);
+  const accessToken  = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '15m' });
   const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
   return { accessToken, refreshToken };
 };
@@ -25,12 +25,12 @@ router.post('/signup', async (req, res) => {
     const user = await User.create({ name, email, password: hashed });
     const { accessToken, refreshToken } = generateTokens(user);
 
-    user.refreshToken = await bcrypt.hash(refreshToken, 8);
+    user.refreshToken = await bcrypt.hash(refreshToken, 10);
     await user.save();
 
     res.status(201).json({ token: accessToken, refreshToken, user: { _id: user._id, name: user.name, email: user.email, avatar: user.avatar || '' } });
   } catch (err) {
-    res.status(400).json({ message: 'Registration failed', error: err.message });
+    res.status(400).json({ message: 'Registration failed' });
   }
 });
 
@@ -44,7 +44,7 @@ router.post('/signin', async (req, res) => {
     }
 
     const { accessToken, refreshToken } = generateTokens(user);
-    user.refreshToken = await bcrypt.hash(refreshToken, 8);
+    user.refreshToken = await bcrypt.hash(refreshToken, 10);
     await user.save();
 
     res.json({ token: accessToken, refreshToken, user: { _id: user._id, name: user.name, email: user.email, avatar: user.avatar || '' } });
@@ -89,7 +89,7 @@ router.post('/google', async (req, res) => {
     }
 
     const { accessToken, refreshToken } = generateTokens(user);
-    user.refreshToken = await bcrypt.hash(refreshToken, 8);
+    user.refreshToken = await bcrypt.hash(refreshToken, 10);
     await user.save();
 
     res.json({
@@ -115,7 +115,7 @@ router.post('/refresh', async (req, res) => {
     const valid = await bcrypt.compare(refreshToken, user.refreshToken);
     if (!valid) return res.status(403).json({ message: 'Refresh token mismatch' });
 
-    const newAccessToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+    const newAccessToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '15m' });
     res.json({ token: newAccessToken });
   } catch {
     res.status(403).json({ message: 'Expired or invalid refresh token. Please sign in again.' });

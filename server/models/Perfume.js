@@ -21,6 +21,11 @@ const perfumeSchema = new mongoose.Schema({
   },
 });
 
+perfumeSchema.index({ slug: 1 });
+perfumeSchema.index({ name: 'text' });
+perfumeSchema.index({ featured: 1 });
+perfumeSchema.index({ 'flashSale.active': 1 });
+
 // ✅ No "next" parameter
 perfumeSchema.pre('save', async function () {
   if (!this.isModified('name') && this.slug) return;

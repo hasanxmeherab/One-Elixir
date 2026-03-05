@@ -1,6 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const UserContext = createContext();
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 export const UserProvider = ({ children }) => {
   const [user, setUser]     = useState(null);
@@ -18,6 +20,41 @@ export const UserProvider = ({ children }) => {
     }
     setLoading(false);
   }, []);
+
+  // Refresh the access token using the stored refresh token
+  const refreshAccessToken = useCallback(async () => {
+    const refreshToken = localStorage.getItem('userRefreshToken');
+    if (!refreshToken) return null;
+    try {
+      const res = await fetch(`${API_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      localStorage.setItem('userToken', data.token);
+      setUser(prev => prev ? { ...prev, token: data.token } : prev);
+      return data.token;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Wrapper for authenticated fetch that auto-retries on 401
+  const authFetch = useCallback(async (url, options = {}) => {
+    const token = localStorage.getItem('userToken');
+    const headers = { ...options.headers, Authorization: `Bearer ${token}` };
+    let res = await fetch(url, { ...options, headers });
+    if (res.status === 401) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        headers.Authorization = `Bearer ${newToken}`;
+        res = await fetch(url, { ...options, headers });
+      }
+    }
+    return res;
+  }, [refreshAccessToken]);
 
   const login = (userData) => {
     const u = userData.user;
@@ -50,7 +87,7 @@ export const UserProvider = ({ children }) => {
   };
 
   return (
-    <UserContext.Provider value={{ user, login, logout, updateUser, authLoading: loading }}>
+    <UserContext.Provider value={{ user, login, logout, updateUser, authLoading: loading, authFetch, refreshAccessToken }}>
       {children}
     </UserContext.Provider>
   );

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Banner = require('../models/Banner');
+const { verifyAdmin } = require('../middleware/authMiddleware');
 
 // 1. GET all active banners for the homepage
 router.get('/', async (req, res) => {
@@ -12,8 +13,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 2. POST a new banner (This fixes your 404 error)
-router.post('/', async (req, res) => {
+// 2. POST a new banner (admin only)
+router.post('/', verifyAdmin, async (req, res) => {
   const { imageUrl, title, subtitle, link } = req.body;
 
   const banner = new Banner({
@@ -32,8 +33,8 @@ router.post('/', async (req, res) => {
   }
 });
 
-// 3. DELETE a banner
-router.delete('/:id', async (req, res) => {
+// 3. DELETE a banner (admin only)
+router.delete('/:id', verifyAdmin, async (req, res) => {
   try {
     const banner = await Banner.findById(req.params.id);
     if (!banner) return res.status(404).json({ message: "Banner not found" });

@@ -9,4 +9,7 @@ const reviewSchema = new mongoose.Schema({
   images:    [{ type: String }], // ← up to 3 Cloudinary URLs
 }, { timestamps: true });
 
+reviewSchema.index({ perfumeId: 1 });
+reviewSchema.index({ userId: 1, perfumeId: 1 });
+
 module.exports = mongoose.model('Review', reviewSchema);

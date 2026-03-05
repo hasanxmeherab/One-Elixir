@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Coupon = require('../models/Coupon');
+const { verifyAdmin } = require('../middleware/authMiddleware');
 
 // 1. VALIDATE COUPON (For Customers at Checkout)
 router.post('/validate', async (req, res) => {
@@ -24,8 +25,8 @@ router.post('/validate', async (req, res) => {
   }
 });
 
-// 2. GET ALL COUPONS (For Admin Panel)
-router.get('/', async (req, res) => {
+// 2. GET ALL COUPONS (admin only)
+router.get('/', verifyAdmin, async (req, res) => {
   try {
     const coupons = await Coupon.find().sort({ _id: -1 });
     res.json(coupons);
@@ -34,8 +35,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 3. CREATE NEW COUPON (For Admin Panel)
-router.post('/', async (req, res) => {
+// 3. CREATE NEW COUPON (admin only)
+router.post('/', verifyAdmin, async (req, res) => {
   const { code, discountValue, discountType } = req.body;
   try {
     const newCoupon = new Coupon({
@@ -50,8 +51,8 @@ router.post('/', async (req, res) => {
   }
 });
 
-// 4. DELETE COUPON (For Admin Panel)
-router.delete('/:id', async (req, res) => {
+// 4. DELETE COUPON (admin only)
+router.delete('/:id', verifyAdmin, async (req, res) => {
   try {
     await Coupon.findByIdAndDelete(req.params.id);
     res.json({ message: "Coupon successfully removed." });

@@ -9,4 +9,7 @@ const logSchema = new mongoose.Schema({
   ip:        { type: String, default: '' }
 }, { timestamps: true });
 
+logSchema.index({ adminId: 1 });
+logSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model('Log', logSchema);

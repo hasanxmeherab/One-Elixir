@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const Investment = require('../models/Investment');
+const { verifyAdmin } = require('../middleware/authMiddleware');
 
-// 1. GET Names for dropdown
-router.get('/names', async (req, res) => {
+// 1. GET Names for dropdown (admin only)
+router.get('/names', verifyAdmin, async (req, res) => {
   try {
     const investors = await Investment.find({}, 'investorName');
     res.json(investors);
@@ -12,10 +13,14 @@ router.get('/names', async (req, res) => {
   }
 });
 
-// 2. GET All data (With NaN Prevention)
-router.get('/', async (req, res) => {
+// 2. GET All data (admin only)
+router.get('/', verifyAdmin, async (req, res) => {
   try {
-    const investments = await Investment.find().sort({ lastUpdated: -1 });
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+    const total = await Investment.countDocuments();
+    const investments = await Investment.find().sort({ lastUpdated: -1 }).skip(skip).limit(limit);
     
     // Safety Check: Force totalAmount to be a number so the Frontend doesn't show NaN
     const sanitizedData = investments.map(inv => ({
@@ -24,14 +29,14 @@ router.get('/', async (req, res) => {
       transactions: inv.transactions || []
     }));
 
-    res.json(sanitizedData);
+    res.json({ investments: sanitizedData, total, page, pages: Math.ceil(total / limit) });
   } catch (err) { 
     res.status(500).json({ message: err.message }); 
   }
 });
 
-// 3. POST Add/Update Investment (Handles Custom Dates)
-router.post('/add', async (req, res) => {
+// 3. POST Add/Update Investment (admin only)
+router.post('/add', verifyAdmin, async (req, res) => {
   const { investorName, amount, note, date } = req.body;
   try {
     let investment = await Investment.findOne({ 
@@ -76,8 +81,8 @@ router.post('/add', async (req, res) => {
   }
 });
 
-// 4. DELETE Specific Transaction
-router.delete('/:investorId/transaction/:transactionId', async (req, res) => {
+// 4. DELETE Specific Transaction (admin only)
+router.delete('/:investorId/transaction/:transactionId', verifyAdmin, async (req, res) => {
   try {
     const investment = await Investment.findById(req.params.investorId);
     if (!investment) return res.status(404).json({ message: "Investor not found" });

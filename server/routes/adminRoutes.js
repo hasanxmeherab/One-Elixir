@@ -55,11 +55,11 @@ router.post('/login', async (req, res) => {
 
     const payload = { id: admin._id, role: admin.role, name: admin.name };
 
-    const accessToken = jwt.sign(payload, process.env.JWT_SECRET);
+    const accessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '15m' });
     const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
 
     // Store hashed refresh token on admin document
-    admin.refreshToken = await bcrypt.hash(refreshToken, 8);
+    admin.refreshToken = await bcrypt.hash(refreshToken, 10);
     await admin.save();
 
     await Log.create({
@@ -91,7 +91,7 @@ router.post('/refresh', async (req, res) => {
     if (!valid) return res.status(403).json({ message: 'Refresh token mismatch' });
 
     const payload = { id: admin._id, role: admin.role, name: admin.name };
-    const newAccessToken = jwt.sign(payload, process.env.JWT_SECRET);
+    const newAccessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '15m' });
     res.json({ accessToken: newAccessToken });
   } catch {
     res.status(403).json({ message: 'Expired or invalid refresh token' });

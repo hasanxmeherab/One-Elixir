@@ -1,6 +1,7 @@
 const express = require('express');
 const router  = express.Router();
 const Bundle  = require('../models/Bundle');
+const { verifyAdmin } = require('../middleware/authMiddleware');
 
 // GET all active bundles (public)
 router.get('/', async (req, res) => {
@@ -22,7 +23,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST create bundle (admin)
-router.post('/', async (req, res) => {
+router.post('/', verifyAdmin, async (req, res) => {
   try {
     const bundle = await Bundle.create(req.body);
     const populated = await bundle.populate('products');
@@ -31,7 +32,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT update bundle (admin)
-router.put('/:id', async (req, res) => {
+router.put('/:id', verifyAdmin, async (req, res) => {
   try {
     const bundle = await Bundle.findByIdAndUpdate(req.params.id, req.body, { new: true }).populate('products');
     if (!bundle) return res.status(404).json({ message: 'Bundle not found' });
@@ -40,7 +41,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE bundle (admin)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', verifyAdmin, async (req, res) => {
   try {
     await Bundle.findByIdAndDelete(req.params.id);
     res.json({ message: 'Bundle deleted' });

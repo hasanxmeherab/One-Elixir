@@ -2,9 +2,10 @@ const express = require('express');
 const router = express.Router();
 const CostRecord = require('../models/CostRecord');
 const Perfume = require('../models/Perfume');
+const { verifyAdmin } = require('../middleware/authMiddleware');
 
-// GET all cost records (optionally filtered by perfumeId)
-router.get('/', async (req, res) => {
+// GET all cost records (admin only)
+router.get('/', verifyAdmin, async (req, res) => {
   try {
     const { perfumeId } = req.query;
     const query = perfumeId ? { perfumeId } : {};
@@ -15,8 +16,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET single record
-router.get('/:id', async (req, res) => {
+// GET single record (admin only)
+router.get('/:id', verifyAdmin, async (req, res) => {
   try {
     const record = await CostRecord.findById(req.params.id);
     if (!record) return res.status(404).json({ message: 'Record not found' });
@@ -26,8 +27,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST new cost record
-router.post('/', async (req, res) => {
+// POST new cost record (admin only)
+router.post('/', verifyAdmin, async (req, res) => {
   try {
     const { perfumeId, ingredients, packaging, bottlesProduced, notes } = req.body;
 
@@ -61,8 +62,8 @@ router.post('/', async (req, res) => {
   }
 });
 
-// DELETE cost record
-router.delete('/:id', async (req, res) => {
+// DELETE cost record (admin only)
+router.delete('/:id', verifyAdmin, async (req, res) => {
   try {
     await CostRecord.findByIdAndDelete(req.params.id);
     res.json({ message: 'Record deleted' });

@@ -35,4 +35,10 @@ const orderSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
+orderSchema.index({ customerEmail: 1 });
+orderSchema.index({ status: 1 });
+orderSchema.index({ createdAt: -1 });
+orderSchema.index({ paymentStatus: 1 });
+orderSchema.index({ isManual: 1 });
+
 module.exports = mongoose.model('Order', orderSchema);

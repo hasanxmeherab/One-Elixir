@@ -3,25 +3,11 @@ const router     = express.Router();
 const Order      = require('../models/Order');
 const Perfume    = require('../models/Perfume');
 const Log        = require('../models/Log');
-const jwt        = require('jsonwebtoken');
 const { Resend } = require('resend');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const { verifyAdmin } = require('../middleware/authMiddleware');
 
-// Optional auth — extract admin from token, falls back to decode if expired
-const optionalAuth = (req, res, next) => {
-  try {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (token) {
-      try {
-        req.admin = jwt.verify(token, process.env.JWT_SECRET);
-      } catch {
-        req.admin = jwt.decode(token);
-      }
-    }
-  } catch {}
-  next();
-};
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const writeLog = async (req, action, target, detail) => {
   try {
@@ -43,15 +29,19 @@ router.get('/customer/:email', async (req, res) => {
     }).sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
-    res.status(500).json({ message: 'Error fetching customer history', error: err.message });
+    res.status(500).json({ message: 'Error fetching customer history' });
   }
 });
 
 // 2. GET all orders (Admin)
-router.get('/', async (req, res) => {
+router.get('/', verifyAdmin, async (req, res) => {
   try {
-    const orders = await Order.find().sort({ createdAt: -1 });
-    res.json(orders);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+    const total = await Order.countDocuments();
+    const orders = await Order.find().sort({ createdAt: -1 }).skip(skip).limit(limit);
+    res.json({ orders, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -93,7 +83,7 @@ router.post('/', async (req, res) => {
 });
 
 // 4. POST manual admin order
-router.post('/manual', optionalAuth, async (req, res) => {
+router.post('/manual', verifyAdmin, async (req, res) => {
   const order = new Order({ ...req.body, isManual: true });
   try {
     const newOrder = await order.save();
@@ -128,7 +118,7 @@ router.put('/:id/cancel', async (req, res) => {
 });
 
 // 6. PUT update status & payment status (Admin)
-router.put('/:id', optionalAuth, async (req, res) => {
+router.put('/:id', verifyAdmin, async (req, res) => {
   const { status, paymentStatus } = req.body;
   try {
     const order = await Order.findById(req.params.id);
@@ -177,7 +167,7 @@ router.put('/:id', optionalAuth, async (req, res) => {
 });
 
 // 7. DELETE (Admin Archive)
-router.delete('/:id', optionalAuth, async (req, res) => {
+router.delete('/:id', verifyAdmin, async (req, res) => {
   try {
     const updatedOrder = await Order.findByIdAndUpdate(
       req.params.id,

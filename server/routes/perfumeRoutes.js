@@ -2,26 +2,10 @@ const express = require('express');
 const router = express.Router();
 const Perfume = require('../models/Perfume');
 const Log = require('../models/Log');
-const jwt = require('jsonwebtoken');
 const Order = require('../models/Order');
+const Review = require('../models/Review');
 const generateSitemap = require('../utils/generateSitemap');
-
-// Optional auth — extracts admin from token if present, doesn't block if absent
-// Falls back to jwt.decode() if token is expired, so name still appears in logs
-const optionalAuth = (req, res, next) => {
-  try {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (token) {
-      try {
-        req.admin = jwt.verify(token, process.env.JWT_SECRET);
-      } catch {
-        // Token expired — decode without verification just to get name for logging
-        req.admin = jwt.decode(token);
-      }
-    }
-  } catch {}
-  next();
-};
+const { verifyAdmin } = require('../middleware/authMiddleware');
 
 // Helper — write activity log silently
 const writeLog = async (req, action, target, detail) => {
@@ -53,7 +37,7 @@ router.get('/', async (req, res) => {
 });
 
 // RESTORE STOCK
-router.put('/restore-stock', optionalAuth, async (req, res) => {
+router.put('/restore-stock', verifyAdmin, async (req, res) => {
   try {
     const { id, quantity } = req.body;
     const perfume = await Perfume.findById(id);
@@ -117,7 +101,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST new perfume
-router.post('/', optionalAuth, async (req, res) => {
+router.post('/', verifyAdmin, async (req, res) => {
   const perfume = new Perfume({
     name:         req.body.name,
     price:        req.body.price,
@@ -145,14 +129,15 @@ router.post('/', optionalAuth, async (req, res) => {
 });
 
 // DELETE perfume
-router.delete('/:id', optionalAuth, async (req, res) => {
+router.delete('/:id', verifyAdmin, async (req, res) => {
   try {
     const perfume = await Perfume.findById(req.params.id);
     if (!perfume) return res.status(404).json({ message: 'Perfume not found' });
 
     await Perfume.findByIdAndDelete(req.params.id);
+    await Review.deleteMany({ perfumeId: req.params.id });
     await writeLog(req, 'DELETE_PRODUCT', 'Perfume',
-      `Deleted perfume "${perfume.name}"`);
+      `Deleted perfume "${perfume.name}" and its reviews`);
 
     res.json({ message: 'Product removed' });
     generateSitemap(Perfume).catch(() => {});
@@ -162,7 +147,7 @@ router.delete('/:id', optionalAuth, async (req, res) => {
 });
 
 // UPDATE perfume
-router.put('/:id', optionalAuth, async (req, res) => {
+router.put('/:id', verifyAdmin, async (req, res) => {
   try {
     const before = await Perfume.findById(req.params.id);
     const updatedPerfume = await Perfume.findByIdAndUpdate(req.params.id, req.body, { new: true });

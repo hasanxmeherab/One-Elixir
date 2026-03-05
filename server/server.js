@@ -5,6 +5,7 @@ const express    = require('express');
 const mongoose   = require('mongoose');
 const cors       = require('cors');
 const path       = require('path');
+const rateLimit  = require('express-rate-limit');
 const costRoutes = require('./routes/costRoutes');
 
 require('dotenv').config();
@@ -19,7 +20,30 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+
+// ── Rate Limiting ────────────────────────────────────────────
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200,                  // 200 requests per window per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many requests, please try again later.' }
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 15,                   // 15 auth attempts per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many login attempts, please try again later.' }
+});
+
+app.use('/api/', generalLimiter);
+app.use('/api/auth/signin', authLimiter);
+app.use('/api/auth/signup', authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/admins/login', authLimiter);
 
 // ── Serve sitemap.xml statically ─────────────────────────────
 app.use(express.static(path.join(__dirname)));

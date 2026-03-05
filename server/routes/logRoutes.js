@@ -26,7 +26,7 @@ router.get('/admin/:adminId', verifyAdmin, async (req, res) => {
 });
 
 // DELETE all logs — superadmin only
-router.delete('/', async (req, res) => {
+router.delete('/', verifyAdmin, async (req, res) => {
   try {
     await Log.deleteMany({});
     res.json({ message: 'Logs cleared' });
