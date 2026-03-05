@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 const PAGE_SIZE = 12;
 
-const Shop = () => {
+const Collection = () => {
   const [perfumes, setPerfumes]     = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy]         = useState('default');
@@ -13,6 +13,7 @@ const Shop = () => {
   const [page, setPage]             = useState(1);
   // ── Scent filter ─────────────────────────────────────────
   const [selectedScents, setSelectedScents] = useState([]);
+  const [now, setNow] = useState(new Date());
   const navigate = useNavigate();
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -62,15 +63,32 @@ const Shop = () => {
   // Reset to page 1 on filter change
   useEffect(() => { setPage(1); }, [searchTerm, priceRange, sortBy, selectedScents]);
 
+  // ── Live clock for flash sale countdowns (only if sales exist) ─
+  const hasFlashSales = perfumes.some(p => p.flashSale?.active && p.flashSale?.endsAt);
+  useEffect(() => {
+    if (!hasFlashSales) return;
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, [hasFlashSales]);
+
   // ── Pagination ────────────────────────────────────────────
   const totalPages   = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated    = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // ── Flash sale helpers ────────────────────────────────────
   const getActivePrice = (p) => {
-    if (p.flashSale?.active && p.flashSale?.salePrice && new Date(p.flashSale.endsAt) > new Date())
+    if (p.flashSale?.active && p.flashSale?.salePrice && new Date(p.flashSale.endsAt) > now)
       return p.flashSale.salePrice;
     return null;
+  };
+
+  const getCountdown = (endsAt) => {
+    const diff = new Date(endsAt) - now;
+    if (diff <= 0) return null;
+    const h = String(Math.floor(diff / 3600000)).padStart(2, '0');
+    const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
+    const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
+    return { h, m, s };
   };
 
   return (
@@ -187,6 +205,17 @@ const Shop = () => {
                   {salePrice && (
                     <div className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 text-[9px] font-bold tracking-[2px]">🔥 SALE</div>
                   )}
+                  {salePrice && getCountdown(p.flashSale?.endsAt) && (() => {
+                    const cd = getCountdown(p.flashSale.endsAt);
+                    return (
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-3 py-2.5 flex items-center justify-center gap-1.5">
+                        <span className="text-[9px] text-white/70 font-bold tracking-wider">ENDS IN</span>
+                        {[cd.h, cd.m, cd.s].map((v, i) => (
+                          <span key={i} className="bg-white/20 text-white text-[11px] font-bold px-1.5 py-0.5 rounded-sm min-w-[24px] text-center">{v}</span>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="px-2">
                   <h3 className="text-[15px] tracking-[3px] mb-2 font-bold">{p.name.toUpperCase()}</h3>
@@ -236,4 +265,4 @@ const Shop = () => {
   );
 };
 
-export default Shop;
+export default Collection;

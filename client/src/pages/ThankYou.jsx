@@ -87,7 +87,7 @@ const ThankYou = () => {
           </Link>
         )}
         <Link
-          to="/shop"
+          to="/collection"
           className="px-8 py-4 bg-black text-white no-underline font-bold text-xs tracking-[2px] hover:bg-gray-800 transition-colors"
         >
           CONTINUE SHOPPING

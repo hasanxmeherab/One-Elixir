@@ -12,7 +12,7 @@ import SignIn from './pages/SignIn';
 import SignUp from './pages/SignUp';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
-import Shop from './pages/Shop';
+import Collection from './pages/Collection';
 import Checkout from './pages/Checkout';
 import Account from './pages/Account';
 import Wishlist from './pages/Wishlist';
@@ -61,7 +61,7 @@ const AppContent = () => {
           <Route path="/thank-you" element={<ThankYou />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />
-          <Route path="/shop" element={<Shop />} />
+          <Route path="/collection" element={<Collection />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />

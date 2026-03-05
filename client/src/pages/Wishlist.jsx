@@ -34,7 +34,7 @@ const Wishlist = ({ openCart }) => {
           <p className="tracking-[2px] text-[#888] text-xs mb-2">YOUR WISHLIST IS CURRENTLY EMPTY</p>
           <p className="text-xs text-[#aaa] mb-10">Save items you love and come back to them anytime.</p>
           <Link
-            to="/shop"
+            to="/collection"
             className="inline-block px-12 py-5 bg-black text-white no-underline text-[11px] font-bold tracking-[3px] hover:bg-gray-800 transition-colors"
           >
             EXPLORE COLLECTION
@@ -102,7 +102,7 @@ const Wishlist = ({ openCart }) => {
           {/* Footer CTA */}
           <div className="text-center mt-16 pt-10 border-t border-[#eee]">
             <Link
-              to="/shop"
+              to="/collection"
               className="inline-block px-12 py-4 border border-black text-black no-underline text-[11px] font-bold tracking-[3px] hover:bg-black hover:text-white transition-colors"
             >
               CONTINUE SHOPPING

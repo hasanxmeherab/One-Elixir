@@ -127,7 +127,7 @@ const Navbar = () => {
 
               <li>
                 <Link
-                  to="/shop"
+                  to="/collection"
                   className="block no-underline text-black text-sm font-bold tracking-[2px] py-4 border-b border-gray-50"
                   onClick={() => setIsSidebarOpen(false)}
                 >

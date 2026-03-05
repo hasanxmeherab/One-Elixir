@@ -273,7 +273,7 @@ const ProductDetails = ({ openCart }) => {
         {/* Right: Product Info */}
         <div className="flex-1 min-w-[300px] md:min-w-[400px] flex flex-col justify-center">
           <button
-            onClick={() => navigate('/shop')}
+            onClick={() => navigate('/collection')}
             className="bg-transparent border-none text-[10px] tracking-[2px] cursor-pointer mb-8 text-left p-0 hover:opacity-50 transition-opacity"
           >
             ← BACK TO COLLECTION

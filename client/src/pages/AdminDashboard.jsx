@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import adminAxios from '../utils/adminAxios';
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis,
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
 
@@ -27,6 +27,7 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const [filterType, setFilterType]    = useState(null);
   const [revenueRange, setRevenueRange] = useState('30');
+  const [now, setNow] = useState(new Date());
 
   // ── Cost records for margin calculation ──────────────────
   const [costRecords, setCostRecords] = useState([]);
@@ -35,6 +36,24 @@ const AdminDashboard = () => {
     adminAxios.get(`${API_URL}/api/costs`).then(r => setCostRecords(r.data)).catch(() => {});
     adminAxios.get(`${API_URL}/api/expenses`).then(r => setExpenses(r.data)).catch(() => {});
   }, []);
+
+  // ── Live clock for flash sale countdowns ────────────────
+  const activeFlashSales = perfumes.filter(p =>
+    p.flashSale?.active && p.flashSale?.salePrice && p.flashSale?.endsAt && new Date(p.flashSale.endsAt) > now
+  );
+  useEffect(() => {
+    if (activeFlashSales.length === 0) return;
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, [activeFlashSales.length > 0]);
+  const getCountdown = (endsAt) => {
+    const diff = new Date(endsAt) - now;
+    if (diff <= 0) return null;
+    const h = String(Math.floor(diff / 3600000)).padStart(2, '0');
+    const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
+    const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
+    return `${h}:${m}:${s}`;
+  };
 
   // ── Product revenue chart tab ─────────────────────────────
   const [productTab, setProductTab] = useState('revenue');
@@ -57,6 +76,27 @@ const AdminDashboard = () => {
   const totalExpenses  = expenses.reduce((a, e) => a + (Number(e.amount) || 0), 0);
   const availableMoney = (totalRevenue + totalInvestment) - totalExpenses;
   const totalOrders = orders.length;
+
+  // ── Quick stats ────────────────────────────────────────────────
+  const deliveredOrders = orders.filter(o => o.status?.toLowerCase() === 'delivered' && o.paymentStatus?.toLowerCase() === 'paid');
+  const avgOrderValue = deliveredOrders.length
+    ? Math.round(deliveredOrders.reduce((a, o) => a + (Number(o.totalAmount) || 0), 0) / deliveredOrders.length)
+    : 0;
+  const uniqueCustomers = new Set(orders.map(o => o.customerEmail).filter(Boolean)).size;
+  const conversionRate = totalOrders > 0
+    ? Math.round((deliveredOrders.length / totalOrders) * 100)
+    : 0;
+
+  // ── Payment status data for pie chart ───────────────────
+  const paymentData = useMemo(() => {
+    const map = {};
+    orders.forEach(o => {
+      const s = o.paymentStatus || 'Unknown';
+      map[s] = (map[s] || 0) + 1;
+    });
+    return Object.entries(map).map(([name, value]) => ({ name, value }));
+  }, [orders]);
+  const PAYMENT_COLORS = { Paid: '#16a34a', Unpaid: '#dc2626', Partial: '#f59e0b', Unknown: '#999' };
 
   // ── Revenue + Volume data ────────────────────────────────────
   const chartData = useMemo(() => {
@@ -165,7 +205,7 @@ const AdminDashboard = () => {
       </div>
 
       {/* ── Alert KPI Cards ── */}
-      <div className="flex gap-5 flex-wrap mb-8">
+      <div className="flex gap-5 flex-wrap mb-5">
         <div onClick={() => setFilterType(f => f === 'low' ? null : 'low')}
           className={`flex-1 min-w-[150px] p-6 border border-[#eee] border-l-4 border-l-[#f39c12] cursor-pointer transition-colors ${filterType === 'low' ? 'bg-[#fff9f0]' : 'bg-white'}`}>
           <span className="block text-[10px] text-[#f39c12] font-bold tracking-[2px] mb-2.5">LOW STOCK (VIEW)</span>
@@ -176,6 +216,21 @@ const AdminDashboard = () => {
           <span className="block text-[10px] text-[#e74c3c] font-bold tracking-[2px] mb-2.5">OUT OF STOCK (VIEW)</span>
           <span className="text-xl font-bold text-[#e74c3c]">{outOfStockItems.length}</span>
         </div>
+      </div>
+
+      {/* ── Quick Stats Row ── */}
+      <div className="flex gap-5 flex-wrap mb-8">
+        {[
+          { label: 'AVG ORDER VALUE', value: `${avgOrderValue.toLocaleString()} TK`, color: '#8b5cf6' },
+          { label: 'UNIQUE CUSTOMERS', value: uniqueCustomers, color: '#0ea5e9' },
+          { label: 'DELIVERED RATE', value: `${conversionRate}%`, color: '#16a34a' },
+          { label: 'ACTIVE FLASH SALES', value: activeFlashSales.length, color: '#dc2626' },
+        ].map(s => (
+          <div key={s.label} className="flex-1 min-w-[130px] p-5 bg-white border border-[#eee] border-l-4" style={{ borderLeftColor: s.color }}>
+            <span className="block text-[10px] font-bold tracking-[2px] mb-2" style={{ color: s.color }}>{s.label}</span>
+            <span className="text-lg font-bold">{s.value}</span>
+          </div>
+        ))}
       </div>
 
       {/* ── Alert List ── */}
@@ -200,6 +255,45 @@ const AdminDashboard = () => {
                 </button>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Active Flash Sales Panel ── */}
+      {activeFlashSales.length > 0 && (
+        <div className="bg-white border border-[#eee] p-6 mb-6">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <p className="text-[10px] tracking-[3px] text-[#888] font-bold">🔥 ACTIVE FLASH SALES</p>
+              <p className="text-xs text-[#aaa] mt-0.5">{activeFlashSales.length} product{activeFlashSales.length !== 1 ? 's' : ''} on sale right now</p>
+            </div>
+            <button onClick={() => navigate('/admin/inventory')}
+              className="px-3 py-1.5 text-[10px] font-bold tracking-wider border border-[#ddd] bg-white hover:border-black transition-colors cursor-pointer">
+              MANAGE →
+            </button>
+          </div>
+          <div className="space-y-3">
+            {activeFlashSales.map(p => {
+              const cd = getCountdown(p.flashSale.endsAt);
+              const discount = Math.round(((p.price - p.flashSale.salePrice) / p.price) * 100);
+              return (
+                <div key={p._id} className="flex items-center gap-4 p-4 border border-[#f0f0f0] rounded">
+                  <img src={p.image} alt={p.name} className="w-12 h-12 object-cover rounded bg-[#f9f9f9]" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] font-bold truncate">{p.name}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[11px] text-red-600 font-bold">{p.flashSale.salePrice.toLocaleString()} TK</span>
+                      <span className="text-[10px] text-[#aaa] line-through">{p.price.toLocaleString()} TK</span>
+                      <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 font-bold rounded">-{discount}%</span>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="block text-[9px] text-[#888] tracking-wider font-bold">ENDS IN</span>
+                    <span className="text-[13px] font-mono font-bold" style={{ color: cd ? '#111' : '#e74c3c' }}>{cd || 'EXPIRED'}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -379,28 +473,60 @@ const AdminDashboard = () => {
         )}
       </div>
 
-      {/* ── Status Breakdown ── */}
-      <div className="bg-white border border-[#eee] p-6">
-        <p className="text-[10px] tracking-[3px] text-[#888] font-bold mb-6">ORDER STATUS BREAKDOWN</p>
-        {statusData.length === 0
-          ? <p className="text-xs text-[#aaa] text-center py-6">No orders yet.</p>
-          : (
-            <div className="flex flex-wrap gap-4">
-              {statusData.map(({ name, value }) => (
-                <div key={name} className="flex-1 min-w-[110px] border border-[#eee] p-4 text-center">
-                  <div className="w-3 h-3 rounded-full mx-auto mb-2" style={{ background: STATUS_COLORS[name] || '#999' }} />
-                  <p className="text-[9px] tracking-wider text-[#888] font-bold mb-1">{name.toUpperCase()}</p>
-                  <p className="text-xl font-bold">{value}</p>
-                  <p className="text-[10px] text-[#aaa]">{totalOrders ? Math.round((value / totalOrders) * 100) : 0}%</p>
-                  <div className="mt-2 h-1 bg-[#f0f0f0] rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${totalOrders ? (value/totalOrders)*100 : 0}%`, background: STATUS_COLORS[name] || '#999' }} />
+      {/* ── Status Breakdown + Payment Status ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white border border-[#eee] p-6">
+          <p className="text-[10px] tracking-[3px] text-[#888] font-bold mb-6">ORDER STATUS BREAKDOWN</p>
+          {statusData.length === 0
+            ? <p className="text-xs text-[#aaa] text-center py-6">No orders yet.</p>
+            : (
+              <div className="flex flex-wrap gap-4">
+                {statusData.map(({ name, value }) => (
+                  <div key={name} className="flex-1 min-w-[110px] border border-[#eee] p-4 text-center">
+                    <div className="w-3 h-3 rounded-full mx-auto mb-2" style={{ background: STATUS_COLORS[name] || '#999' }} />
+                    <p className="text-[9px] tracking-wider text-[#888] font-bold mb-1">{name.toUpperCase()}</p>
+                    <p className="text-xl font-bold">{value}</p>
+                    <p className="text-[10px] text-[#aaa]">{totalOrders ? Math.round((value / totalOrders) * 100) : 0}%</p>
+                    <div className="mt-2 h-1 bg-[#f0f0f0] rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${totalOrders ? (value/totalOrders)*100 : 0}%`, background: STATUS_COLORS[name] || '#999' }} />
+                    </div>
                   </div>
+                ))}
+              </div>
+            )
+          }
+        </div>
+
+        {/* ── Payment Status Pie Chart ── */}
+        <div className="bg-white border border-[#eee] p-6">
+          <p className="text-[10px] tracking-[3px] text-[#888] font-bold mb-4">PAYMENT STATUS</p>
+          {paymentData.length === 0
+            ? <p className="text-xs text-[#aaa] text-center py-6">No data.</p>
+            : (
+              <>
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie data={paymentData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} strokeWidth={0}>
+                      {paymentData.map((entry, i) => (
+                        <Cell key={i} fill={PAYMENT_COLORS[entry.name] || '#999'} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip suffix=" orders" />} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex flex-wrap justify-center gap-3 mt-3">
+                  {paymentData.map(d => (
+                    <div key={d.name} className="flex items-center gap-1.5">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: PAYMENT_COLORS[d.name] || '#999' }} />
+                      <span className="text-[10px] font-bold text-[#666]">{d.name}: {d.value}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )
-        }
+              </>
+            )
+          }
+        </div>
       </div>
     </div>
   );
