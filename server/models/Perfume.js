@@ -14,12 +14,23 @@ const perfumeSchema = new mongoose.Schema({
   stock:        { type: Number, default: 0 },
   featured:     { type: Boolean, default: false },
 
+  // #7 Product Variants (sizes/volumes)
+  variants: [{
+    label: { type: String, required: true },
+    price: { type: Number, required: true },
+    stock: { type: Number, default: 0 },
+  }],
+
+  // #13 Soft Delete
+  isDeleted:  { type: Boolean, default: false },
+  deletedAt:  { type: Date,    default: null },
+
   flashSale: {
     active:    { type: Boolean, default: false },
     salePrice: { type: Number },
     endsAt:    { type: Date },
   },
-});
+}, { timestamps: true });
 
 perfumeSchema.index({ name: 'text' });
 perfumeSchema.index({ featured: 1 });
