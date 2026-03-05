@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import adminAxios from '../utils/adminAxios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -22,14 +22,14 @@ const CostCalculator = () => {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   useEffect(() => {
-    axios.get(`${API_URL}/api/perfumes`).then(r => setPerfumes(r.data)).catch(() => {});
+    adminAxios.get(`${API_URL}/api/perfumes`).then(r => setPerfumes(r.data)).catch(() => {});
     fetchRecords();
   }, []);
 
   const fetchRecords = async (pid = '') => {
     try {
       const url = pid ? `${API_URL}/api/costs?perfumeId=${pid}` : `${API_URL}/api/costs`;
-      const res = await axios.get(url);
+      const res = await adminAxios.get(url);
       setRecords(res.data);
     } catch {}
   };
@@ -63,7 +63,7 @@ const CostCalculator = () => {
 
     setSaving(true);
     try {
-      await axios.post(`${API_URL}/api/costs`, {
+      await adminAxios.post(`${API_URL}/api/costs`, {
         perfumeId: selectedPerfume,
         ingredients: ingredients.map(i => ({ ...i, qty: Number(i.qty), cost: Number(i.cost) })),
         packaging:   packaging.filter(p => p.name).map(p => ({ ...p, qty: Number(p.qty), cost: Number(p.cost) })),
@@ -84,7 +84,7 @@ const CostCalculator = () => {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`${API_URL}/api/costs/${id}`);
+      await adminAxios.delete(`${API_URL}/api/costs/${id}`);
       showToast('Record deleted');
       fetchRecords(filterPerfume);
     } catch { showToast('Failed to delete'); }
