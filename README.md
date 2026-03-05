@@ -104,7 +104,7 @@ VITE_CLOUDINARY_UPLOAD_PRESET=your_upload_preset
 
 ```bash
 # Clone the repo
-git clone https://github.com/your-username/One-Elixir.git
+git clone https://github.com/hasanxmeherab/One-Elixir.git
 cd One-Elixir
 
 # Install server dependencies
