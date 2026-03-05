@@ -6,12 +6,16 @@ const { verifyAdmin } = require('../middleware/authMiddleware');
 // GET all expenses (admin only)
 router.get('/', verifyAdmin, async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 50;
-        const skip = (page - 1) * limit;
-        const total = await Expense.countDocuments();
-        const expenses = await Expense.find().sort({ date: -1 }).skip(skip).limit(limit);
-        res.json({ expenses, total, page, pages: Math.ceil(total / limit) });
+        if (req.query.page) {
+            const page = parseInt(req.query.page);
+            const limit = parseInt(req.query.limit) || 50;
+            const skip = (page - 1) * limit;
+            const total = await Expense.countDocuments();
+            const expenses = await Expense.find().sort({ date: -1 }).skip(skip).limit(limit);
+            return res.json({ expenses, total, page, pages: Math.ceil(total / limit) });
+        }
+        const expenses = await Expense.find().sort({ date: -1 });
+        res.json(expenses);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

@@ -36,12 +36,16 @@ router.get('/customer/:email', async (req, res) => {
 // 2. GET all orders (Admin)
 router.get('/', verifyAdmin, async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 50;
-    const skip = (page - 1) * limit;
-    const total = await Order.countDocuments();
-    const orders = await Order.find().sort({ createdAt: -1 }).skip(skip).limit(limit);
-    res.json({ orders, total, page, pages: Math.ceil(total / limit) });
+    if (req.query.page) {
+      const page = parseInt(req.query.page);
+      const limit = parseInt(req.query.limit) || 50;
+      const skip = (page - 1) * limit;
+      const total = await Order.countDocuments();
+      const orders = await Order.find().sort({ createdAt: -1 }).skip(skip).limit(limit);
+      return res.json({ orders, total, page, pages: Math.ceil(total / limit) });
+    }
+    const orders = await Order.find().sort({ createdAt: -1 });
+    res.json(orders);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

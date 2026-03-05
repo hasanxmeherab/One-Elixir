@@ -16,20 +16,26 @@ router.get('/names', verifyAdmin, async (req, res) => {
 // 2. GET All data (admin only)
 router.get('/', verifyAdmin, async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 50;
-    const skip = (page - 1) * limit;
-    const total = await Investment.countDocuments();
-    const investments = await Investment.find().sort({ lastUpdated: -1 }).skip(skip).limit(limit);
-    
-    // Safety Check: Force totalAmount to be a number so the Frontend doesn't show NaN
+    if (req.query.page) {
+      const page = parseInt(req.query.page);
+      const limit = parseInt(req.query.limit) || 50;
+      const skip = (page - 1) * limit;
+      const total = await Investment.countDocuments();
+      const investments = await Investment.find().sort({ lastUpdated: -1 }).skip(skip).limit(limit);
+      const sanitizedData = investments.map(inv => ({
+        ...inv._doc,
+        totalAmount: Number(inv.totalAmount) || 0,
+        transactions: inv.transactions || []
+      }));
+      return res.json({ investments: sanitizedData, total, page, pages: Math.ceil(total / limit) });
+    }
+    const investments = await Investment.find().sort({ lastUpdated: -1 });
     const sanitizedData = investments.map(inv => ({
       ...inv._doc,
       totalAmount: Number(inv.totalAmount) || 0,
       transactions: inv.transactions || []
     }));
-
-    res.json({ investments: sanitizedData, total, page, pages: Math.ceil(total / limit) });
+    res.json(sanitizedData);
   } catch (err) { 
     res.status(500).json({ message: err.message }); 
   }

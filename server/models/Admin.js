@@ -9,6 +9,4 @@ const adminSchema = new mongoose.Schema({
   createdAt:    { type: Date, default: Date.now }
 });
 
-adminSchema.index({ email: 1 });
-
 module.exports = mongoose.model('Admin', adminSchema);

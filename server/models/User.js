@@ -23,7 +23,6 @@ const userSchema = new mongoose.Schema({
   addresses: [addressSchema]
 }, { timestamps: true });
 
-userSchema.index({ email: 1 });
 userSchema.index({ googleId: 1 });
 userSchema.index({ resetPasswordToken: 1 });
 
