@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import adminAxios from '../utils/adminAxios';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell
@@ -32,8 +32,8 @@ const AdminDashboard = () => {
   const [costRecords, setCostRecords] = useState([]);
   const [expenses, setExpenses] = useState([]);
   useEffect(() => {
-    axios.get(`${API_URL}/api/costs`).then(r => setCostRecords(r.data)).catch(() => {});
-    axios.get(`${API_URL}/api/expenses`).then(r => setExpenses(r.data)).catch(() => {});
+    adminAxios.get(`${API_URL}/api/costs`).then(r => setCostRecords(r.data)).catch(() => {});
+    adminAxios.get(`${API_URL}/api/expenses`).then(r => setExpenses(r.data)).catch(() => {});
   }, []);
 
   // ── Product revenue chart tab ─────────────────────────────
