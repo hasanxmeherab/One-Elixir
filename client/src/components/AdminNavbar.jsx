@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Menu, Bell } from 'lucide-react';
-import axios from 'axios';
+import adminAxios from '../utils/adminAxios';
 
 const AdminNavbar = ({ onMenuClick }) => {
   const navigate = useNavigate();
@@ -11,10 +11,7 @@ const AdminNavbar = ({ onMenuClick }) => {
 
   const fetchPendingCount = async () => {
     try {
-      const token = localStorage.getItem('adminToken');
-      const res = await axios.get(`${API_URL}/api/orders`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await adminAxios.get(`${API_URL}/api/orders`);
       const count = res.data.filter(o =>
         o.status?.toLowerCase() === 'pending'
       ).length;
