@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import adminAxios from '../utils/adminAxios';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -63,12 +64,12 @@ const OrderList = () => {
   if (!orders) return <div className="p-10 text-center">Loading Order Data...</div>;
 
   const updatePaymentStatus = async (id, paymentStatus) => {
-    try { await axios.put(`${API_URL}/api/orders/${id}`, { paymentStatus }, authHeader()); fetchData(); }
+    try { await adminAxios.put(`${API_URL}/api/orders/${id}`, { paymentStatus }); fetchData(); }
     catch { toast.error('Failed to update payment status'); }
   };
 
   const updateStatus = async (id, status) => {
-    try { await axios.put(`${API_URL}/api/orders/${id}`, { status }, authHeader()); fetchData(); toast.success(`Order updated to ${status}`); }
+    try { await adminAxios.put(`${API_URL}/api/orders/${id}`, { status }); fetchData(); toast.success(`Order updated to ${status}`); }
     catch { toast.error('Failed to update order status'); }
   };
 
@@ -91,9 +92,9 @@ const OrderList = () => {
         const res = await axios.post(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, data);
         screenshotUrl = res.data.secure_url;
       }
-      await axios.put(`${API_URL}/api/orders/${editPaymentOrder._id}`, {
+      await adminAxios.put(`${API_URL}/api/orders/${editPaymentOrder._id}`, {
         paymentDetails: { platform: editPaymentOrder.paymentMethod, senderNumber: editPaymentForm.senderNumber, transactionId: editPaymentForm.transactionId, screenshot: screenshotUrl }
-      }, authHeader());
+      });
       toast.success('Payment details saved.');
       setEditPaymentOrder(null);
       fetchData();

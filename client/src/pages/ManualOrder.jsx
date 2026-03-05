@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import axios from 'axios';
+import adminAxios from '../utils/adminAxios';
 import { useOutletContext } from 'react-router-dom';
 import Select from 'react-select';
 import locationData from '../data/locationData.json';
@@ -61,7 +62,7 @@ const ManualOrder = () => {
     if (!couponCode) return;
     setCouponLoading(true);
     try {
-      const res = await axios.post(`${API_URL}/api/coupons/validate`, { code: couponCode });
+      const res = await adminAxios.post(`${API_URL}/api/coupons/validate`, { code: couponCode });
       const discountAmount = res.data.discountType === 'percentage'
         ? (subtotal * res.data.discountValue) / 100
         : res.data.discountValue;
@@ -117,7 +118,7 @@ const ManualOrder = () => {
         catch { console.warn('Screenshot upload failed, continuing without it.'); }
       }
       const authHeader = { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } };
-      await axios.post(`${API_URL}/api/orders/manual`, {
+      await adminAxios.post(`${API_URL}/api/orders/manual`, {
         ...orderData,
         address: `${orderData.address}, ${district.label}, ${division.label}`,
         items: itemsToOrder, totalAmount: grandTotal, shippingCost, freeDelivery,
