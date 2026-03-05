@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import adminAxios from '../utils/adminAxios';
 import { ImagePlus } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
@@ -78,7 +79,7 @@ const BannerManagement = ({ isAdmin }) => {
     e.preventDefault();
     if (!formData.imageUrl) return toast.warning("Please upload an image first.");
     try {
-      await axios.post(`${API_URL}/api/banners`, formData);
+      await adminAxios.post(`${API_URL}/api/banners`, formData);
       setFormData({ imageUrl: '', title: '', subtitle: '' });
       fetchBanners();
       toast.success("Banner published successfully!");
@@ -87,7 +88,7 @@ const BannerManagement = ({ isAdmin }) => {
 
   const deleteBanner = async (id) => {
     if (window.confirm("Remove?")) {
-      await axios.delete(`${API_URL}/api/banners/${id}`);
+      await adminAxios.delete(`${API_URL}/api/banners/${id}`);
       fetchBanners();
     }
   };

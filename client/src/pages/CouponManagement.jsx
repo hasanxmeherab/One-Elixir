@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import adminAxios from '../utils/adminAxios';
 import { useToast } from '../context/ToastContext';
 
 const CouponManagement = () => {
@@ -12,7 +12,7 @@ const CouponManagement = () => {
 
   const fetchCoupons = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/coupons`);
+      const res = await adminAxios.get(`${API_URL}/api/coupons`);
       setCoupons(res.data);
     } catch (err) { console.error("Error fetching coupons", err); }
   };
@@ -20,7 +20,7 @@ const CouponManagement = () => {
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${API_URL}/api/coupons`, newCoupon);
+      await adminAxios.post(`${API_URL}/api/coupons`, newCoupon);
       setNewCoupon({ code: '', discountValue: '', discountType: 'percentage' });
       fetchCoupons();
       toast.success("Coupon created successfully!");
@@ -30,7 +30,7 @@ const CouponManagement = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Delete this coupon?")) {
       try {
-        await axios.delete(`${API_URL}/api/coupons/${id}`);
+        await adminAxios.delete(`${API_URL}/api/coupons/${id}`);
         fetchCoupons();
       } catch (err) { console.error(err); }
     }
