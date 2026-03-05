@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useCart } from '../context/CartContext';
 import { Link } from 'react-router-dom';
 import BannerManagement from './BannerManagement';
+import { optimizeImage } from '../utils/optimizeImage';
 
 const Home = () => {
   const [perfumes, setPerfumes]         = useState([]);
@@ -69,10 +70,10 @@ const Home = () => {
       {p.stock === 0 && <div style={badgeStyle}>SOLD OUT</div>}
       <Link to={`/product/${p.slug || p._id}`} style={{ textDecoration: 'none' }}>
         <div style={imageContainer} className="image-container">
-          <img src={p.image} alt={p.name} style={{
+          <img src={optimizeImage(p.image, 400)} alt={p.name} style={{
             width: '100%', height: '100%', objectFit: 'cover',
             opacity: p.stock === 0 ? 0.6 : 1
-          }} className="product-image-hover" />
+          }} className="product-image-hover" loading="lazy" />
         </div>
       </Link>
       <div style={{ padding: '20px 0', textAlign: 'center' }}>
@@ -135,7 +136,7 @@ const Home = () => {
                   </div>
                   <Link to={`/product/${p.slug || p._id}`} style={{ textDecoration: 'none' }}>
                     <div style={imageContainer} className="image-container">
-                      <img src={p.image} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} className="product-image-hover" />
+                      <img src={optimizeImage(p.image, 400)} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} className="product-image-hover" loading="lazy" />
                     </div>
                   </Link>
                   <div style={{ padding: '20px 0', textAlign: 'center' }}>
@@ -196,10 +197,10 @@ const Home = () => {
                 {p.stock === 0 && <div style={{ ...badgeStyle, left: 'auto', right: '15px' }}>SOLD OUT</div>}
                 <Link to={`/product/${p.slug || p._id}`} style={{ textDecoration: 'none' }}>
                   <div style={imageContainer} className="image-container">
-                    <img src={p.image} alt={p.name} style={{
+                    <img src={optimizeImage(p.image, 400)} alt={p.name} style={{
                       width: '100%', height: '100%', objectFit: 'cover',
                       opacity: p.stock === 0 ? 0.6 : 1
-                    }} className="product-image-hover" />
+                    }} className="product-image-hover" loading="lazy" />
                   </div>
                 </Link>
                 <div style={{ padding: '20px 0', textAlign: 'center' }}>

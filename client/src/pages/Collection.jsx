@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { optimizeImage } from '../utils/optimizeImage';
 
 const PAGE_SIZE = 12;
 
@@ -195,7 +196,7 @@ const Collection = () => {
               <div key={p._id} className="cursor-pointer group text-center"
                 onClick={() => navigate(`/product/${p.slug || p._id}`)}>
                 <div className="relative w-full h-[380px] bg-[#fcfcfc] mb-5 overflow-hidden">
-                  <img src={p.image} alt={p.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                  <img src={optimizeImage(p.image, 400)} alt={p.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" />
                   {p.stock === 0 && (
                     <div className="absolute top-4 right-4 bg-black text-white px-3 py-1 text-[9px] font-bold tracking-[2px]">SOLD OUT</div>
                   )}
