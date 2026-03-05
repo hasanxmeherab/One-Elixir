@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import adminAxios from '../utils/adminAxios';
 import { useToast } from '../context/ToastContext';
 import { X, ImagePlus } from 'lucide-react';
 
@@ -25,8 +26,8 @@ const AdminBundles = () => {
   const fetchAll = async () => {
     try {
       const [bRes, pRes] = await Promise.all([
-        axios.get(`${API_URL}/api/bundles?admin=true`),
-        axios.get(`${API_URL}/api/perfumes`),
+        adminAxios.get(`${API_URL}/api/bundles?admin=true`),
+        adminAxios.get(`${API_URL}/api/perfumes`),
       ]);
       setBundles(bRes.data);
       setPerfumes(pRes.data);
@@ -77,10 +78,10 @@ const AdminBundles = () => {
       }
       const payload = { ...form, image: imageUrl, bundlePrice: Number(form.bundlePrice) };
       if (editId) {
-        await axios.put(`${API_URL}/api/bundles/${editId}`, payload, authHeader());
+        await adminAxios.put(`${API_URL}/api/bundles/${editId}`, payload);
         toast.success('Bundle updated!');
       } else {
-        await axios.post(`${API_URL}/api/bundles`, payload, authHeader());
+        await adminAxios.post(`${API_URL}/api/bundles`, payload);
         toast.success('Bundle created!');
       }
       resetForm();
@@ -91,7 +92,7 @@ const AdminBundles = () => {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`${API_URL}/api/bundles/${id}`, authHeader());
+      await adminAxios.delete(`${API_URL}/api/bundles/${id}`);
       toast.success('Bundle deleted.');
       fetchAll();
     } catch { toast.error('Failed to delete.'); }
@@ -100,7 +101,7 @@ const AdminBundles = () => {
 
   const toggleActive = async (b) => {
     try {
-      await axios.put(`${API_URL}/api/bundles/${b._id}`, { active: !b.active }, authHeader());
+      await adminAxios.put(`${API_URL}/api/bundles/${b._id}`, { active: !b.active });
       fetchAll();
     } catch { toast.error('Failed to update.'); }
   };
