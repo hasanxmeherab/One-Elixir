@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const axios = require('axios');
 const sendEmail = require('../utils/sendEmail');
+const { validate, signupSchema, signinSchema } = require('../middleware/validate');
 
 // Helper — generate both tokens
 const generateTokens = (user) => {
@@ -15,7 +16,7 @@ const generateTokens = (user) => {
 };
 
 // SIGN UP
-router.post('/signup', async (req, res) => {
+router.post('/signup', validate(signupSchema), async (req, res) => {
   try {
     const { name, email, password } = req.body;
     const existingUser = await User.findOne({ email });
@@ -35,7 +36,7 @@ router.post('/signup', async (req, res) => {
 });
 
 // SIGN IN
-router.post('/signin', async (req, res) => {
+router.post('/signin', validate(signinSchema), async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });

@@ -2,6 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const Bundle  = require('../models/Bundle');
 const { verifyAdmin } = require('../middleware/authMiddleware');
+const { validate, createBundleSchema } = require('../middleware/validate');
 
 // GET all active bundles (public)
 router.get('/', async (req, res) => {
@@ -23,7 +24,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST create bundle (admin)
-router.post('/', verifyAdmin, async (req, res) => {
+router.post('/', verifyAdmin, validate(createBundleSchema), async (req, res) => {
   try {
     const bundle = await Bundle.create(req.body);
     const populated = await bundle.populate('products');

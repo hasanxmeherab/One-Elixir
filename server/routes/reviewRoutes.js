@@ -2,6 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const Review  = require('../models/Review');
 const { verifyAdmin } = require('../middleware/authMiddleware');
+const { validate, createReviewSchema } = require('../middleware/validate');
 
 // GET all reviews for a product
 router.get('/:perfumeId', async (req, res) => {
@@ -12,7 +13,7 @@ router.get('/:perfumeId', async (req, res) => {
 });
 
 // POST new review (with optional image URLs)
-router.post('/', async (req, res) => {
+router.post('/', validate(createReviewSchema), async (req, res) => {
   try {
     const { perfumeId, userId, userName, rating, comment, images } = req.body;
     if (!perfumeId || !userName || !rating || !comment)

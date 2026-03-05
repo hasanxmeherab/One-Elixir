@@ -6,6 +6,7 @@ const Log        = require('../models/Log');
 const { Resend } = require('resend');
 
 const { verifyAdmin } = require('../middleware/authMiddleware');
+const { validate, createOrderSchema, updateOrderSchema } = require('../middleware/validate');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -52,7 +53,7 @@ router.get('/', verifyAdmin, async (req, res) => {
 });
 
 // 3. POST standard website order
-router.post('/', async (req, res) => {
+router.post('/', validate(createOrderSchema), async (req, res) => {
   const order = new Order(req.body);
   try {
     const newOrder = await order.save();
@@ -87,7 +88,7 @@ router.post('/', async (req, res) => {
 });
 
 // 4. POST manual admin order
-router.post('/manual', verifyAdmin, async (req, res) => {
+router.post('/manual', verifyAdmin, validate(createOrderSchema), async (req, res) => {
   const order = new Order({ ...req.body, isManual: true });
   try {
     const newOrder = await order.save();
@@ -102,6 +103,25 @@ router.post('/manual', verifyAdmin, async (req, res) => {
     res.status(201).json(newOrder);
   } catch (err) {
     res.status(400).json({ message: err.message });
+  }
+});
+
+// #11 Bulk order status update (Admin)
+router.put('/bulk-update', verifyAdmin, async (req, res) => {
+  try {
+    const { orderIds, status, paymentStatus } = req.body;
+    if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'orderIds array required' });
+    }
+    const update = {};
+    if (status) update.status = status;
+    if (paymentStatus) update.paymentStatus = paymentStatus;
+    const result = await Order.updateMany({ _id: { $in: orderIds } }, { $set: update });
+    await writeLog(req, 'BULK_UPDATE_ORDER', 'Order',
+      `Bulk updated ${result.modifiedCount} orders — ${JSON.stringify(update)}`);
+    res.json({ success: true, message: `${result.modifiedCount} orders updated` });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Bulk update failed' });
   }
 });
 
@@ -164,6 +184,26 @@ router.put('/:id', verifyAdmin, async (req, res) => {
     }
 
     const updatedOrder = await order.save();
+
+    // #6 Order status email notification
+    if (status && updatedOrder.customerEmail) {
+      try {
+        await resend.emails.send({
+          from: 'OneElixir <onboarding@resend.dev>',
+          to: updatedOrder.customerEmail,
+          subject: `Order Update - #${updatedOrder._id.toString().slice(-6).toUpperCase()}`,
+          html: `
+            <div style="font-family:sans-serif;max-width:600px;margin:auto;border:1px solid #eee;padding:20px;">
+              <h2 style="text-align:center;letter-spacing:2px;">ONEELIXIR</h2>
+              <p>Hi ${updatedOrder.customerName},</p>
+              <p>Your order <strong>#${updatedOrder._id.toString().slice(-6).toUpperCase()}</strong> status has been updated to:</p>
+              <h3 style="text-align:center;padding:10px;background:#f5f5f5;">${status}</h3>
+              <p style="font-size:10px;color:#999;margin-top:20px;text-align:center;">&copy; 2026 ONEELIXIR FRAGRANCES.</p>
+            </div>`
+        });
+      } catch (emailErr) { console.error('Status email failed:', emailErr.message); }
+    }
+
     res.json(updatedOrder);
   } catch (err) {
     res.status(400).json({ message: err.message });

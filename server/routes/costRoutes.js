@@ -3,6 +3,7 @@ const router = express.Router();
 const CostRecord = require('../models/CostRecord');
 const Perfume = require('../models/Perfume');
 const { verifyAdmin } = require('../middleware/authMiddleware');
+const { validate, createCostRecordSchema } = require('../middleware/validate');
 
 // GET all cost records (admin only)
 router.get('/', verifyAdmin, async (req, res) => {
@@ -28,7 +29,7 @@ router.get('/:id', verifyAdmin, async (req, res) => {
 });
 
 // POST new cost record (admin only)
-router.post('/', verifyAdmin, async (req, res) => {
+router.post('/', verifyAdmin, validate(createCostRecordSchema), async (req, res) => {
   try {
     const { perfumeId, ingredients, packaging, bottlesProduced, notes } = req.body;
 

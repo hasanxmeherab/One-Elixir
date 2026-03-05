@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Coupon = require('../models/Coupon');
 const { verifyAdmin } = require('../middleware/authMiddleware');
+const { validate, createCouponSchema } = require('../middleware/validate');
 
 // 1. VALIDATE COUPON (For Customers at Checkout)
 router.post('/validate', async (req, res) => {
@@ -36,7 +37,7 @@ router.get('/', verifyAdmin, async (req, res) => {
 });
 
 // 3. CREATE NEW COUPON (admin only)
-router.post('/', verifyAdmin, async (req, res) => {
+router.post('/', verifyAdmin, validate(createCouponSchema), async (req, res) => {
   const { code, discountValue, discountType } = req.body;
   try {
     const newCoupon = new Coupon({

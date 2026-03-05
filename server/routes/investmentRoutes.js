@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Investment = require('../models/Investment');
 const { verifyAdmin } = require('../middleware/authMiddleware');
+const { validate, addInvestmentSchema } = require('../middleware/validate');
 
 // 1. GET Names for dropdown (admin only)
 router.get('/names', verifyAdmin, async (req, res) => {
@@ -42,7 +43,7 @@ router.get('/', verifyAdmin, async (req, res) => {
 });
 
 // 3. POST Add/Update Investment (admin only)
-router.post('/add', verifyAdmin, async (req, res) => {
+router.post('/add', verifyAdmin, validate(addInvestmentSchema), async (req, res) => {
   const { investorName, amount, note, date } = req.body;
   try {
     let investment = await Investment.findOne({ 

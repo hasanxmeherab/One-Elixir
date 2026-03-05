@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Expense = require('../models/Expense');
 const { verifyAdmin } = require('../middleware/authMiddleware');
+const { validate, createExpenseSchema } = require('../middleware/validate');
 
 // GET all expenses (admin only)
 router.get('/', verifyAdmin, async (req, res) => {
@@ -22,7 +23,7 @@ router.get('/', verifyAdmin, async (req, res) => {
 });
 
 // POST new expense (admin only)
-router.post('/', verifyAdmin, async (req, res) => {
+router.post('/', verifyAdmin, validate(createExpenseSchema), async (req, res) => {
     try {
         const expense = new Expense(req.body);
         const newExpense = await expense.save();

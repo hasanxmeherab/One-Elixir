@@ -5,6 +5,7 @@ const Log = require('../models/Log');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { verifyAdmin, verifySuperadmin } = require('../middleware/authMiddleware');
+const { validate, adminLoginSchema, adminRegisterSchema } = require('../middleware/validate');
 
 // Helper — write an activity log
 const writeLog = async (req, action, target, detail) => {
@@ -23,7 +24,7 @@ const writeLog = async (req, action, target, detail) => {
 };
 
 // ── 1. REGISTER new admin (superadmin only, or first-run if no admins exist)
-router.post('/register', verifyAdmin, async (req, res) => {
+router.post('/register', verifyAdmin, validate(adminRegisterSchema), async (req, res) => {
   try {
     // Allow superadmin to set role, default to 'admin'
     const { name, email, password, role } = req.body;
@@ -44,7 +45,7 @@ router.post('/register', verifyAdmin, async (req, res) => {
 });
 
 // ── 2. ADMIN LOGIN — returns accessToken (no expiry) + refreshToken (7d)
-router.post('/login', async (req, res) => {
+router.post('/login', validate(adminLoginSchema), async (req, res) => {
   try {
     const { email, password } = req.body;
     const admin = await Admin.findOne({ email });
