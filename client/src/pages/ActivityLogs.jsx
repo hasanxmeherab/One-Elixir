@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import adminAxios from '../utils/adminAxios';
 import { RefreshCw, Trash2, Filter } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
@@ -24,10 +24,7 @@ const ActivityLogs = () => {
   const fetchLogs = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('adminToken');
-      const res = await axios.get(`${API_URL}/api/logs?limit=200`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await adminAxios.get(`${API_URL}/api/logs?limit=200`);
       setLogs(res.data);
     } catch (err) {
       console.error('Failed to fetch logs', err);
@@ -41,10 +38,7 @@ const ActivityLogs = () => {
   const handleClear = async () => {
     if (!window.confirm('Clear all activity logs? This cannot be undone.')) return;
     try {
-      const token = localStorage.getItem('adminToken');
-      await axios.delete(`${API_URL}/api/logs`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await adminAxios.delete(`${API_URL}/api/logs`);
       setLogs([]);
     } catch { toast.error('Failed to clear logs'); }
   };
