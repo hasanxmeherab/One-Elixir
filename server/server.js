@@ -6,11 +6,23 @@ const mongoose   = require('mongoose');
 const cors       = require('cors');
 const path       = require('path');
 const rateLimit  = require('express-rate-limit');
+const helmet     = require('helmet');
 const costRoutes = require('./routes/costRoutes');
 
 require('dotenv').config();
 
+// ── #4 Environment Validation ────────────────────────────────
+const requiredEnv = ['MONGO_URI', 'JWT_SECRET', 'JWT_REFRESH_SECRET', 'RESEND_API_KEY'];
+const missingEnv = requiredEnv.filter(key => !process.env[key]);
+if (missingEnv.length) {
+  console.error(`❌ Missing required env vars: ${missingEnv.join(', ')}`);
+  process.exit(1);
+}
+
 const app = express();
+
+// ── #2 Helmet Security Headers ───────────────────────────────
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
 app.use(cors({
   origin: [
@@ -63,6 +75,36 @@ app.use('/api/logs',        require('./routes/logRoutes'));
 app.use('/api/addresses',   require('./routes/addressRoutes'));
 app.use('/api/costs',       costRoutes);
 app.use('/api/bundles',     require('./routes/bundleRoutes'));
+
+// ── #20 Simple In-Memory Cache ───────────────────────────────
+const cache = new Map();
+const CACHE_TTL = 60 * 1000; // 60 seconds
+
+app.cacheGet = (key) => {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CACHE_TTL) { cache.delete(key); return null; }
+  return entry.data;
+};
+app.cacheSet = (key, data) => cache.set(key, { data, ts: Date.now() });
+app.cacheDel = (prefix) => {
+  for (const key of cache.keys()) { if (key.startsWith(prefix)) cache.delete(key); }
+};
+
+// ── #3 / #15 — 404 Handler (unknown routes) ─────────────────
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: 'Route not found' });
+});
+
+// ── #3 Global Error Handler ──────────────────────────────────
+app.use((err, req, res, next) => {
+  console.error(err.stack || err);
+  const status = err.status || 500;
+  res.status(status).json({
+    success: false,
+    message: process.env.NODE_ENV === 'production' ? 'Something went wrong' : err.message,
+  });
+});
 
 // Connect to MongoDB — then generate sitemap on startup
 mongoose.connect(process.env.MONGO_URI)
