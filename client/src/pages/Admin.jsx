@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import adminAxios from '../utils/adminAxios';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 const LINKS = [
@@ -31,9 +31,9 @@ const Admin = () => {
   const fetchData = async () => {
     try {
       const [pRes, oRes, iRes] = await Promise.all([
-        axios.get(`${API_URL}/api/perfumes`),
-        axios.get(`${API_URL}/api/orders`),
-        axios.get(`${API_URL}/api/investments`),
+        adminAxios.get(`${API_URL}/api/perfumes`),
+        adminAxios.get(`${API_URL}/api/orders`),
+        adminAxios.get(`${API_URL}/api/investments`),
       ]);
       setPerfumes(pRes.data);
       setOrders(oRes.data);
