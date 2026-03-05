@@ -1,4 +1,4 @@
-import React from 'react'; 
+import React, { Suspense, lazy } from 'react'; 
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 //import { Analytics } from "@vercel/analytics/react";
 //import { SpeedInsights } from '@vercel/speed-insights/react';
@@ -17,28 +17,28 @@ import Checkout from './pages/Checkout';
 import Account from './pages/Account';
 import Wishlist from './pages/Wishlist';
 import OrderTracking from './pages/OrderTracking';
-import ActivityLogs from './pages/ActivityLogs';
 import Bundles from './pages/Bundles';
-import AdminBundles from './pages/AdminBundles';
 
-// --- COMPONENTS ---
-import Navbar from './pages/Navbar';
+// --- COMPONENTS --- (#17 Navbar moved to components/)
+import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 
-// --- ADMIN PAGES ---
-import Admin from './pages/Admin';
-import AdminManagement from './pages/AdminManagement';
-import AdminLogin from './pages/AdminLogin';
-import AdminDashboard from './pages/AdminDashboard';
-import InventoryManager from './pages/InventoryManager';
-import ManualOrder from './pages/ManualOrder';
-import OrderList from './pages/OrderList';
-import ExpenseManagement from './pages/ExpenseManagement';
-import InvestmentTracker from './pages/InvestmentTracker';
-import CouponManagement from './pages/CouponManagement';
-import BannerManagement from './pages/BannerManagement';
-import CustomerList from './pages/CustomerList';
-import CostCalculator from './pages/CostCalculator';
+// --- #18 LAZY-LOADED ADMIN PAGES ---
+const Admin = lazy(() => import('./pages/Admin'));
+const AdminManagement = lazy(() => import('./pages/AdminManagement'));
+const AdminLogin = lazy(() => import('./pages/AdminLogin'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const InventoryManager = lazy(() => import('./pages/InventoryManager'));
+const ManualOrder = lazy(() => import('./pages/ManualOrder'));
+const OrderList = lazy(() => import('./pages/OrderList'));
+const ExpenseManagement = lazy(() => import('./pages/ExpenseManagement'));
+const InvestmentTracker = lazy(() => import('./pages/InvestmentTracker'));
+const CouponManagement = lazy(() => import('./pages/CouponManagement'));
+const BannerManagement = lazy(() => import('./pages/BannerManagement'));
+const CustomerList = lazy(() => import('./pages/CustomerList'));
+const CostCalculator = lazy(() => import('./pages/CostCalculator'));
+const ActivityLogs = lazy(() => import('./pages/ActivityLogs'));
+const AdminBundles = lazy(() => import('./pages/AdminBundles'));
 
 // --- CONTEXT ---
 import { WishlistProvider } from './context/WishlistContext';
@@ -54,6 +54,7 @@ const AppContent = () => {
     <>      {!isHideNavbar && <Navbar onCartClick={() => console.log("Cart Open")} />}
       
       <div style={{ minHeight: '80vh' }}>
+        <Suspense fallback={<div style={{ textAlign: 'center', padding: '60px 0', color: '#999', letterSpacing: '2px', fontSize: '13px' }}>Loading...</div>}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/product/:slug" element={<ProductDetails />} />
@@ -66,7 +67,7 @@ const AppContent = () => {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           
-          {/* --- ADMIN ROUTES --- */}
+          {/* --- ADMIN ROUTES (lazy-loaded) --- */}
           <Route 
             path="/admin" 
             element={
@@ -98,6 +99,7 @@ const AppContent = () => {
           <Route path="/track" element={<OrderTracking />} />
           <Route path="/bundles" element={<Bundles />} />
         </Routes>
+        </Suspense>
       </div>
     </>
   );
