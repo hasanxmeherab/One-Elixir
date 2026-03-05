@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import adminAxios from '../utils/adminAxios';
 import { useOutletContext } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import { Plus, X, ImagePlus } from 'lucide-react';
@@ -14,7 +15,7 @@ const StockCell = ({ p, API_URL, authHeader, fetchData, toast }) => {
     if (Number(value) === p.stock) { setEditing(false); return; }
     try {
       setSaving(true);
-      await axios.put(`${API_URL}/api/perfumes/${p._id}`, { stock: Number(value) }, authHeader());
+      await adminAxios.put(`${API_URL}/api/perfumes/${p._id}`, { stock: Number(value) });
       toast.success(`Stock set to ${value}`);
       fetchData();
       setEditing(false);
@@ -65,7 +66,7 @@ const AddStockCell = ({ p, API_URL, authHeader, fetchData, toast }) => {
     try {
       setSaving(true);
       const newStock = p.stock + add;
-      await axios.put(`${API_URL}/api/perfumes/${p._id}`, { stock: newStock }, authHeader());
+      await adminAxios.put(`${API_URL}/api/perfumes/${p._id}`, { stock: newStock });
       toast.success(`+${add} added → stock is now ${newStock}`);
       setQty(''); setOpen(false); fetchData();
     } catch { toast.error('Failed to add stock.'); }
@@ -186,9 +187,9 @@ const InventoryManager = () => {
         featured:     formData.featured,
       };
       if (editId) {
-        await axios.put(`${API_URL}/api/perfumes/${editId}`, payload, authHeader());
+        await adminAxios.put(`${API_URL}/api/perfumes/${editId}`, payload);
       } else {
-        await axios.post(`${API_URL}/api/perfumes`, payload, authHeader());
+        await adminAxios.post(`${API_URL}/api/perfumes`, payload);
       }
       cancelEdit();
       fetchData();
@@ -201,14 +202,14 @@ const InventoryManager = () => {
 
   const deletePerfume = async (id) => {
     if (window.confirm('Remove item from inventory?')) {
-      await axios.delete(`${API_URL}/api/perfumes/${id}`, authHeader());
+      await adminAxios.delete(`${API_URL}/api/perfumes/${id}`);
       fetchData();
     }
   };
 
   const toggleFeatured = async (p) => {
     try {
-      await axios.put(`${API_URL}/api/perfumes/${p._id}`, { featured: !p.featured }, authHeader());
+      await adminAxios.put(`${API_URL}/api/perfumes/${p._id}`, { featured: !p.featured });
       fetchData();
     } catch { toast.error('Failed to update featured status.'); }
   };
@@ -227,9 +228,9 @@ const InventoryManager = () => {
       toast.error('Fill in sale price and end date/time.'); return;
     }
     try {
-      await axios.put(`${API_URL}/api/perfumes/${id}`, {
+      await adminAxios.put(`${API_URL}/api/perfumes/${id}`, {
         flashSale: { active: true, salePrice: Number(flashForm.salePrice), endsAt: new Date(flashForm.endsAt) }
-      }, authHeader());
+      });
       toast.success('Flash sale activated!');
       setFlashEditId(null); fetchData();
     } catch { toast.error('Failed to save flash sale.'); }
@@ -237,7 +238,7 @@ const InventoryManager = () => {
 
   const endFlashSale = async (id) => {
     try {
-      await axios.put(`${API_URL}/api/perfumes/${id}`, { flashSale: { active: false } }, authHeader());
+      await adminAxios.put(`${API_URL}/api/perfumes/${id}`, { flashSale: { active: false } });
       toast.success('Flash sale ended.'); fetchData();
     } catch { toast.error('Failed to end flash sale.'); }
   };

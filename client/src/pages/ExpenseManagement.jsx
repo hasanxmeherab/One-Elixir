@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import adminAxios from '../utils/adminAxios';
 import { useToast } from '../context/ToastContext';
 
 
@@ -62,7 +62,7 @@ const ExpenseManagement = () => {
 
   const fetchExpenses = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/expenses`);
+      const res = await adminAxios.get(`${API_URL}/api/expenses`);
       setExpenses(res.data);
     } catch (err) { console.error("Failed to fetch expenses", err); }
   };
@@ -80,7 +80,7 @@ const ExpenseManagement = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${API_URL}/api/expenses`, formData);
+      await adminAxios.post(`${API_URL}/api/expenses`, formData);
       setFormData({
         title: '', amount: '', quantity: '', unitPrice: '',
         unit: 'pcs', category: 'Packaging',
@@ -93,7 +93,7 @@ const ExpenseManagement = () => {
 
   const deleteExpense = async (id) => {
     if (window.confirm("Delete this expense record?")) {
-      await axios.delete(`${API_URL}/api/expenses/${id}`);
+      await adminAxios.delete(`${API_URL}/api/expenses/${id}`);
       fetchExpenses();
     }
   };
