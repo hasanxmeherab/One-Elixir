@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react'; 
+import React, { Suspense, lazy, useEffect } from 'react'; 
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 //import { Analytics } from "@vercel/analytics/react";
 //import { SpeedInsights } from '@vercel/speed-insights/react';
@@ -21,6 +21,7 @@ import Bundles from './pages/Bundles';
 
 // --- COMPONENTS --- (#17 Navbar moved to components/)
 import Navbar from './components/Navbar';
+import MobileTabBar from './components/MobileTabBar';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // --- #18 LAZY-LOADED ADMIN PAGES ---
@@ -47,14 +48,19 @@ import { ToastProvider } from './context/ToastContext';
 
 const AppContent = () => {
   const location = useLocation();
+
+  // Scroll to top on route change
+  useEffect(() => { window.scrollTo(0, 0); }, [location.pathname]);
+
   // Hide Navbar for any admin-related paths
   const isHideNavbar = location.pathname.startsWith('/admin') || location.pathname === '/admin-login';
 
   return (
     <>      {!isHideNavbar && <Navbar onCartClick={() => console.log("Cart Open")} />}
       
-      <div style={{ minHeight: '80vh' }}>
+      <div style={{ minHeight: '80vh' }} className={!isHideNavbar ? 'pb-16 md:pb-0' : ''}>
         <Suspense fallback={<div style={{ textAlign: 'center', padding: '60px 0', color: '#999', letterSpacing: '2px', fontSize: '13px' }}>Loading...</div>}>
+        <div key={location.pathname} className="page-transition">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/product/:slug" element={<ProductDetails />} />
@@ -99,8 +105,11 @@ const AppContent = () => {
           <Route path="/track" element={<OrderTracking />} />
           <Route path="/bundles" element={<Bundles />} />
         </Routes>
+        </div>
         </Suspense>
       </div>
+
+      {!isHideNavbar && <MobileTabBar />}
     </>
   );
 };
