@@ -10,6 +10,7 @@ const costRecordSchema = new mongoose.Schema({
   ingredients:     [ingredientSchema],
   packaging:       [ingredientSchema], // ← packaging materials
   bottlesProduced: { type: Number, required: true },
+  remainingBottles:{ type: Number },   // ← stock remaining from this batch
   totalCost:       Number,
   costPerBottle:   Number,
   sellingPrice:    Number,
