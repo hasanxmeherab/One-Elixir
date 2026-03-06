@@ -54,6 +54,11 @@ const Home = () => {
   const featuredProducts = perfumes.filter(p => p.featured).slice(0, 4);
   const displayProducts  = featuredProducts.length >= 2 ? featuredProducts : perfumes.slice(0, 4);
 
+  // New Arrivals — most recently added products (use _id for reliable creation order)
+  const newArrivals = [...perfumes]
+    .sort((a, b) => (a._id > b._id ? -1 : 1))
+    .slice(0, 4);
+
   // ── Flash sale products + live countdown ────────────────────
   const flashSaleProducts = perfumes.filter(p =>
     p.flashSale?.active && p.flashSale?.salePrice && new Date(p.flashSale.endsAt) > now
@@ -137,6 +142,61 @@ const Home = () => {
           ))}
         </div>
       </section>
+
+      {/* NEW ARRIVALS */}
+      {newArrivals.length > 0 && !loading && (
+        <section className="collection-container" style={{ padding: '0 10% 80px 10%' }}>
+          <div style={sectionHeader}>
+            <p style={{ fontSize: '11px', letterSpacing: '4px', color: '#888', margin: '0 0 12px 0' }}>JUST DROPPED</p>
+            <h2 style={{ letterSpacing: '8px', fontSize: '24px', margin: 0 }}>NEW ARRIVALS</h2>
+            <div style={headerLine}></div>
+          </div>
+          <div style={gridStyle} className="product-grid">
+            {newArrivals.map(p => (
+              <div key={p._id} style={cardStyle} className="product-card">
+                <div style={newBadge}>NEW</div>
+                {p.stock === 0 && <div style={{ ...badgeStyle, left: 'auto', right: '15px' }}>SOLD OUT</div>}
+                <Link to={`/product/${p.slug || p._id}`} style={{ textDecoration: 'none' }}>
+                  <div style={imageContainer} className="image-container">
+                    <img src={optimizeImage(p.image, 400)} alt={p.name} style={{
+                      width: '100%', height: '100%', objectFit: 'cover',
+                      opacity: p.stock === 0 ? 0.6 : 1
+                    }} className="product-image-hover" loading="lazy" />
+                  </div>
+                </Link>
+                <div style={{ padding: '20px 0', textAlign: 'center' }}>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', letterSpacing: '1px' }}>{p.name.toUpperCase()}</h4>
+                  {ratings[p._id] && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginBottom: '6px' }}>
+                      {[1,2,3,4,5].map(i => (
+                        <Star key={i} size={12}
+                          fill={i <= Math.round(ratings[p._id].avgRating) ? '#000' : 'none'}
+                          style={{ color: '#000' }} />
+                      ))}
+                      <span style={{ fontSize: '10px', color: '#999', letterSpacing: '1px', marginLeft: '2px' }}>
+                        {ratings[p._id].avgRating} ({ratings[p._id].count})
+                      </span>
+                    </div>
+                  )}
+                  <p style={{ fontWeight: 'bold', fontSize: '15px', color: '#333' }}>{p.price.toLocaleString()} TK</p>
+                  <button
+                    onClick={() => addToCart({ ...p, price: Number(p.price) })}
+                    disabled={p.stock === 0}
+                    style={{
+                      ...btnStyle,
+                      backgroundColor: p.stock === 0 ? '#ebebeb' : '#000',
+                      color: p.stock === 0 ? '#999' : '#fff',
+                      cursor: p.stock === 0 ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {p.stock === 0 ? 'UNAVAILABLE' : 'ADD TO BAG'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* FLASH DEALS */}
       {flashSaleProducts.length > 0 && (
@@ -312,5 +372,6 @@ const imageContainer = { width: '100%', height: '380px', backgroundColor: '#f9f9
 const btnStyle      = { width: '100%', padding: '12px', border: 'none', marginTop: '10px', fontWeight: 'bold', letterSpacing: '2px', fontSize: '11px', transition: '0.3s' };
 const badgeStyle    = { position: 'absolute', top: '15px', left: '15px', backgroundColor: '#000', color: '#fff', padding: '6px 15px', fontSize: '10px', fontWeight: 'bold', letterSpacing: '2px', zIndex: 2 };
 const rankBadge     = { position: 'absolute', top: '15px', left: '15px', backgroundColor: '#000', color: '#fff', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', zIndex: 2 };
+const newBadge      = { position: 'absolute', top: '15px', left: '15px', backgroundColor: '#16a34a', color: '#fff', padding: '6px 15px', fontSize: '10px', fontWeight: 'bold', letterSpacing: '2px', zIndex: 2 };
 
 export default Home;

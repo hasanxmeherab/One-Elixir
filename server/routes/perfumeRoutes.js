@@ -55,7 +55,7 @@ router.get('/', async (req, res) => {
     const cached = req.app.cacheGet?.(cacheKey);
     if (cached) return res.json(cached);
 
-    const perfumes = await Perfume.find(query);
+    const perfumes = await Perfume.find(query).sort({ createdAt: -1 });
     req.app.cacheSet?.(cacheKey, perfumes);
     res.json(perfumes);
   } catch (err) {
