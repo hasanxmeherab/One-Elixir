@@ -76,7 +76,7 @@ const Navbar = () => {
 
         {/* MIDDLE: LOGO */}
         <div className="flex justify-center">
-          <Link to="/" className="text-2xl font-bold tracking-[6px] no-underline text-black">
+          <Link to="/" className="text-2xl font-bold tracking-2xl no-underline text-black">
             ONEELIXIR
           </Link>
         </div>
@@ -97,10 +97,10 @@ const Navbar = () => {
           {/* Desktop Auth */}
           {!user && (
             <div className="hidden md:flex gap-4 items-center mr-2">
-              <Link to="/signin" className="no-underline text-black text-[11px] font-bold tracking-wider">
+              <Link to="/signin" className="no-underline text-black text-caption font-bold tracking-wider">
                 SIGN IN
               </Link>
-              <Link to="/signup" className="no-underline text-white bg-black text-[11px] font-bold tracking-wider px-4 py-2 rounded-sm">
+              <Link to="/signup" className="no-underline text-white bg-black text-caption font-bold tracking-wider px-4 py-2 rounded-sm">
                 REGISTER
               </Link>
             </div>
@@ -110,7 +110,7 @@ const Navbar = () => {
           <div className="relative cursor-pointer" onClick={() => navigate('/cart')}>
             <ShoppingBag size={20} className="text-black" />
             {cartCount > 0 && (
-              <span className="absolute -top-2.5 -right-2.5 bg-black text-white text-[10px] rounded-full w-[18px] h-[18px] flex items-center justify-center font-bold">
+              <span className="absolute -top-2.5 -right-2.5 bg-black text-white text-label rounded-full w-[18px] h-[18px] flex items-center justify-center font-bold">
                 {cartCount}
               </span>
             )}
@@ -136,7 +136,7 @@ const Navbar = () => {
               {/* Mobile Search */}
               <li className="md:hidden">
                 <div
-                  className="flex items-center text-black text-sm font-bold tracking-[2px] py-4 border-b-2 border-gray-100 cursor-pointer"
+                  className="flex items-center text-black text-sm font-bold tracking-sm py-4 border-b-2 border-gray-100 cursor-pointer"
                   onClick={() => { setIsSearchOpen(true); setIsSidebarOpen(false); }}
                 >
                   <Search size={18} className="mr-3" /> SEARCH
@@ -146,7 +146,7 @@ const Navbar = () => {
               <li>
                 <Link
                   to="/collection"
-                  className="block no-underline text-black text-sm font-bold tracking-[2px] py-4 border-b border-gray-50"
+                  className="block no-underline text-black text-sm font-bold tracking-sm py-4 border-b border-gray-50"
                   onClick={() => setIsSidebarOpen(false)}
                 >
                   THE COLLECTION
@@ -156,7 +156,7 @@ const Navbar = () => {
               <li>
                 <Link
                   to="/bundles"
-                  className="block no-underline text-black text-sm font-bold tracking-[2px] py-4 border-b border-gray-50"
+                  className="block no-underline text-black text-sm font-bold tracking-sm py-4 border-b border-gray-50"
                   onClick={() => setIsSidebarOpen(false)}
                 >
                   BUNDLES
@@ -167,7 +167,7 @@ const Navbar = () => {
               <li className="md:hidden">
                 <Link
                   to="/wishlist"
-                  className="block no-underline text-black text-sm font-bold tracking-[2px] py-4 border-b border-gray-50"
+                  className="block no-underline text-black text-sm font-bold tracking-sm py-4 border-b border-gray-50"
                   onClick={() => setIsSidebarOpen(false)}
                 >
                   WISHLIST
@@ -179,7 +179,7 @@ const Navbar = () => {
                   <li className="md:hidden">
                     <Link
                       to="/signin"
-                      className="block no-underline text-black text-sm font-bold tracking-[2px] py-4 border-b border-gray-50"
+                      className="block no-underline text-black text-sm font-bold tracking-sm py-4 border-b border-gray-50"
                       onClick={() => setIsSidebarOpen(false)}
                     >
                       SIGN IN
@@ -188,7 +188,7 @@ const Navbar = () => {
                   <li className="md:hidden">
                     <Link
                       to="/signup"
-                      className="block no-underline bg-black text-white text-sm font-bold tracking-[2px] py-4 text-center mt-2"
+                      className="block no-underline bg-black text-white text-sm font-bold tracking-sm py-4 text-center mt-2"
                       onClick={() => setIsSidebarOpen(false)}
                     >
                       REGISTER
@@ -200,7 +200,7 @@ const Navbar = () => {
                   <li className="md:hidden">
                     <Link
                       to="/account"
-                      className="block no-underline text-black text-sm font-bold tracking-[2px] py-4 border-b border-gray-50"
+                      className="block no-underline text-black text-sm font-bold tracking-sm py-4 border-b border-gray-50"
                       onClick={() => setIsSidebarOpen(false)}
                     >
                       MY PROFILE
@@ -209,7 +209,7 @@ const Navbar = () => {
                   <li>
                     <button
                       onClick={handleLogout}
-                      className="w-full text-left bg-transparent border-none text-black text-sm font-bold tracking-[2px] py-4 border-b border-gray-50 cursor-pointer"
+                      className="w-full text-left bg-transparent border-none text-black text-sm font-bold tracking-sm py-4 border-b border-gray-50 cursor-pointer"
                     >
                       LOGOUT
                     </button>
@@ -245,14 +245,14 @@ const Navbar = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleSearchKeyDown}
-              className="w-full max-w-3xl border-none border-b-2 border-black py-5 text-3xl md:text-4xl text-center outline-none tracking-[2px] uppercase"
+              className="w-full max-w-3xl border-none border-b-2 border-black py-5 text-3xl md:text-4xl text-center outline-none tracking-sm uppercase"
             />
             <div className="w-full max-w-3xl mt-10">
               {searchLoading && (
-                <div className="text-center py-8 text-muted-light text-[11px] tracking-[2px]">SEARCHING...</div>
+                <div className="text-center py-8 text-muted-light text-caption tracking-sm">SEARCHING...</div>
               )}
               {!searchLoading && searchQuery.trim().length > 1 && suggestions.length === 0 && (
-                <div className="text-center py-8 text-muted-lighter text-[11px] tracking-[2px]">NO RESULTS FOUND</div>
+                <div className="text-center py-8 text-muted-lighter text-caption tracking-sm">NO RESULTS FOUND</div>
               )}
               {!searchLoading && suggestions.map((item) => (
                 <div
@@ -262,7 +262,7 @@ const Navbar = () => {
                 >
                   {item.image && <img src={optimizeImage(item.image, 120)} alt={item.name} className="w-16 h-16 object-cover" />}
                   <div>
-                    <div className="font-bold text-[13px] tracking-wider">{item.name.toUpperCase()}</div>
+                    <div className="font-bold text-sm tracking-wider">{item.name.toUpperCase()}</div>
                     <div className="text-gray-500 text-xs mt-1">{item.price?.toLocaleString()} TK</div>
                   </div>
                 </div>
@@ -272,7 +272,7 @@ const Navbar = () => {
                   className="text-center py-6 cursor-pointer group"
                   onClick={() => { navigate(`/collection?search=${encodeURIComponent(searchQuery.trim())}`); setIsSearchOpen(false); setSearchQuery(''); }}
                 >
-                  <span className="text-[11px] font-bold tracking-[2px] text-muted group-hover:text-black transition-colors border-b border-muted-lightest group-hover:border-black pb-1">
+                  <span className="text-caption font-bold tracking-sm text-muted group-hover:text-black transition-colors border-b border-muted-lightest group-hover:border-black pb-1">
                     VIEW ALL RESULTS →
                   </span>
                 </div>

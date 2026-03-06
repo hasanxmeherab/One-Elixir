@@ -80,27 +80,27 @@ const CartSidebar = ({ isOpen, onClose }) => {
   );
 };
 
-// --- Styles (Existing Styles Maintained) ---
+// --- Styles ---
 const overlay = { position: 'fixed', top: 0, left: 0, width: '100%', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1001 };
 const sidebar = { position: 'fixed', top: 0, right: 0, width: '380px', height: '100vh', backgroundColor: '#fff', zIndex: 1002, display: 'flex', flexDirection: 'column', padding: '30px', boxShadow: '-5px 0 15px rgba(0,0,0,0.1)' };
-const header = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '1px solid #eee', paddingBottom: '15px' };
-const title = { fontSize: '12px', letterSpacing: '3px', fontWeight: 'bold' };
-const closeBtn = { background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', letterSpacing: '1px' };
+const header = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '1px solid var(--color-faint)', paddingBottom: '15px' };
+const title = { fontSize: 'var(--font-size-xs, 12px)', letterSpacing: '3px', fontWeight: 'bold' };
+const closeBtn = { background: 'none', border: 'none', cursor: 'pointer', fontSize: 'var(--font-size-caption, 11px)', letterSpacing: '1px' };
 const itemList = { flex: 1, overflowY: 'auto' };
-const emptyMsg = { textAlign: 'center', marginTop: '50px', color: '#888', fontSize: '11px', letterSpacing: '1px' };
-const cartItem = { display: 'flex', gap: '15px', marginBottom: '20px', borderBottom: '1px solid #f9f9f9', paddingBottom: '15px' };
-const itemImg = { width: '60px', height: '80px', objectFit: 'cover', backgroundColor: '#f9f9f9' };
+const emptyMsg = { textAlign: 'center', marginTop: '50px', color: 'var(--color-muted)', fontSize: 'var(--font-size-caption, 11px)', letterSpacing: '1px' };
+const cartItem = { display: 'flex', gap: '15px', marginBottom: '20px', borderBottom: '1px solid var(--color-surface)', paddingBottom: '15px' };
+const itemImg = { width: '60px', height: '80px', objectFit: 'cover', backgroundColor: 'var(--color-surface)' };
 const itemDetails = { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' };
-const itemName = { fontSize: '11px', fontWeight: 'bold', letterSpacing: '1px', marginBottom: '5px' };
-const removeBtn = { background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '9px', fontWeight: 'bold', textDecoration: 'underline', padding: 0, textAlign: 'left', marginTop: '5px' };
+const itemName = { fontSize: 'var(--font-size-caption, 11px)', fontWeight: 'bold', letterSpacing: '1px', marginBottom: '5px' };
+const removeBtn = { background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', fontSize: 'var(--font-size-2xs, 9px)', fontWeight: 'bold', textDecoration: 'underline', padding: 0, textAlign: 'left', marginTop: '5px' };
 
 const qtyContainer = { display: 'flex', alignItems: 'center', gap: '10px', marginTop: '5px' };
-const qtySmallBtn = { width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: '14px' };
-const qtyText = { fontSize: '12px', fontWeight: 'bold', width: '20px', textAlign: 'center' };
-const priceText = { fontSize: '11px', color: '#666', marginLeft: '5px' };
+const qtySmallBtn = { width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--color-subtle)', background: '#fff', cursor: 'pointer', fontSize: '14px' };
+const qtyText = { fontSize: 'var(--font-size-xs, 12px)', fontWeight: 'bold', width: '20px', textAlign: 'center' };
+const priceText = { fontSize: 'var(--font-size-caption, 11px)', color: '#666', marginLeft: '5px' };
 
 const footer = { borderTop: '1px solid #000', paddingTop: '20px' };
 const totalRow = { display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', marginBottom: '20px', fontSize: '13px', letterSpacing: '1px' };
-const checkoutBtn = { width: '100%', padding: '15px', backgroundColor: '#000', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold', letterSpacing: '2px', fontSize: '11px' };
+const checkoutBtn = { width: '100%', padding: '15px', backgroundColor: '#000', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold', letterSpacing: '2px', fontSize: 'var(--font-size-caption, 11px)' };
 
 export default CartSidebar;
