@@ -19,9 +19,70 @@ const Navbar = () => {
   const [suggestions, setSuggestions] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const searchInputRef = useRef(null);
+  const sidebarRef = useRef(null);
+  const searchOverlayRef = useRef(null);
 
   useEffect(() => {
     if (isSearchOpen) searchInputRef.current?.focus();
+  }, [isSearchOpen]);
+
+  // Lock body scroll when sidebar or search is open
+  useEffect(() => {
+    document.body.style.overflow = (isSidebarOpen || isSearchOpen) ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isSidebarOpen, isSearchOpen]);
+
+  // Close sidebar/search on Escape
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        if (isSearchOpen) { setIsSearchOpen(false); setSearchQuery(''); }
+        if (isSidebarOpen) setIsSidebarOpen(false);
+      }
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [isSearchOpen, isSidebarOpen]);
+
+  // Focus trap for sidebar
+  useEffect(() => {
+    if (!isSidebarOpen || !sidebarRef.current) return;
+    const container = sidebarRef.current;
+    const focusable = container.querySelectorAll('a, button, input, [tabindex]:not([tabindex="-1"])');
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    first.focus();
+    const trap = (e) => {
+      if (e.key !== 'Tab') return;
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    container.addEventListener('keydown', trap);
+    return () => container.removeEventListener('keydown', trap);
+  }, [isSidebarOpen]);
+
+  // Focus trap for search overlay
+  useEffect(() => {
+    if (!isSearchOpen || !searchOverlayRef.current) return;
+    const container = searchOverlayRef.current;
+    const focusable = container.querySelectorAll('a, button, input, [tabindex]:not([tabindex="-1"])');
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const trap = (e) => {
+      if (e.key !== 'Tab') return;
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    container.addEventListener('keydown', trap);
+    return () => container.removeEventListener('keydown', trap);
   }, [isSearchOpen]);
 
   useEffect(() => {
@@ -67,11 +128,13 @@ const Navbar = () => {
         
         {/* LEFT: MENU ICON */}
         <div className="flex justify-start">
-          <Menu
-            size={22}
-            className="cursor-pointer text-black"
+          <button
+            aria-label="Open menu"
+            className="bg-transparent border-none cursor-pointer text-black p-0"
             onClick={() => setIsSidebarOpen(true)}
-          />
+          >
+            <Menu size={22} />
+          </button>
         </div>
 
         {/* MIDDLE: LOGO */}
@@ -83,16 +146,20 @@ const Navbar = () => {
 
         {/* RIGHT: ICONS */}
         <div className="flex justify-end gap-5 items-center">
-          <Search
-            size={20}
-            className="cursor-pointer text-black hidden md:block"
+          <button
+            aria-label="Search products"
+            className="bg-transparent border-none cursor-pointer text-black p-0 hidden md:block"
             onClick={() => setIsSearchOpen(true)}
-          />
-          <Heart
-            size={20}
-            className="cursor-pointer text-black hidden md:block"
+          >
+            <Search size={20} />
+          </button>
+          <button
+            aria-label="View wishlist"
+            className="bg-transparent border-none cursor-pointer text-black p-0 hidden md:block"
             onClick={() => navigate('/wishlist')}
-          />
+          >
+            <Heart size={20} />
+          </button>
 
           {/* Desktop Auth */}
           {!user && (
@@ -107,30 +174,34 @@ const Navbar = () => {
           )}
 
           {/* Cart */}
-          <div className="relative cursor-pointer" onClick={() => navigate('/cart')}>
-            <ShoppingBag size={20} className="text-black" />
+          <button aria-label={`Shopping cart${cartCount > 0 ? `, ${cartCount} items` : ''}`} className="relative cursor-pointer bg-transparent border-none p-0 text-black" onClick={() => navigate('/cart')}>
+            <ShoppingBag size={20} />
             {cartCount > 0 && (
               <span className="absolute -top-2.5 -right-2.5 bg-black text-white text-label rounded-full w-[18px] h-[18px] flex items-center justify-center font-bold">
                 {cartCount}
               </span>
             )}
-          </div>
+          </button>
 
-          <User
-            size={20}
-            className="cursor-pointer text-black hidden md:block"
+          <button
+            aria-label={user ? 'My account' : 'Sign in'}
+            className="bg-transparent border-none cursor-pointer text-black p-0 hidden md:block"
             onClick={() => user ? navigate('/account') : navigate('/signin')}
-          />
+          >
+            <User size={20} />
+          </button>
         </div>
       </nav>
 
       {/* SIDEBAR DRAWER */}
       {isSidebarOpen && (
-        <div className="fixed top-0 left-0 w-full h-screen z-[2000] flex">
+        <div className="fixed top-0 left-0 w-full h-screen z-[2000] flex" role="dialog" aria-modal="true" aria-label="Navigation menu">
           {/* Sidebar Content */}
-          <div className="w-[300px] bg-white h-full px-10 py-10 flex flex-col z-[2001]">
+          <div ref={sidebarRef} className="w-[300px] bg-white h-full px-10 py-10 flex flex-col z-[2001]">
             <div className="mb-12">
-              <X size={28} className="cursor-pointer" onClick={() => setIsSidebarOpen(false)} />
+              <button aria-label="Close menu" className="bg-transparent border-none cursor-pointer p-0" onClick={() => setIsSidebarOpen(false)}>
+                <X size={28} />
+              </button>
             </div>
             <ul className="list-none p-0 m-0 flex flex-col gap-1">
               {/* Mobile Search */}
@@ -229,13 +300,15 @@ const Navbar = () => {
 
       {/* SEARCH OVERLAY */}
       {isSearchOpen && (
-        <div className="fixed top-0 left-0 w-full h-screen bg-white z-[5000] flex flex-col">
+        <div ref={searchOverlayRef} className="fixed top-0 left-0 w-full h-screen bg-white z-[5000] flex flex-col" role="dialog" aria-modal="true" aria-label="Search products">
           <div className="flex justify-end px-[5%] py-8">
-            <X
-              size={32}
-              className="cursor-pointer"
+            <button
+              aria-label="Close search"
+              className="bg-transparent border-none cursor-pointer p-0"
               onClick={() => { setIsSearchOpen(false); setSearchQuery(''); }}
-            />
+            >
+              <X size={32} />
+            </button>
           </div>
           <div className="flex flex-col items-center px-[10%] pt-8 flex-1">
             <input

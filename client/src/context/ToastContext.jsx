@@ -41,7 +41,7 @@ export const ToastProvider = ({ children }) => {
       {children}
 
       {/* Toast Container */}
-      <div className="fixed top-6 right-4 z-[9999] flex flex-col gap-3 max-w-[340px] w-full pointer-events-none">
+      <div className="fixed top-6 right-4 z-[9999] flex flex-col gap-3 max-w-[340px] w-full pointer-events-none" aria-live="polite" role="status">
         {toasts.map(t => (
           <div
             key={t.id}
@@ -52,6 +52,7 @@ export const ToastProvider = ({ children }) => {
             <p className="text-xs text-body leading-relaxed flex-1 tracking-wide">{t.message}</p>
             <button
               onClick={() => remove(t.id)}
+              aria-label="Dismiss notification"
               className="text-muted-lighter hover:text-muted transition-colors border-none bg-transparent cursor-pointer p-0 shrink-0"
             >
               <X size={14} />

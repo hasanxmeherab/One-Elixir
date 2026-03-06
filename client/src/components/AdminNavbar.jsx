@@ -54,6 +54,7 @@ const AdminNavbar = ({ onMenuClick }) => {
         {onMenuClick && (
           <button
             onClick={onMenuClick}
+            aria-label="Toggle sidebar menu"
             className="lg:hidden bg-transparent border-none text-white cursor-pointer flex items-center hover:opacity-70 transition-opacity"
           >
             <Menu size={22} />
@@ -72,7 +73,7 @@ const AdminNavbar = ({ onMenuClick }) => {
         <button
           onClick={() => navigate('/admin/order-list')}
           className={`relative bg-transparent border-none text-white cursor-pointer p-1 hover:opacity-70 transition-opacity ${showBell ? 'animate-bounce' : ''}`}
-          title={`${pendingCount} pending order${pendingCount !== 1 ? 's' : ''}`}
+          aria-label={`${pendingCount} pending order${pendingCount !== 1 ? 's' : ''}`}
         >
           <Bell size={18} />
           {pendingCount > 0 && (
