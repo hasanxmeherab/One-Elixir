@@ -2,7 +2,7 @@ import React from 'react';
 
 // Base shimmer block — uses Tailwind's built-in animate-pulse (no extra CSS needed)
 const Shimmer = ({ className = '' }) => (
-  <div className={`bg-[#e8e8e8] animate-pulse rounded-sm ${className}`} />
+  <div className={`bg-shimmer animate-pulse rounded-sm ${className}`} />
 );
 
 // Single product card skeleton

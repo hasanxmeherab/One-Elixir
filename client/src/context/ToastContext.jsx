@@ -45,27 +45,20 @@ export const ToastProvider = ({ children }) => {
         {toasts.map(t => (
           <div
             key={t.id}
-            className={`flex items-start gap-3 bg-white border border-[#eee] border-l-4 ${BORDERS[t.type]} shadow-lg px-4 py-3.5 pointer-events-auto animate-slide-in`}
-            style={{ animation: 'slideIn 0.25s ease-out' }}
+            className={`flex items-start gap-3 bg-white border border-faint border-l-4 ${BORDERS[t.type]} shadow-lg px-4 py-3.5 pointer-events-auto animate-slide-in`}
+
           >
             {ICONS[t.type]}
-            <p className="text-xs text-[#333] leading-relaxed flex-1 tracking-wide">{t.message}</p>
+            <p className="text-xs text-body leading-relaxed flex-1 tracking-wide">{t.message}</p>
             <button
               onClick={() => remove(t.id)}
-              className="text-[#bbb] hover:text-[#888] transition-colors border-none bg-transparent cursor-pointer p-0 shrink-0"
+              className="text-muted-lighter hover:text-muted transition-colors border-none bg-transparent cursor-pointer p-0 shrink-0"
             >
               <X size={14} />
             </button>
           </div>
         ))}
       </div>
-
-      <style>{`
-        @keyframes slideIn {
-          from { opacity: 0; transform: translateX(40px); }
-          to   { opacity: 1; transform: translateX(0); }
-        }
-      `}</style>
     </ToastContext.Provider>
   );
 };

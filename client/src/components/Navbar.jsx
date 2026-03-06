@@ -249,10 +249,10 @@ const Navbar = () => {
             />
             <div className="w-full max-w-3xl mt-10">
               {searchLoading && (
-                <div className="text-center py-8 text-[#aaa] text-[11px] tracking-[2px]">SEARCHING...</div>
+                <div className="text-center py-8 text-muted-light text-[11px] tracking-[2px]">SEARCHING...</div>
               )}
               {!searchLoading && searchQuery.trim().length > 1 && suggestions.length === 0 && (
-                <div className="text-center py-8 text-[#bbb] text-[11px] tracking-[2px]">NO RESULTS FOUND</div>
+                <div className="text-center py-8 text-muted-lighter text-[11px] tracking-[2px]">NO RESULTS FOUND</div>
               )}
               {!searchLoading && suggestions.map((item) => (
                 <div
@@ -272,7 +272,7 @@ const Navbar = () => {
                   className="text-center py-6 cursor-pointer group"
                   onClick={() => { navigate(`/collection?search=${encodeURIComponent(searchQuery.trim())}`); setIsSearchOpen(false); setSearchQuery(''); }}
                 >
-                  <span className="text-[11px] font-bold tracking-[2px] text-[#888] group-hover:text-black transition-colors border-b border-[#ccc] group-hover:border-black pb-1">
+                  <span className="text-[11px] font-bold tracking-[2px] text-muted group-hover:text-black transition-colors border-b border-muted-lightest group-hover:border-black pb-1">
                     VIEW ALL RESULTS →
                   </span>
                 </div>
