@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Package, CheckCircle, Truck, Clock, XCircle } from 'lucide-react';
+import { TrackingSkeleton } from '../components/Skeleton';
 
 const STEPS = [
   { key: 'Pending',    label: 'ORDER PLACED',  icon: Clock,       desc: 'Your order has been received and is awaiting confirmation.' },
@@ -84,7 +85,7 @@ const OrderTracking = () => {
       </form>
 
       {loading && orderId && (
-        <p className="text-center tracking-[3px] text-xs text-[#888] animate-pulse">LOCATING YOUR ORDER...</p>
+        <TrackingSkeleton />
       )}
 
       {error && (

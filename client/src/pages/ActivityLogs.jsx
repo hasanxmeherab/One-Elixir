@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import adminAxios from '../utils/adminAxios';
+import { TableSkeleton } from '../components/Skeleton';
 import { RefreshCw, Trash2, Filter } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
@@ -95,7 +96,7 @@ const ActivityLogs = () => {
 
       {/* Logs Table */}
       {loading ? (
-        <p className="text-center text-xs text-[#aaa] tracking-widest py-20">LOADING LOGS...</p>
+        <TableSkeleton rows={8} cols={4} />
       ) : filtered.length === 0 ? (
         <p className="text-center text-xs text-[#aaa] py-20">No activity logs found.</p>
       ) : (

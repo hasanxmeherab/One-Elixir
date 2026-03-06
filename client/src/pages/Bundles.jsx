@@ -48,9 +48,9 @@ const Bundles = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
           {[1,2].map(i => (
             <div key={i} className="animate-pulse">
-              <div className="bg-[#f0f0f0] h-[300px] mb-6"></div>
-              <div className="h-4 bg-[#f0f0f0] w-2/3 mb-3"></div>
-              <div className="h-3 bg-[#f0f0f0] w-1/2"></div>
+              <div className="bg-shimmer h-[300px] mb-6 rounded-sm"></div>
+              <div className="h-4 bg-shimmer w-2/3 mb-3 rounded-sm"></div>
+              <div className="h-3 bg-shimmer w-1/2 rounded-sm"></div>
             </div>
           ))}
         </div>

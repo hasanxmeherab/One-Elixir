@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useUser } from '../context/UserContext';
+import { AccountSkeleton } from '../components/Skeleton';
 import { useNavigate, Link } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import { MapPin, Plus, Trash2, Star, Home, Briefcase, Map, Camera, Eye, EyeOff, User } from 'lucide-react';
@@ -194,11 +195,7 @@ const Account = () => {
     } catch { toast.error('Failed to remove address.'); }
   };
 
-  if (loading) return (
-    <div className="h-[80vh] flex items-center justify-center tracking-[2px]">
-      RETRIEVING YOUR COLLECTION...
-    </div>
-  );
+  if (loading) return <AccountSkeleton />;
 
   const tabs = [
     { key: 'orders',  label: 'ORDER HISTORY' },

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
+import { DashboardSkeleton } from '../components/Skeleton';
 import adminAxios from '../utils/adminAxios';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, XAxis, YAxis,
@@ -59,7 +60,7 @@ const AdminDashboard = () => {
   const [productTab, setProductTab] = useState('revenue');
 
   if (!perfumes || !orders) {
-    return <div className="p-10 text-center">Loading Dashboard Data...</div>;
+    return <DashboardSkeleton />;
   }
 
   // ── KPIs ────────────────────────────────────────────────────

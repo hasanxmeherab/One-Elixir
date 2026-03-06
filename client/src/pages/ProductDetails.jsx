@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ProductDetailsSkeleton } from '../components/Skeleton';
+import { ProductDetailsSkeleton, ReviewsSkeleton } from '../components/Skeleton';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
@@ -528,7 +528,7 @@ const ProductDetails = ({ openCart }) => {
               {/* Review list */}
               <div className="flex flex-col gap-8">
                 {reviewsLoading ? (
-                  <p className="text-xs text-[#aaa] tracking-wider">LOADING REVIEWS...</p>
+                  <ReviewsSkeleton count={3} />
                 ) : reviews.map(review => (
                   <div key={review._id} className="border-b border-[#f0f0f0] pb-6">
                     <div className="flex items-center justify-between mb-2">
