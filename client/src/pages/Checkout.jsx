@@ -6,7 +6,7 @@ import axios from 'axios';
 import Select from 'react-select'; 
 import locationData from '../data/locationData.json'; 
 import { useToast } from '../context/ToastContext';
-import { ImagePlus } from 'lucide-react';
+import { ImagePlus, Check } from 'lucide-react';
 
 const Checkout = () => {
   const toast = useToast();
@@ -143,8 +143,43 @@ const Checkout = () => {
     })
   };
 
+  // ── Step indicator logic ──
+  const shippingComplete = !!(formData.name && formData.phone && formData.division && formData.district && formData.address);
+  const paymentComplete = !!paymentMethod;
+  const currentStep = !shippingComplete ? 1 : !paymentMethod ? 2 : 3;
+  const STEPS = [
+    { num: 1, label: 'SHIPPING' },
+    { num: 2, label: 'PAYMENT' },
+    { num: 3, label: 'REVIEW' },
+  ];
+
   return (
     <div className="px-[8%] pt-28 pb-20 max-w-[1200px] mx-auto">
+
+      {/* ── Step Progress Indicator ── */}
+      <div className="flex items-center justify-center mb-14 max-w-md mx-auto">
+        {STEPS.map((step, i) => {
+          const done = step.num < currentStep || (step.num === 1 && shippingComplete) || (step.num === 2 && paymentComplete && shippingComplete);
+          const active = step.num === currentStep;
+          return (
+            <React.Fragment key={step.num}>
+              <div className="flex flex-col items-center gap-2">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                  done ? 'bg-black text-white' : active ? 'border-2 border-black text-black' : 'border-2 border-[#ddd] text-[#ccc]'
+                }`}>
+                  {done ? <Check size={14} /> : step.num}
+                </div>
+                <span className={`text-[10px] tracking-[2px] font-bold ${done || active ? 'text-black' : 'text-[#ccc]'}`}>
+                  {step.label}
+                </span>
+              </div>
+              {i < STEPS.length - 1 && (
+                <div className={`flex-1 h-px mx-3 mb-5 transition-colors ${done ? 'bg-black' : 'bg-[#ddd]'}`} />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-16">
 
         {/* LEFT: FORM SECTION */}
