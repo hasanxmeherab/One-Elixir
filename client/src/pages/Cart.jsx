@@ -85,12 +85,12 @@ const Cart = () => {
                     <button
                       onClick={() => addToCart(item, -1)}
                       disabled={item.quantity <= 1}
-                      className="border-none bg-transparent px-4 cursor-pointer text-lg disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="stepper-btn border-none bg-transparent px-4 cursor-pointer text-lg disabled:opacity-30 disabled:cursor-not-allowed"
                     >−</button>
                     <span className="text-sm min-w-[20px] text-center">{item.quantity}</span>
                     <button
                       onClick={() => addToCart(item, 1)}
-                      className="border-none bg-transparent px-4 cursor-pointer text-lg"
+                      className="stepper-btn border-none bg-transparent px-4 cursor-pointer text-lg"
                     >+</button>
                   </div>
 
@@ -119,7 +119,7 @@ const Cart = () => {
               <button
                 onClick={handleCheckout}
                 disabled={loading}
-                className={`w-full bg-black text-white py-5 border-none font-bold tracking-[2px] cursor-pointer mb-5 transition-opacity ${loading ? 'opacity-70' : 'opacity-100 hover:bg-gray-800'}`}
+                className={`btn-press w-full bg-black text-white py-5 border-none font-bold tracking-[2px] cursor-pointer mb-5 transition-opacity ${loading ? 'opacity-70' : 'opacity-100 hover:bg-gray-800'}`}
               >
                 {loading ? "PROCESSING..." : "PROCEED TO CHECKOUT"}
               </button>

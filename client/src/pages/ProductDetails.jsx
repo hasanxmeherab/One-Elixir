@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ProductDetailsSkeleton, ReviewsSkeleton } from '../components/Skeleton';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
-import { Heart, Star } from 'lucide-react';
+import { Heart, Star, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 // ── Flash Sale Countdown Hook ─────────────────────────────────
 const useCountdown = (endsAt) => {
@@ -88,6 +88,31 @@ const ProductDetails = ({ openCart }) => {
 
   // --- IMAGE GALLERY ---
   const [selectedImage, setSelectedImage] = useState(null);
+  const [zoomPos, setZoomPos] = useState({ x: 50, y: 50 });
+  const [isZooming, setIsZooming] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const touchStartX = useRef(0);
+  const touchDelta = useRef(0);
+
+  const images = product?.images?.length ? product.images : product ? [product.image] : [];
+  const currentIndex = images.indexOf(selectedImage || product?.image);
+
+  const goToImage = useCallback((dir) => {
+    if (images.length <= 1) return;
+    const next = (currentIndex + dir + images.length) % images.length;
+    setSelectedImage(images[next]);
+  }, [currentIndex, images]);
+
+  const handleMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setZoomPos({ x: ((e.clientX - rect.left) / rect.width) * 100, y: ((e.clientY - rect.top) / rect.height) * 100 });
+  };
+
+  const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; touchDelta.current = 0; };
+  const handleTouchMove = (e) => { touchDelta.current = e.touches[0].clientX - touchStartX.current; };
+  const handleTouchEnd = () => {
+    if (Math.abs(touchDelta.current) > 50) goToImage(touchDelta.current < 0 ? 1 : -1);
+  };
 
   // --- RELATED PRODUCTS ---
   const [related, setRelated] = useState([]);
@@ -193,7 +218,11 @@ const ProductDetails = ({ openCart }) => {
   useEffect(() => {
     const fetchProduct = async () => {
       try {
-        const res = await axios.get(`${API_URL}/api/perfumes/slug/${slug}`);
+        const isObjectId = /^[a-f0-9]{24}$/i.test(slug);
+        const endpoint = isObjectId
+          ? `${API_URL}/api/perfumes/${slug}`
+          : `${API_URL}/api/perfumes/slug/${slug}`;
+        const res = await axios.get(endpoint);
         setProduct(res.data);
         setSelectedImage(res.data.images?.[0] || res.data.image);
         fetchRelated(res.data);
@@ -280,13 +309,30 @@ const ProductDetails = ({ openCart }) => {
       <div className="flex min-h-screen px-[8%] pt-28 pb-20 gap-20 flex-wrap">      
         {/* Left: Product Image Gallery */}
         <div className="flex-1 min-w-[300px] md:min-w-[400px] bg-[#fcfcfc]">
-          {/* Main image */}
-          <div className="w-full overflow-hidden bg-[#f8f8f8] mb-3">
+          {/* Main image with hover zoom & swipe */}
+          <div
+            className="relative w-full overflow-hidden bg-[#f8f8f8] mb-3 cursor-zoom-in select-none"
+            onMouseEnter={() => setIsZooming(true)}
+            onMouseLeave={() => setIsZooming(false)}
+            onMouseMove={handleMouseMove}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onClick={() => setLightboxOpen(true)}
+          >
             <img
               src={selectedImage || product.image}
               alt={product.name}
+              draggable={false}
               className="w-full h-[480px] object-cover transition-opacity duration-300"
+              style={isZooming ? { transform: 'scale(2)', transformOrigin: `${zoomPos.x}% ${zoomPos.y}%`, transition: 'transform 0.1s ease-out' } : {}}
             />
+            {/* Image counter */}
+            {images.length > 1 && (
+              <span className="absolute bottom-3 right-3 bg-black/50 text-white text-[10px] font-bold px-2 py-1 rounded-sm tracking-wider pointer-events-none">
+                {(currentIndex >= 0 ? currentIndex : 0) + 1} / {images.length}
+              </span>
+            )}
           </div>
           {/* Thumbnails — only when multiple images */}
           {product.images?.length > 1 && (
@@ -357,19 +403,19 @@ const ProductDetails = ({ openCart }) => {
                 <div className="flex items-center border border-black">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="px-4 py-2.5 bg-transparent border-none cursor-pointer text-lg hover:bg-gray-50 transition-colors"
+                    className="stepper-btn px-4 py-2.5 bg-transparent border-none cursor-pointer text-lg hover:bg-gray-50"
                   >-</button>
                   <span className="px-5 font-bold">{quantity}</span>
                   <button
                     onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                    className="px-4 py-2.5 bg-transparent border-none cursor-pointer text-lg hover:bg-gray-50 transition-colors"
+                    className="stepper-btn px-4 py-2.5 bg-transparent border-none cursor-pointer text-lg hover:bg-gray-50"
                   >+</button>
                 </div>
 
                 {/* Add to Cart Button */}
                 <button
                   onClick={handleAddToCart}
-                  className="flex-1 bg-black text-white border-none font-bold tracking-[2px] cursor-pointer text-xs hover:bg-gray-800 transition-colors px-6 py-3"
+                  className="btn-press flex-1 bg-black text-white border-none font-bold tracking-[2px] cursor-pointer text-xs hover:bg-gray-800 transition-colors px-6 py-3"
                 >
                   ADD TO COLLECTION
                 </button>
@@ -377,13 +423,13 @@ const ProductDetails = ({ openCart }) => {
                 {/* Wishlist Button */}
                 <button
                   onClick={() => toggleWishlist(product)}
-                  className={`flex items-center gap-2 px-5 py-3 border font-bold text-xs tracking-wider transition-colors ${
+                  className={`btn-press flex items-center gap-2 px-5 py-3 border font-bold text-xs tracking-wider transition-colors ${
                     isWishlisted(product._id)
                       ? 'border-red-300 bg-red-50 text-red-500 hover:bg-red-100'
                       : 'border-black text-black hover:bg-gray-50'
                   }`}
                 >
-                  <Heart size={14} className={isWishlisted(product._id) ? 'fill-red-500' : ''} />
+                  <Heart size={14} className={`${isWishlisted(product._id) ? 'fill-red-500 heart-pop' : ''}`} />
                   {isWishlisted(product._id) ? 'WISHLISTED' : 'WISHLIST'}
                 </button>
               </>
@@ -397,13 +443,13 @@ const ProductDetails = ({ openCart }) => {
                 </button>
                 <button
                   onClick={() => toggleWishlist(product)}
-                  className={`flex items-center gap-2 px-5 py-3 border font-bold text-xs tracking-wider transition-colors ${
+                  className={`btn-press flex items-center gap-2 px-5 py-3 border font-bold text-xs tracking-wider transition-colors ${
                     isWishlisted(product._id)
                       ? 'border-red-300 bg-red-50 text-red-500 hover:bg-red-100'
                       : 'border-black text-black hover:bg-gray-50'
                   }`}
                 >
-                  <Heart size={14} className={isWishlisted(product._id) ? 'fill-red-500' : ''} />
+                  <Heart size={14} className={`${isWishlisted(product._id) ? 'fill-red-500 heart-pop' : ''}`} />
                   {isWishlisted(product._id) ? 'WISHLISTED' : 'NOTIFY ME'}
                 </button>
               </div>
@@ -426,7 +472,7 @@ const ProductDetails = ({ openCart }) => {
                   onClick={() => { navigate(`/product/${p.slug || p._id}`); window.scrollTo(0, 0); }}
                   className="cursor-pointer group transition-shadow duration-300 hover:shadow-lg">
                   <div className="relative w-full h-[220px] bg-[#fcfcfc] overflow-hidden mb-4">
-                    <img src={p.image} alt={p.name}
+                    <img src={p.image || null} alt={p.name}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                     {p.stock === 0 && (
                       <div className="absolute top-2 left-2 bg-black text-white px-2 py-0.5 text-[9px] font-bold tracking-wider">SOLD OUT</div>
@@ -455,7 +501,7 @@ const ProductDetails = ({ openCart }) => {
                 >
                   <div className="relative w-full h-[220px] bg-[#fcfcfc] overflow-hidden mb-4">
                     <img
-                      src={p.image} alt={p.name}
+                      src={p.image || null} alt={p.name}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                     {p.stock === 0 && (
@@ -652,6 +698,52 @@ const ProductDetails = ({ openCart }) => {
           </div>
         </div>
       </div>
+
+      {/* ── Fullscreen Lightbox ── */}
+      {lightboxOpen && (
+        <div
+          className="fixed inset-0 z-[3000] bg-black/90 flex items-center justify-center"
+          onClick={() => setLightboxOpen(false)}
+        >
+          <button
+            onClick={() => setLightboxOpen(false)}
+            className="absolute top-6 right-6 text-white bg-transparent border-none cursor-pointer z-10"
+            aria-label="Close lightbox"
+          >
+            <X size={28} />
+          </button>
+          {images.length > 1 && (
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); goToImage(-1); }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-white bg-white/10 hover:bg-white/20 border-none rounded-full w-10 h-10 flex items-center justify-center cursor-pointer transition-colors"
+                aria-label="Previous image"
+              >
+                <ChevronLeft size={22} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); goToImage(1); }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-white bg-white/10 hover:bg-white/20 border-none rounded-full w-10 h-10 flex items-center justify-center cursor-pointer transition-colors"
+                aria-label="Next image"
+              >
+                <ChevronRight size={22} />
+              </button>
+            </>
+          )}
+          <img
+            src={selectedImage || product.image}
+            alt={product.name}
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[85vh] max-w-[90vw] object-contain select-none"
+            draggable={false}
+          />
+          {images.length > 1 && (
+            <span className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/70 text-xs tracking-[2px] font-bold">
+              {(currentIndex >= 0 ? currentIndex : 0) + 1} / {images.length}
+            </span>
+          )}
+        </div>
+      )}
     </>
   );
 };

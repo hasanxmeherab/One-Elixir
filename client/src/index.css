@@ -105,3 +105,34 @@ body {
 .animate-slide-in {
   animation: slideIn 0.25s ease-out;
 }
+
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-transition {
+  animation: pageFadeIn 0.25s ease-out;
+}
+
+/* Micro-interactions */
+@keyframes heartPop {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.25); }
+  60%  { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+.heart-pop {
+  animation: heartPop 0.35s ease-out;
+}
+.btn-press {
+  transition: transform 0.1s ease;
+}
+.btn-press:active {
+  transform: scale(0.97);
+}
+.stepper-btn {
+  transition: transform 0.1s ease, background-color 0.15s;
+}
+.stepper-btn:active {
+  transform: scale(0.88);
+}

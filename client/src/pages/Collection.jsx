@@ -272,7 +272,7 @@ const Collection = () => {
                     )}
                   </div>
                   <p className="text-[10px] text-[#999] mb-5 italic tracking-wider">{p.scentProfile?.join(' • ')}</p>
-                  <button className="w-full border border-black py-3 text-[10px] font-bold tracking-[2px] bg-white hover:bg-black hover:text-white transition-colors">
+                  <button className="btn-press w-full border border-black py-3 text-[10px] font-bold tracking-[2px] bg-white hover:bg-black hover:text-white transition-colors">
                     {p.stock > 0 ? 'VIEW ELIXIR' : 'OUT OF STOCK'}
                   </button>
                 </div>

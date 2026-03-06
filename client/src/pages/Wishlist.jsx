@@ -79,7 +79,7 @@ const Wishlist = ({ openCart }) => {
                     <button
                       onClick={() => handleAddToCart(product)}
                       disabled={product.stock === 0}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-black text-white text-[10px] font-bold tracking-wider hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="btn-press flex-1 flex items-center justify-center gap-2 py-2.5 bg-black text-white text-[10px] font-bold tracking-wider hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <ShoppingBag size={13} />
                       {product.stock === 0 ? 'SOLD OUT' : 'ADD TO CART'}
@@ -88,7 +88,7 @@ const Wishlist = ({ openCart }) => {
                     {/* Remove from Wishlist */}
                     <button
                       onClick={() => removeFromWishlist(product._id)}
-                      className="p-2.5 border border-[#eee] text-red-400 hover:bg-red-50 hover:border-red-200 transition-colors"
+                      className="btn-press p-2.5 border border-[#eee] text-red-400 hover:bg-red-50 hover:border-red-200 transition-colors"
                       title="Remove from wishlist"
                     >
                       <Trash2 size={14} />
