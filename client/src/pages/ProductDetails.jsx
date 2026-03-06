@@ -241,6 +241,42 @@ const ProductDetails = ({ openCart }) => {
         return null;
       })()}
 
+      {/* ── JSON-LD Product + BreadcrumbList ──────────────────── */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": product.name,
+        "image": product.images?.length ? product.images : [product.image],
+        "description": product.description || `${product.name} — ${product.scentProfile?.join(', ')}`,
+        "brand": { "@type": "Brand", "name": "OneElixir" },
+        "sku": product._id,
+        "offers": {
+          "@type": "Offer",
+          "url": `https://oneelixir.vercel.app/product/${product.slug || product._id}`,
+          "priceCurrency": "BDT",
+          "price": displayPrice,
+          "availability": product.stock > 0
+            ? "https://schema.org/InStock"
+            : "https://schema.org/OutOfStock",
+        },
+        ...(avgRating ? {
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": avgRating,
+            "reviewCount": reviews.length,
+          }
+        } : {}),
+      }) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://oneelixir.vercel.app/" },
+          { "@type": "ListItem", "position": 2, "name": "Collection", "item": "https://oneelixir.vercel.app/collection" },
+          { "@type": "ListItem", "position": 3, "name": product.name, "item": `https://oneelixir.vercel.app/product/${product.slug || product._id}` },
+        ],
+      }) }} />
+
       <div className="flex min-h-screen px-[8%] pt-28 pb-20 gap-20 flex-wrap">      
         {/* Left: Product Image Gallery */}
         <div className="flex-1 min-w-[300px] md:min-w-[400px] bg-[#fcfcfc]">

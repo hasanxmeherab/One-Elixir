@@ -3,6 +3,7 @@ import { HomeSkeleton } from '../components/Skeleton';
 import axios from 'axios';
 import { useCart } from '../context/CartContext';
 import { Link } from 'react-router-dom';
+import { Star } from 'lucide-react';
 import BannerManagement from './BannerManagement';
 import { optimizeImage } from '../utils/optimizeImage';
 
@@ -12,6 +13,7 @@ const Home = () => {
   const [loading, setLoading]           = useState(true);
   const [bsLoading, setBsLoading]       = useState(true);
   const [now, setNow]                   = useState(new Date());
+  const [ratings, setRatings]           = useState({});
   const { addToCart } = useCart();
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -39,6 +41,13 @@ const Home = () => {
       finally { setLoading(false); setBsLoading(false); }
     };
     fetchData();
+  }, [API_URL]);
+
+  // ── Fetch aggregated ratings ────────────────────────────────
+  useEffect(() => {
+    axios.get(`${API_URL}/api/perfumes/ratings`)
+      .then(res => setRatings(res.data))
+      .catch(() => {});
   }, [API_URL]);
 
   // Featured = products with featured flag, fallback to first 4
@@ -77,7 +86,19 @@ const Home = () => {
         </div>
       </Link>
       <div style={{ padding: '20px 0', textAlign: 'center' }}>
-        <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', letterSpacing: '1px' }}>{p.name.toUpperCase()}</h4>
+        <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', letterSpacing: '1px' }}>{p.name.toUpperCase()}</h4>
+        {ratings[p._id] && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginBottom: '6px' }}>
+            {[1,2,3,4,5].map(i => (
+              <Star key={i} size={12}
+                fill={i <= Math.round(ratings[p._id].avgRating) ? '#000' : 'none'}
+                style={{ color: '#000' }} />
+            ))}
+            <span style={{ fontSize: '10px', color: '#999', letterSpacing: '1px', marginLeft: '2px' }}>
+              {ratings[p._id].avgRating} ({ratings[p._id].count})
+            </span>
+          </div>
+        )}
         <p style={{ fontWeight: 'bold', fontSize: '15px', color: '#333' }}>{p.price.toLocaleString()} TK</p>
         <button
           onClick={() => addToCart({ ...p, price: Number(p.price) })}
@@ -204,7 +225,19 @@ const Home = () => {
                   </div>
                 </Link>
                 <div style={{ padding: '20px 0', textAlign: 'center' }}>
-                  <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', letterSpacing: '1px' }}>{p.name.toUpperCase()}</h4>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', letterSpacing: '1px' }}>{p.name.toUpperCase()}</h4>
+                  {ratings[p._id] && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginBottom: '6px' }}>
+                      {[1,2,3,4,5].map(i => (
+                        <Star key={i} size={12}
+                          fill={i <= Math.round(ratings[p._id].avgRating) ? '#000' : 'none'}
+                          style={{ color: '#000' }} />
+                      ))}
+                      <span style={{ fontSize: '10px', color: '#999', letterSpacing: '1px', marginLeft: '2px' }}>
+                        {ratings[p._id].avgRating} ({ratings[p._id].count})
+                      </span>
+                    </div>
+                  )}
                   <p style={{ fontWeight: 'bold', fontSize: '15px', color: '#333' }}>{p.price.toLocaleString()} TK</p>
                   <button
                     onClick={() => addToCart({ ...p, price: Number(p.price) })}

@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useUser } from '../context/UserContext';
 import { Menu, Search, ShoppingBag, Heart, User, X } from 'lucide-react';
 import axios from 'axios';
+import { optimizeImage } from '../utils/optimizeImage';
 
 const Navbar = () => {
   const { user, logout } = useUser();
@@ -16,15 +17,24 @@ const Navbar = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    if (isSearchOpen) searchInputRef.current?.focus();
+  }, [isSearchOpen]);
 
   useEffect(() => {
     const fetchSuggestions = async () => {
       if (searchQuery.trim().length > 1) {
         try {
-          const res = await axios.get(`${API_URL}/api/perfumes?search=${searchQuery}`);
-          setSuggestions(res.data.slice(0, 6));
+          setSearchLoading(true);
+          const res = await axios.get(`${API_URL}/api/perfumes/search?q=${encodeURIComponent(searchQuery.trim())}`);
+          setSuggestions(res.data);
         } catch (err) {
           console.error('Search Error:', err);
+        } finally {
+          setSearchLoading(false);
         }
       } else {
         setSuggestions([]);
@@ -33,6 +43,14 @@ const Navbar = () => {
     const timeoutId = setTimeout(fetchSuggestions, 300);
     return () => clearTimeout(timeoutId);
   }, [searchQuery, API_URL]);
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter' && searchQuery.trim()) {
+      navigate(`/collection?search=${encodeURIComponent(searchQuery.trim())}`);
+      setIsSearchOpen(false);
+      setSearchQuery('');
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -221,27 +239,44 @@ const Navbar = () => {
           </div>
           <div className="flex flex-col items-center px-[10%] pt-8 flex-1">
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="START TYPING..."
-              autoFocus
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
               className="w-full max-w-3xl border-none border-b-2 border-black py-5 text-3xl md:text-4xl text-center outline-none tracking-[2px] uppercase"
             />
             <div className="w-full max-w-3xl mt-10">
-              {searchQuery.length > 0 && suggestions.map((item) => (
+              {searchLoading && (
+                <div className="text-center py-8 text-[#aaa] text-[11px] tracking-[2px]">SEARCHING...</div>
+              )}
+              {!searchLoading && searchQuery.trim().length > 1 && suggestions.length === 0 && (
+                <div className="text-center py-8 text-[#bbb] text-[11px] tracking-[2px]">NO RESULTS FOUND</div>
+              )}
+              {!searchLoading && suggestions.map((item) => (
                 <div
                   key={item._id}
                   className="flex items-center gap-5 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
-                  onClick={() => { navigate(`/product/${item._id}`); setIsSearchOpen(false); setSearchQuery(''); }}
+                  onClick={() => { navigate(`/product/${item.slug || item._id}`); setIsSearchOpen(false); setSearchQuery(''); }}
                 >
-                  <img src={item.image} alt={item.name} className="w-16 h-16 object-cover" />
+                  {item.image && <img src={optimizeImage(item.image, 120)} alt={item.name} className="w-16 h-16 object-cover" />}
                   <div>
                     <div className="font-bold text-[13px] tracking-wider">{item.name.toUpperCase()}</div>
-                    <div className="text-gray-500 text-xs mt-1">{item.price.toLocaleString()} TK</div>
+                    <div className="text-gray-500 text-xs mt-1">{item.price?.toLocaleString()} TK</div>
                   </div>
                 </div>
               ))}
+              {!searchLoading && suggestions.length > 0 && searchQuery.trim() && (
+                <div
+                  className="text-center py-6 cursor-pointer group"
+                  onClick={() => { navigate(`/collection?search=${encodeURIComponent(searchQuery.trim())}`); setIsSearchOpen(false); setSearchQuery(''); }}
+                >
+                  <span className="text-[11px] font-bold tracking-[2px] text-[#888] group-hover:text-black transition-colors border-b border-[#ccc] group-hover:border-black pb-1">
+                    VIEW ALL RESULTS →
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Star } from 'lucide-react';
 import { optimizeImage } from '../utils/optimizeImage';
 
 const PAGE_SIZE = 12;
@@ -15,8 +16,16 @@ const Collection = () => {
   // ── Scent filter ─────────────────────────────────────────
   const [selectedScents, setSelectedScents] = useState([]);
   const [now, setNow] = useState(new Date());
+  const [ratings, setRatings] = useState({});
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+  // Pre-fill search from URL query param (?search=...)
+  useEffect(() => {
+    const q = searchParams.get('search');
+    if (q) setSearchTerm(q);
+  }, [searchParams]);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -33,6 +42,13 @@ const Collection = () => {
     };
     fetchProducts();
   }, []);
+
+  // ── Fetch aggregated ratings ──────────────────────────────
+  useEffect(() => {
+    axios.get(`${API_URL}/api/perfumes/ratings`)
+      .then(res => setRatings(res.data))
+      .catch(() => {});
+  }, [API_URL]);
 
   // ── All unique scent notes across all products ────────────
   const allScents = useMemo(() => {
@@ -95,12 +111,23 @@ const Collection = () => {
   return (
     <div className="px-[5%] pt-24 pb-20 max-w-[1300px] mx-auto min-h-screen">
 
+      {/* ── JSON-LD BreadcrumbList ──────────────────────────── */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://oneelixir.vercel.app/" },
+          { "@type": "ListItem", "position": 2, "name": "Collection", "item": "https://oneelixir.vercel.app/collection" },
+        ],
+      }) }} />
+
       {/* Header */}
       <div className="text-center mb-14">
         <h1 className="text-4xl font-light tracking-[10px] mb-4">OUR ELIXIRS</h1>
         <p className="text-[11px] text-[#888] tracking-[2px] uppercase mb-8">Bespoke fragrances, crafted in small batches.</p>
         <input type="text" placeholder="Search for a scent..."
           className="px-5 py-3 border border-[#eee] w-full max-w-[400px] text-center outline-none text-[13px] tracking-wider"
+          value={searchTerm}
           onChange={e => setSearchTerm(e.target.value)} />
       </div>
 
@@ -220,6 +247,20 @@ const Collection = () => {
                 </div>
                 <div className="px-2">
                   <h3 className="text-[15px] tracking-[3px] mb-2 font-bold">{p.name.toUpperCase()}</h3>
+                  {ratings[p._id] && (
+                    <div className="flex items-center justify-center gap-1.5 mb-2">
+                      <div className="flex gap-0.5">
+                        {[1,2,3,4,5].map(i => (
+                          <Star key={i} size={12}
+                            fill={i <= Math.round(ratings[p._id].avgRating) ? '#000' : 'none'}
+                            className="text-black" />
+                        ))}
+                      </div>
+                      <span className="text-[10px] text-[#999] tracking-wider">
+                        {ratings[p._id].avgRating} ({ratings[p._id].count})
+                      </span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-center gap-2 mb-3">
                     {salePrice ? (
                       <>

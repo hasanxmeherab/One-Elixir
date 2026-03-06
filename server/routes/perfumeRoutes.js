@@ -125,19 +125,28 @@ router.get('/search', async (req, res) => {
   try {
     const { q } = req.query;
     if (!q || q.trim().length < 2) return res.json([]);
-    const results = await Perfume.find(
-      { $text: { $search: q.trim() }, isDeleted: { $ne: true } },
-      { score: { $meta: 'textScore' } }
-    ).sort({ score: { $meta: 'textScore' } }).limit(5).select('name slug image price');
-    res.json(results);
-  } catch {
+    const term = q.trim();
+
+    // Try full-text search first (matches whole words, ranked by relevance)
+    let results = [];
     try {
-      const results = await Perfume.find({
-        name: { $regex: req.query.q?.trim(), $options: 'i' },
+      results = await Perfume.find(
+        { $text: { $search: term }, isDeleted: { $ne: true } },
+        { score: { $meta: 'textScore' } }
+      ).sort({ score: { $meta: 'textScore' } }).limit(5).select('name slug image price');
+    } catch {}
+
+    // Fall back to regex for partial matches (e.g. "ros" → "Rose")
+    if (results.length === 0) {
+      results = await Perfume.find({
+        name: { $regex: term, $options: 'i' },
         isDeleted: { $ne: true }
       }).limit(5).select('name slug image price');
-      res.json(results);
-    } catch { res.json([]); }
+    }
+
+    res.json(results);
+  } catch {
+    res.json([]);
   }
 });
 
