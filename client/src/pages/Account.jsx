@@ -4,7 +4,7 @@ import { useUser } from '../context/UserContext';
 import { AccountSkeleton } from '../components/Skeleton';
 import { useNavigate, Link } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
-import { MapPin, Plus, Trash2, Star, Home, Briefcase, Map, Camera, Eye, EyeOff, User } from 'lucide-react';
+import { MapPin, Plus, Trash2, Star, Home, Briefcase, Map, Camera, Eye, EyeOff, User, ShoppingBag } from 'lucide-react';
 
 const LABEL_ICONS = { Home: <Home size={13}/>, Work: <Briefcase size={13}/>, Other: <Map size={13}/> };
 const CLOUD_NAME = 'dluvmed0b';
@@ -257,7 +257,17 @@ const Account = () => {
       {activeTab === 'orders' && (
         <section>
           {orders.length === 0 ? (
-            <p className="text-center text-[#888] mt-12 italic">No elixirs secured yet.</p>
+            <div className="text-center mt-16">
+              <ShoppingBag size={40} className="mx-auto mb-5 text-[#ddd]" />
+              <p className="tracking-[2px] text-[#888] text-xs mb-2">NO ORDERS YET</p>
+              <p className="text-xs text-[#aaa] mb-8">Your order history will appear here once you make a purchase.</p>
+              <Link
+                to="/collection"
+                className="inline-block px-10 py-4 bg-black text-white no-underline text-[11px] font-bold tracking-[3px] hover:bg-gray-800 transition-colors"
+              >
+                START SHOPPING
+              </Link>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-left">
@@ -368,10 +378,16 @@ const Account = () => {
           )}
 
           {addresses.length === 0 ? (
-            <div className="text-center py-16 border border-dashed border-[#ddd]">
-              <MapPin size={36} className="mx-auto mb-4 text-[#ddd]" />
-              <p className="text-xs text-[#aaa] tracking-wider">NO SAVED ADDRESSES</p>
-              <p className="text-xs text-[#ccc] mt-1">Add your delivery addresses for faster checkout</p>
+            <div className="text-center py-16">
+              <MapPin size={40} className="mx-auto mb-5 text-[#ddd]" />
+              <p className="tracking-[2px] text-[#888] text-xs mb-2">NO SAVED ADDRESSES</p>
+              <p className="text-xs text-[#aaa] mb-8">Add your delivery addresses for faster checkout.</p>
+              <button
+                onClick={() => setShowAddForm(true)}
+                className="inline-block px-10 py-4 bg-black text-white border-none text-[11px] font-bold tracking-[3px] hover:bg-gray-800 transition-colors cursor-pointer"
+              >
+                ADD ADDRESS
+              </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">

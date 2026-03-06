@@ -3,6 +3,7 @@ import { useCart } from '../context/CartContext';
 import { useUser } from '../context/UserContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
+import { ShoppingBag } from 'lucide-react';
 
 const Cart = () => {
   const toast = useToast();
@@ -35,10 +36,15 @@ const Cart = () => {
         </h2>
 
         {cart.length === 0 ? (
-          <div className="text-center mt-12">
-            <p>Your OneElixir collection is currently empty.</p>
-            <Link to="/" className="inline-block mt-5 text-black font-bold underline">
-              BROWSE FRAGRANCES
+          <div className="text-center mt-20">
+            <ShoppingBag size={48} className="mx-auto mb-6 text-[#ddd]" />
+            <p className="tracking-[2px] text-[#888] text-xs mb-2">YOUR CART IS CURRENTLY EMPTY</p>
+            <p className="text-xs text-[#aaa] mb-10">Add fragrances you love and check out when you're ready.</p>
+            <Link
+              to="/collection"
+              className="inline-block px-12 py-5 bg-black text-white no-underline text-[11px] font-bold tracking-[3px] hover:bg-gray-800 transition-colors"
+            >
+              EXPLORE COLLECTION
             </Link>
           </div>
         ) : (
