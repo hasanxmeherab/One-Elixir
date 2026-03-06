@@ -180,10 +180,13 @@ const InventoryManager = () => {
       const allImages = [...(formData.images || []), ...newUrls];
       const primaryImage = allImages[0] || formData.image || '';
       const payload = {
-        ...formData,
-        image:        primaryImage,
-        images:       allImages,
-        scentProfile: formData.scentProfile.split(',').map(s => s.trim()),
+        name:         formData.name,
+        price:        Number(formData.price),
+        description:  formData.description || undefined,
+        scentProfile: formData.scentProfile.split(',').map(s => s.trim()).filter(Boolean),
+        image:        primaryImage || undefined,
+        images:       allImages.length > 0 ? allImages : undefined,
+        stock:        formData.stock !== '' ? Number(formData.stock) : 0,
         featured:     formData.featured,
       };
       if (editId) {
