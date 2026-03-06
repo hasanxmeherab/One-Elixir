@@ -45,7 +45,7 @@ const Wishlist = ({ openCart }) => {
           {/* Wishlist Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {wishlist.map(product => (
-              <div key={product._id} className="group relative border border-[#eee] bg-white">
+              <div key={product._id} className="group relative border border-[#eee] bg-white transition-shadow duration-300 hover:shadow-lg">
 
                 {/* Image */}
                 <div

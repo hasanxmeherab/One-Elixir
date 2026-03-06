@@ -424,7 +424,7 @@ const ProductDetails = ({ openCart }) => {
               {recentlyViewed.map(p => (
                 <div key={p._id}
                   onClick={() => { navigate(`/product/${p.slug || p._id}`); window.scrollTo(0, 0); }}
-                  className="cursor-pointer group">
+                  className="cursor-pointer group transition-shadow duration-300 hover:shadow-lg">
                   <div className="relative w-full h-[220px] bg-[#fcfcfc] overflow-hidden mb-4">
                     <img src={p.image} alt={p.name}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
@@ -451,7 +451,7 @@ const ProductDetails = ({ openCart }) => {
                 <div
                   key={p._id}
                   onClick={() => { navigate(`/product/${p.slug || p._id}`); window.scrollTo(0,0); }}
-                  className="cursor-pointer group"
+                  className="cursor-pointer group transition-shadow duration-300 hover:shadow-lg"
                 >
                   <div className="relative w-full h-[220px] bg-[#fcfcfc] overflow-hidden mb-4">
                     <img

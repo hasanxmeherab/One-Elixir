@@ -67,6 +67,18 @@ body {
   transform: translateY(-10px);
 }
 
+.product-card {
+  transition: box-shadow 0.3s ease;
+}
+.product-card:hover {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+}
+
+/* iOS safe area for mobile tab bar */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 .add-btn {
   background: var(--color-primary);
   color: white;

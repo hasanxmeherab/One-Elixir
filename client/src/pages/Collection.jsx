@@ -220,7 +220,7 @@ const Collection = () => {
           {paginated.map(p => {
             const salePrice = getActivePrice(p);
             return (
-              <div key={p._id} className="cursor-pointer group text-center"
+              <div key={p._id} className="cursor-pointer group text-center transition-shadow duration-300 hover:shadow-lg"
                 onClick={() => navigate(`/product/${p.slug || p._id}`)}>
                 <div className="relative w-full h-[380px] bg-[#fcfcfc] mb-5 overflow-hidden">
                   {p.image && <img src={optimizeImage(p.image, 400)} alt={p.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" />}
