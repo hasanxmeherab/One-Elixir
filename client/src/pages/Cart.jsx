@@ -53,16 +53,19 @@ const Cart = () => {
             {/* LEFT: PRODUCT LIST */}
             <div className="flex-[2] min-w-[300px] md:min-w-[350px]">
               {cart.map((item) => (
-                <div key={item._id} className="flex justify-between items-center py-6 border-b border-[#f1f1f1] flex-wrap gap-4">
+                <div key={item.cartKey || item._id} className="flex justify-between items-center py-6 border-b border-[#f1f1f1] flex-wrap gap-4">
                   
                   {/* Item Info */}
                   <div className="flex gap-5 items-center flex-1">
-                    <img src={item.image} alt={item.name} className="w-[100px] h-[130px] object-cover bg-[#f9f9f9]" />
+                    <img src={item.variantImage || item.image} alt={item.name} className="w-[100px] h-[130px] object-cover bg-[#f9f9f9]" />
                     <div>
                       {item.isBundle && (
                         <span className="inline-block bg-black text-white text-[8px] font-bold tracking-[1px] px-2 py-0.5 mb-1">BUNDLE</span>
                       )}
                       <h4 className="m-0 mb-1 text-sm tracking-wider font-bold">{item.name?.toUpperCase()}</h4>
+                      {item.selectedSize && (
+                        <span className="inline-block bg-gray-100 text-[10px] font-bold tracking-wider px-2 py-0.5 mb-1 border border-[#eee]">{item.selectedSize}</span>
+                      )}
                       <p className="m-0 mb-1 text-[#666] text-[13px]">{item.price} TK</p>
                       {item.isBundle && item.bundleProducts && (
                         <div className="flex flex-wrap gap-1 mb-1">
@@ -72,7 +75,7 @@ const Cart = () => {
                         </div>
                       )}
                       <button
-                        onClick={() => removeFromCart(item._id)}
+                        onClick={() => removeFromCart(item.cartKey || item._id)}
                         className="bg-transparent border-none text-[#999] text-[10px] underline cursor-pointer p-0"
                       >
                         REMOVE
@@ -83,13 +86,13 @@ const Cart = () => {
                   {/* Quantity Controls */}
                   <div className="flex items-center border border-[#ddd] p-1">
                     <button
-                      onClick={() => addToCart(item, -1)}
+                      onClick={() => addToCart(item, -1, item.selectedSize || null)}
                       disabled={item.quantity <= 1}
                       className="stepper-btn border-none bg-transparent px-4 cursor-pointer text-lg disabled:opacity-30 disabled:cursor-not-allowed"
                     >−</button>
                     <span className="text-sm min-w-[20px] text-center">{item.quantity}</span>
                     <button
-                      onClick={() => addToCart(item, 1)}
+                      onClick={() => addToCart(item, 1, item.selectedSize || null)}
                       className="stepper-btn border-none bg-transparent px-4 cursor-pointer text-lg"
                     >+</button>
                   </div>

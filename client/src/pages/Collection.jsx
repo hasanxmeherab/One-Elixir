@@ -267,11 +267,22 @@ const Collection = () => {
                         <span className="text-red-600 font-bold text-base">{salePrice.toLocaleString()} TK</span>
                         <span className="text-[#aaa] line-through text-sm">{p.price.toLocaleString()} TK</span>
                       </>
+                    ) : p.variants?.length > 0 ? (
+                      <span className="text-[14px] text-[#333]">
+                        From {Math.min(...p.variants.map(v => v.price)).toLocaleString()} TK
+                      </span>
                     ) : (
                       <span className="text-[14px] text-[#333]">{p.price.toLocaleString()} TK</span>
                     )}
                   </div>
                   <p className="text-[10px] text-[#999] mb-5 italic tracking-wider">{p.scentProfile?.join(' • ')}</p>
+                  {p.variants?.length > 0 && (
+                    <div className="flex items-center justify-center gap-1.5 mb-3">
+                      {p.variants.map((v, vi) => (
+                        <span key={vi} className="text-[9px] font-bold tracking-wider border border-[#ddd] px-2 py-0.5 text-[#666]">{v.label}</span>
+                      ))}
+                    </div>
+                  )}
                   <button className="btn-press w-full border border-black py-3 text-[10px] font-bold tracking-[2px] bg-white hover:bg-black hover:text-white transition-colors">
                     {p.stock > 0 ? 'VIEW ELIXIR' : 'OUT OF STOCK'}
                   </button>

@@ -30,14 +30,15 @@ const createPerfumeSchema = z.object({
   price: z.number().positive(),
   description: z.string().max(5000).optional(),
   scentProfile: z.array(z.string().max(50)).max(20).optional(),
-  image: z.string().url().optional(),
-  images: z.array(z.string().url()).max(10).optional(),
+  image: z.string().url().optional().or(z.literal('')),
+  images: z.array(z.string().url().or(z.literal(''))).max(10).optional(),
   stock: z.number().int().min(0).optional(),
   featured: z.boolean().optional(),
   variants: z.array(z.object({
     label: z.string().min(1).max(50),
     price: z.number().positive(),
     stock: z.number().int().min(0).default(0),
+    image: z.string().optional().default(''),
   })).optional(),
   flashSale: z.object({
     active: z.boolean().optional(),

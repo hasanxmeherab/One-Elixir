@@ -116,8 +116,11 @@ const InventoryManager = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     name: '', price: '', description: '', scentProfile: '',
-    image: '', images: [], stock: '', featured: false
+    image: '', images: [], stock: '', featured: false,
+    variants: []
   });
+
+
 
   // ── Flash Sale ──────────────────────────────────────────────
   const [flashEditId, setFlashEditId] = useState(null);
@@ -143,7 +146,8 @@ const InventoryManager = () => {
       name: p.name, price: p.price, description: p.description,
       scentProfile: p.scentProfile.join(', '),
       image: p.image, images: p.images || [], stock: p.stock,
-      featured: p.featured || false
+      featured: p.featured || false,
+      variants: p.variants?.length ? p.variants.map(v => ({ label: v.label, price: v.price, stock: v.stock, image: v.image || '' })) : []
     });
     setFiles([]);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -151,7 +155,7 @@ const InventoryManager = () => {
 
   const cancelEdit = () => {
     setEditId(null);
-    setFormData({ name: '', price: '', description: '', scentProfile: '', image: '', images: [], stock: '', featured: false });
+    setFormData({ name: '', price: '', description: '', scentProfile: '', image: '', images: [], stock: '', featured: false, variants: [] });
     setFiles([]);
   };
 
@@ -174,20 +178,51 @@ const InventoryManager = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Validate variant fields before upload
+    for (const v of formData.variants) {
+      if (!v.label || !v.price) {
+        toast.error('Each size variant needs a label and price.');
+        return;
+      }
+    }
     try {
       setUploading(true);
       const newUrls   = files.length > 0 ? await Promise.all(files.map(uploadSingleFile)) : [];
       const allImages = [...(formData.images || []), ...newUrls];
       const primaryImage = allImages[0] || formData.image || '';
+
+      // Upload variant images
+      const finalVariants = await Promise.all(
+        formData.variants
+          .filter(v => v.label && v.price)
+          .map(async (v) => {
+            let img = v.image || '';
+            if (v._file) {
+              img = await uploadSingleFile(v._file);
+            }
+            return { label: v.label, price: Number(v.price), stock: Number(v.stock) || 0, image: img };
+          })
+      );
+
+      // When variants exist, derive base price & stock from them
+      const hasVariants = finalVariants.length > 0;
+      const basePrice = hasVariants
+        ? Math.min(...finalVariants.map(v => v.price))
+        : Number(formData.price);
+      const baseStock = hasVariants
+        ? finalVariants.reduce((sum, v) => sum + v.stock, 0)
+        : (formData.stock !== '' ? Number(formData.stock) : 0);
+
       const payload = {
         name:         formData.name,
-        price:        Number(formData.price),
+        price:        basePrice,
         description:  formData.description || undefined,
         scentProfile: formData.scentProfile.split(',').map(s => s.trim()).filter(Boolean),
         image:        primaryImage || undefined,
-        images:       allImages.length > 0 ? allImages : undefined,
-        stock:        formData.stock !== '' ? Number(formData.stock) : 0,
+        images:       allImages,
+        stock:        baseStock,
         featured:     formData.featured,
+        variants:     finalVariants.length > 0 ? finalVariants : [],
       };
       if (editId) {
         await adminAxios.put(`${API_URL}/api/perfumes/${editId}`, payload);
@@ -197,7 +232,8 @@ const InventoryManager = () => {
       cancelEdit();
       fetchData();
     } catch (err) {
-      toast.error('Operation failed. Please try again.');
+      console.error('Submit error:', err.response?.data || err.message);
+      toast.error(err.response?.data?.message || 'Operation failed. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -259,16 +295,19 @@ const InventoryManager = () => {
         />
         <div className="flex flex-col sm:flex-row gap-2.5">
           <input
-            type="number" placeholder="Price (TK)" required
+            type="number" placeholder="Price (TK)" required={formData.variants.length === 0}
             value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})}
-            className="flex-1 p-3 border border-[#ddd] outline-none text-sm"
+            disabled={formData.variants.length > 0}
+            className={`flex-1 p-3 border border-[#ddd] outline-none text-sm ${formData.variants.length > 0 ? 'opacity-40 cursor-not-allowed bg-gray-100' : ''}`}
           />
           <input
-            type="number" placeholder="Quantity" required min="0"
+            type="number" placeholder="Quantity" required={formData.variants.length === 0} min="0"
             value={formData.stock} onChange={e => setFormData({...formData, stock: e.target.value})}
-            className="flex-1 p-3 border border-[#ddd] outline-none text-sm"
+            disabled={formData.variants.length > 0}
+            className={`flex-1 p-3 border border-[#ddd] outline-none text-sm ${formData.variants.length > 0 ? 'opacity-40 cursor-not-allowed bg-gray-100' : ''}`}
           />
         </div>
+        {formData.variants.length > 0 && <p className="text-[10px] text-[#aaa] -mt-2">Price & quantity are set per variant below</p>}
         <textarea
           placeholder="Description"
           value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}
@@ -290,6 +329,49 @@ const InventoryManager = () => {
             {formData.featured ? '★ SHOW IN EXCLUSIVE SECTION' : 'MARK AS FEATURED (EXCLUSIVE)'}
           </span>
         </label>
+
+        {/* ── Size Variants ── */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-bold tracking-wider text-[#888]">SIZE VARIANTS <span className="font-normal text-[#bbb]">(optional — add if product has multiple sizes)</span></p>
+            <button type="button" onClick={() => setFormData(f => ({ ...f, variants: [...f.variants, { label: '', price: '', stock: '', image: '' }] }))}
+              className="flex items-center gap-1 px-3 py-1.5 bg-black text-white text-[9px] font-bold tracking-wider border-none cursor-pointer hover:bg-gray-800 transition-colors">
+              <Plus size={12} /> ADD SIZE
+            </button>
+          </div>
+          {formData.variants.map((v, i) => (
+            <div key={i} className="flex flex-wrap gap-2 items-center mb-2 p-3 border border-[#eee] bg-[#fafafa]">
+              <input type="text" placeholder="Size (e.g. 8ml)"
+                value={v.label} onChange={e => { const arr = [...formData.variants]; arr[i] = { ...arr[i], label: e.target.value }; setFormData(f => ({ ...f, variants: arr })); }}
+                className="w-24 p-2 border border-[#ddd] outline-none text-sm" />
+              <input type="number" placeholder="Price" min="1"
+                value={v.price} onChange={e => { const arr = [...formData.variants]; arr[i] = { ...arr[i], price: e.target.value }; setFormData(f => ({ ...f, variants: arr })); }}
+                className="w-24 p-2 border border-[#ddd] outline-none text-sm" />
+              <input type="number" placeholder="Stock" min="0"
+                value={v.stock} onChange={e => { const arr = [...formData.variants]; arr[i] = { ...arr[i], stock: e.target.value }; setFormData(f => ({ ...f, variants: arr })); }}
+                className="w-20 p-2 border border-[#ddd] outline-none text-sm" />
+              {/* Variant image */}
+              <label className="flex items-center gap-1.5 px-3 py-2 border border-dashed border-[#ccc] cursor-pointer hover:border-black transition-colors bg-white">
+                <ImagePlus size={14} className="text-[#888]" />
+                <span className="text-[9px] font-bold tracking-wider text-[#666]">
+                  {v._file ? v._file.name.slice(0, 12) + '...' : v.image ? 'CHANGE IMG' : 'SIZE IMAGE'}
+                </span>
+                <input type="file" accept="image/*" className="hidden"
+                  onChange={e => { if (e.target.files[0]) { const arr = [...formData.variants]; arr[i] = { ...arr[i], _file: e.target.files[0] }; setFormData(f => ({ ...f, variants: arr })); } }} />
+              </label>
+              {(v.image || v._file) && (
+                <img src={v._file ? URL.createObjectURL(v._file) : v.image} alt="" className="w-10 h-10 object-cover border border-[#eee]" />
+              )}
+              <button type="button" onClick={() => {
+                const arr = formData.variants.filter((_, j) => j !== i);
+                setFormData(f => ({ ...f, variants: arr }));
+              }}
+                className="w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center cursor-pointer border-none p-0 hover:bg-red-600 shrink-0">
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
 
         {/* Existing images (edit mode) */}
         {editId && formData.images?.length > 0 && (
@@ -313,10 +395,11 @@ const InventoryManager = () => {
         )}
 
         {/* Upload new images */}
-        <div>
+        <div className={formData.variants.length > 0 ? 'opacity-40 pointer-events-none' : ''}>
           {!editId && <p className="text-[10px] font-bold tracking-wider text-[#888] mb-2">PRODUCT IMAGES <span className="font-normal text-[#bbb]">(upload up to 5)</span></p>}
           {editId  && <p className="text-[10px] font-bold tracking-wider text-[#888] mb-2">ADD MORE IMAGES</p>}
-          <label className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded cursor-pointer transition-colors p-6 ${files.length > 0 ? 'border-black bg-gray-50' : 'border-[#ddd] hover:border-black hover:bg-gray-50'}`}>
+          {formData.variants.length > 0 && <p className="text-[10px] text-[#aaa] mb-2">Images are set per variant above</p>}
+          <label className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded transition-colors p-6 ${formData.variants.length > 0 ? 'border-[#eee] bg-gray-50 cursor-not-allowed' : files.length > 0 ? 'border-black bg-gray-50 cursor-pointer' : 'border-[#ddd] hover:border-black hover:bg-gray-50 cursor-pointer'}`}>
             <ImagePlus size={22} className="text-[#888]" />
             <span className="text-xs font-bold tracking-wider text-black">
               {files.length > 0 ? `${files.length} FILE${files.length > 1 ? 'S' : ''} SELECTED` : 'CLICK TO UPLOAD IMAGES'}
@@ -324,8 +407,9 @@ const InventoryManager = () => {
             <span className="text-[10px] text-[#aaa]">Select multiple — first image becomes the primary</span>
             <input type="file" accept="image/*" multiple
               onChange={e => setFiles(Array.from(e.target.files).slice(0, 5))}
-              required={!editId && formData.images?.length === 0}
+              required={!editId && formData.images?.length === 0 && formData.variants.length === 0}
               className="hidden"
+              disabled={formData.variants.length > 0}
             />
           </label>
           {files.length > 0 && (
@@ -393,7 +477,18 @@ const InventoryManager = () => {
               return (
                 <React.Fragment key={p._id}>
                   <tr className="border-b border-[#eee]">
-                    <td className="p-2.5 text-sm">{p.name}</td>
+                    <td className="p-2.5 text-sm">
+                      {p.name}
+                      {p.variants?.length > 0 && (
+                        <div className="flex gap-1 mt-1 flex-wrap">
+                          {p.variants.map((v, vi) => (
+                            <span key={vi} className="text-[9px] bg-gray-100 border border-[#eee] px-1.5 py-0.5 font-bold text-[#666]">
+                              {v.label} — {v.price}TK
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
                     <td className="p-2.5">
                       <div className="flex gap-1">
                         {(p.images?.length > 0 ? p.images : [p.image]).filter(Boolean).slice(0, 3).map((img, i) => (

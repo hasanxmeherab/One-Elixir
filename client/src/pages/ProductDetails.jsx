@@ -94,6 +94,9 @@ const ProductDetails = ({ openCart }) => {
   const touchStartX = useRef(0);
   const touchDelta = useRef(0);
 
+  // --- SIZE VARIANT ---
+  const [selectedVariant, setSelectedVariant] = useState(null);
+
   const images = product?.images?.length ? product.images : product ? [product.image] : [];
   const currentIndex = images.indexOf(selectedImage || product?.image);
 
@@ -225,6 +228,13 @@ const ProductDetails = ({ openCart }) => {
         const res = await axios.get(endpoint);
         setProduct(res.data);
         setSelectedImage(res.data.images?.[0] || res.data.image);
+        // Auto-select first variant if available
+        if (res.data.variants?.length > 0) {
+          setSelectedVariant(res.data.variants[0]);
+          if (res.data.variants[0].image) setSelectedImage(res.data.variants[0].image);
+        } else {
+          setSelectedVariant(null);
+        }
         fetchRelated(res.data);
         fetchReviews(res.data._id);
         // ── Save to recently viewed ──────────────────────────
@@ -241,10 +251,25 @@ const ProductDetails = ({ openCart }) => {
 
   // ── Flash sale active? ──────────────────────────────────────
   const flashActive = product.flashSale?.active && product.flashSale?.salePrice && new Date(product.flashSale.endsAt) > new Date();
-  const displayPrice = flashActive ? product.flashSale.salePrice : product.price;
+  const hasVariants = product.variants?.length > 0;
+  const basePrice = selectedVariant ? selectedVariant.price : product.price;
+  const displayPrice = flashActive ? product.flashSale.salePrice : basePrice;
+  const effectiveStock = selectedVariant ? selectedVariant.stock : product.stock;
+
+  const handleVariantSelect = (variant) => {
+    setSelectedVariant(variant);
+    if (variant.image) setSelectedImage(variant.image);
+    setQuantity(1);
+  };
 
   const handleAddToCart = () => {
-    addToCart({ ...product, price: displayPrice }, quantity);
+    const cartItem = {
+      ...product,
+      price: displayPrice,
+      stock: effectiveStock,
+      ...(selectedVariant ? { selectedSize: selectedVariant.label, variantImage: selectedVariant.image } : {}),
+    };
+    addToCart(cartItem, quantity, selectedVariant?.label);
     if (openCart) openCart(); 
   };
 
@@ -308,7 +333,7 @@ const ProductDetails = ({ openCart }) => {
 
       <div className="flex min-h-screen px-[8%] pt-28 pb-20 gap-20 flex-wrap">      
         {/* Left: Product Image Gallery */}
-        <div className="flex-1 min-w-[300px] md:min-w-[400px] bg-[#fcfcfc]">
+        <div className="flex-1 min-w-[300px] max-w-[480px] bg-[#fcfcfc]">
           {/* Main image with hover zoom & swipe */}
           <div
             className="relative w-full overflow-hidden bg-[#f8f8f8] mb-3 cursor-zoom-in select-none"
@@ -324,7 +349,7 @@ const ProductDetails = ({ openCart }) => {
               src={selectedImage || product.image}
               alt={product.name}
               draggable={false}
-              className="w-full h-[480px] object-cover transition-opacity duration-300"
+              className="w-full h-[380px] object-contain transition-opacity duration-300"
               style={isZooming ? { transform: 'scale(2)', transformOrigin: `${zoomPos.x}% ${zoomPos.y}%`, transition: 'transform 0.1s ease-out' } : {}}
             />
             {/* Image counter */}
@@ -369,11 +394,36 @@ const ProductDetails = ({ openCart }) => {
           {flashActive ? (
             <FlashSaleBanner
               salePrice={product.flashSale.salePrice}
-              originalPrice={product.price}
+              originalPrice={selectedVariant ? selectedVariant.price : product.price}
               endsAt={product.flashSale.endsAt}
             />
           ) : (
-            <p className="text-xl text-[#555] mb-8">{product.price.toLocaleString()} TK</p>
+            <p className="text-xl text-[#555] mb-8">{displayPrice.toLocaleString()} TK</p>
+          )}
+
+          {/* ── Size Selector ── */}
+          {hasVariants && (
+            <div className="mb-8">
+              <p className="text-[10px] tracking-[3px] font-bold mb-3 text-[#888]">SELECT SIZE</p>
+              <div className="flex gap-2 flex-wrap">
+                {product.variants.map((v, i) => (
+                  <button key={i}
+                    onClick={() => handleVariantSelect(v)}
+                    className={`px-5 py-2.5 border text-xs font-bold tracking-wider transition-colors cursor-pointer ${
+                      selectedVariant?.label === v.label
+                        ? 'bg-black text-white border-black'
+                        : v.stock > 0
+                          ? 'bg-white text-black border-[#ddd] hover:border-black'
+                          : 'bg-[#f5f5f5] text-[#bbb] border-[#eee] cursor-not-allowed'
+                    }`}
+                    disabled={v.stock === 0}
+                  >
+                    {v.label} — {v.price.toLocaleString()} TK
+                    {v.stock === 0 && <span className="ml-1 text-[9px]">(SOLD OUT)</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
 
           <div className="h-px bg-[#eee] w-16 mb-8"></div>
@@ -397,7 +447,7 @@ const ProductDetails = ({ openCart }) => {
 
           {/* Purchase Actions */}
           <div className="flex gap-5 mb-5 flex-wrap">
-            {product.stock > 0 ? (
+            {effectiveStock > 0 ? (
               <>
                 {/* Quantity Selector */}
                 <div className="flex items-center border border-black">
@@ -407,7 +457,7 @@ const ProductDetails = ({ openCart }) => {
                   >-</button>
                   <span className="px-5 font-bold">{quantity}</span>
                   <button
-                    onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
+                    onClick={() => setQuantity(Math.min(effectiveStock, quantity + 1))}
                     className="stepper-btn px-4 py-2.5 bg-transparent border-none cursor-pointer text-lg hover:bg-gray-50"
                   >+</button>
                 </div>
@@ -457,7 +507,7 @@ const ProductDetails = ({ openCart }) => {
           </div>
 
           <p className="text-[11px] text-[#aaa] italic">
-            {product.stock > 0 ? `Inventory: ${product.stock} units available` : 'Restocking soon.'}
+            {effectiveStock > 0 ? `Inventory: ${effectiveStock} units available${selectedVariant ? ` (${selectedVariant.label})` : ''}` : 'Restocking soon.'}
           </p>
         </div>
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { HomeSkeleton } from '../components/Skeleton';
 import axios from 'axios';
 import { useCart } from '../context/CartContext';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import BannerManagement from './BannerManagement';
 import { optimizeImage } from '../utils/optimizeImage';
@@ -15,6 +15,7 @@ const Home = () => {
   const [now, setNow]                   = useState(new Date());
   const [ratings, setRatings]           = useState({});
   const { addToCart } = useCart();
+  const navigate = useNavigate();
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   const sectionGap = '60px';
@@ -104,18 +105,20 @@ const Home = () => {
             </span>
           </div>
         )}
-        <p style={{ fontWeight: 'bold', fontSize: '15px', color: '#333' }}>{p.price.toLocaleString()} TK</p>
+        <p style={{ fontWeight: 'bold', fontSize: '15px', color: '#333' }}>
+          {p.variants?.length > 0 ? `From ${Math.min(...p.variants.map(v => v.price)).toLocaleString()} TK` : `${p.price.toLocaleString()} TK`}
+        </p>
         <button
-          onClick={() => addToCart({ ...p, price: Number(p.price) })}
-          disabled={p.stock === 0}
+          onClick={() => p.variants?.length > 0 ? navigate(`/product/${p.slug || p._id}`) : addToCart({ ...p, price: Number(p.price) })}
+          disabled={p.stock === 0 && !(p.variants?.length > 0)}
           style={{
             ...btnStyle,
-            backgroundColor: p.stock === 0 ? '#ebebeb' : '#000',
-            color: p.stock === 0 ? '#999' : '#fff',
-            cursor: p.stock === 0 ? 'not-allowed' : 'pointer'
+            backgroundColor: p.stock === 0 && !(p.variants?.length > 0) ? '#ebebeb' : '#000',
+            color: p.stock === 0 && !(p.variants?.length > 0) ? '#999' : '#fff',
+            cursor: p.stock === 0 && !(p.variants?.length > 0) ? 'not-allowed' : 'pointer'
           }}
         >
-          {p.stock === 0 ? 'UNAVAILABLE' : 'ADD TO BAG'}
+          {p.stock === 0 && !(p.variants?.length > 0) ? 'UNAVAILABLE' : p.variants?.length > 0 ? 'SELECT SIZE' : 'ADD TO BAG'}
         </button>
       </div>
     </div>
@@ -178,18 +181,20 @@ const Home = () => {
                       </span>
                     </div>
                   )}
-                  <p style={{ fontWeight: 'bold', fontSize: '15px', color: '#333' }}>{p.price.toLocaleString()} TK</p>
+                  <p style={{ fontWeight: 'bold', fontSize: '15px', color: '#333' }}>
+                    {p.variants?.length > 0 ? `From ${Math.min(...p.variants.map(v => v.price)).toLocaleString()} TK` : `${p.price.toLocaleString()} TK`}
+                  </p>
                   <button
-                    onClick={() => addToCart({ ...p, price: Number(p.price) })}
-                    disabled={p.stock === 0}
+                    onClick={() => p.variants?.length > 0 ? navigate(`/product/${p.slug || p._id}`) : addToCart({ ...p, price: Number(p.price) })}
+                    disabled={p.stock === 0 && !(p.variants?.length > 0)}
                     style={{
                       ...btnStyle,
-                      backgroundColor: p.stock === 0 ? '#ebebeb' : '#000',
-                      color: p.stock === 0 ? '#999' : '#fff',
-                      cursor: p.stock === 0 ? 'not-allowed' : 'pointer'
+                      backgroundColor: p.stock === 0 && !(p.variants?.length > 0) ? '#ebebeb' : '#000',
+                      color: p.stock === 0 && !(p.variants?.length > 0) ? '#999' : '#fff',
+                      cursor: p.stock === 0 && !(p.variants?.length > 0) ? 'not-allowed' : 'pointer'
                     }}
                   >
-                    {p.stock === 0 ? 'UNAVAILABLE' : 'ADD TO BAG'}
+                    {p.stock === 0 && !(p.variants?.length > 0) ? 'UNAVAILABLE' : p.variants?.length > 0 ? 'SELECT SIZE' : 'ADD TO BAG'}
                   </button>
                 </div>
               </div>
@@ -298,18 +303,20 @@ const Home = () => {
                       </span>
                     </div>
                   )}
-                  <p style={{ fontWeight: 'bold', fontSize: '15px', color: '#333' }}>{p.price.toLocaleString()} TK</p>
+                  <p style={{ fontWeight: 'bold', fontSize: '15px', color: '#333' }}>
+                    {p.variants?.length > 0 ? `From ${Math.min(...p.variants.map(v => v.price)).toLocaleString()} TK` : `${p.price.toLocaleString()} TK`}
+                  </p>
                   <button
-                    onClick={() => addToCart({ ...p, price: Number(p.price) })}
-                    disabled={p.stock === 0}
+                    onClick={() => p.variants?.length > 0 ? navigate(`/product/${p.slug || p._id}`) : addToCart({ ...p, price: Number(p.price) })}
+                    disabled={p.stock === 0 && !(p.variants?.length > 0)}
                     style={{
                       ...btnStyle,
-                      backgroundColor: p.stock === 0 ? '#ebebeb' : '#000',
-                      color: p.stock === 0 ? '#999' : '#fff',
-                      cursor: p.stock === 0 ? 'not-allowed' : 'pointer'
+                      backgroundColor: p.stock === 0 && !(p.variants?.length > 0) ? '#ebebeb' : '#000',
+                      color: p.stock === 0 && !(p.variants?.length > 0) ? '#999' : '#fff',
+                      cursor: p.stock === 0 && !(p.variants?.length > 0) ? 'not-allowed' : 'pointer'
                     }}
                   >
-                    {p.stock === 0 ? 'UNAVAILABLE' : 'ADD TO BAG'}
+                    {p.stock === 0 && !(p.variants?.length > 0) ? 'UNAVAILABLE' : p.variants?.length > 0 ? 'SELECT SIZE' : 'ADD TO BAG'}
                   </button>
                 </div>
               </div>

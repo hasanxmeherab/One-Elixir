@@ -106,7 +106,7 @@ const Checkout = () => {
         }
         return [{
           perfumeId: item._id,
-          name: item.name,
+          name: item.selectedSize ? `${item.name} (${item.selectedSize})` : item.name,
           quantity: item.quantity,
           price: item.price,
         }];
@@ -280,8 +280,8 @@ const Checkout = () => {
           <h2 className="text-xs tracking-[3px] font-bold mb-5">ORDER SUMMARY</h2>
 
           {cart.map(item => (
-            <div key={item._id} className="flex justify-between text-sm mb-4">
-              <span>{item.name} (x{item.quantity})</span>
+            <div key={item.cartKey || item._id} className="flex justify-between text-sm mb-4">
+              <span>{item.name}{item.selectedSize ? ` (${item.selectedSize})` : ''} (x{item.quantity})</span>
               <span>{(item.price * item.quantity).toLocaleString()} TK</span>
             </div>
           ))}
