@@ -80,7 +80,16 @@ const ExpenseManagement = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await adminAxios.post(`${API_URL}/api/expenses`, formData);
+      const payload = {
+        title: formData.title,
+        amount: Number(formData.amount),
+        category: formData.category,
+        date: formData.date,
+        unit: formData.unit,
+        ...(formData.quantity ? { quantity: Number(formData.quantity) } : {}),
+        ...(formData.unitPrice ? { unitPrice: Number(formData.unitPrice) } : {}),
+      };
+      await adminAxios.post(`${API_URL}/api/expenses`, payload);
       setFormData({
         title: '', amount: '', quantity: '', unitPrice: '',
         unit: 'pcs', category: 'Packaging',
