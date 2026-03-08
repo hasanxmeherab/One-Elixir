@@ -58,6 +58,11 @@ router.post('/', validate(createOrderSchema), async (req, res) => {
   try {
     const newOrder = await order.save();
 
+    // Deduct stock immediately on order placement
+    await Promise.all(newOrder.items.map(item =>
+      Perfume.findByIdAndUpdate(item.perfumeId, { $inc: { stock: -item.quantity } })
+    ));
+
     if (newOrder.customerEmail) {
       try {
         await resend.emails.send({
