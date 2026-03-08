@@ -157,7 +157,7 @@ const exportToExcel = () => {
     'Payment Method': order.paymentMethod,
     'Payment Status': order.paymentStatus || 'Unpaid',
     'Order Status':   order.status,
-    'Created By':     order.createdBy || 'Customer',
+    'Created By':     order.createdBy || (order.isManual ? 'Admin' : 'Customer'),
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   ws['!cols'] = [
@@ -280,7 +280,7 @@ const exportToExcel = () => {
                     <span className="text-[11px] text-gray-200 block text-center">—</span>
                   )}
                 </td>
-                <td className="py-2.5 px-2 text-[11px] text-gray-500">{order.createdBy || 'Customer'}</td>
+                <td className="py-2.5 px-2 text-[11px] text-gray-500">{order.createdBy || (order.isManual ? 'Admin' : 'Customer')}</td>
                 <td className="py-2.5 px-2">
                   <span className={`px-2 py-0.5 rounded-sm text-[10px] font-bold ${getStatusClass(order.status)}`}>
                     {order.status.toUpperCase()}

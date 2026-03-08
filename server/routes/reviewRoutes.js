@@ -1,8 +1,17 @@
 const express = require('express');
 const router  = express.Router();
+const rateLimit = require('express-rate-limit');
 const Review  = require('../models/Review');
 const { verifyAdmin } = require('../middleware/authMiddleware');
 const { validate, createReviewSchema } = require('../middleware/validate');
+
+const reviewLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many reviews submitted, please try again later.' }
+});
 
 // GET all reviews for a product
 router.get('/:perfumeId', async (req, res) => {
@@ -13,7 +22,7 @@ router.get('/:perfumeId', async (req, res) => {
 });
 
 // POST new review (with optional image URLs)
-router.post('/', validate(createReviewSchema), async (req, res) => {
+router.post('/', reviewLimiter, validate(createReviewSchema), async (req, res) => {
   try {
     const { perfumeId, userId, userName, rating, comment, images } = req.body;
     if (!perfumeId || !userName || !rating || !comment)

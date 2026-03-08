@@ -23,9 +23,25 @@ const writeLog = async (req, action, target, detail) => {
   }
 };
 
+// Helper — deactivate all expired flash sales (runs at most once per 60s)
+let lastFlashSaleCleanup = 0;
+const cleanupExpiredFlashSales = async () => {
+  if (Date.now() - lastFlashSaleCleanup < 60000) return;
+  lastFlashSaleCleanup = Date.now();
+  try {
+    await Perfume.updateMany(
+      { 'flashSale.active': true, 'flashSale.endsAt': { $lte: new Date() } },
+      { $set: { 'flashSale.active': false } }
+    );
+  } catch (e) {
+    console.error('Flash sale cleanup failed:', e.message);
+  }
+};
+
 // GET all perfumes with search support (public) — #19 server-side pagination, #20 cache
 router.get('/', async (req, res) => {
   try {
+    await cleanupExpiredFlashSales();
     const { search, page, limit: lim } = req.query;
     let query = { isDeleted: { $ne: true } };
     if (search && search.trim() !== '') {
@@ -35,7 +51,7 @@ router.get('/', async (req, res) => {
     // Server-side pagination when ?page= is provided
     if (page) {
       const pageNum = parseInt(page);
-      const limit = parseInt(lim) || 12;
+      const limit = Math.min(parseInt(lim) || 12, 100);
       const skip = (pageNum - 1) * limit;
       const cacheKey = `perfumes:${search || ''}:${pageNum}:${limit}`;
       const cached = req.app.cacheGet?.(cacheKey);
@@ -67,6 +83,9 @@ router.get('/', async (req, res) => {
 router.put('/restore-stock', verifyAdmin, async (req, res) => {
   try {
     const { id, quantity } = req.body;
+    if (!quantity || !Number.isInteger(Number(quantity)) || Number(quantity) <= 0) {
+      return res.status(400).json({ message: 'Quantity must be a positive integer' });
+    }
     const perfume = await Perfume.findById(id);
     if (!perfume) return res.status(404).json({ message: 'Perfume not found' });
 
@@ -86,6 +105,7 @@ router.put('/restore-stock', verifyAdmin, async (req, res) => {
 // GET single perfume by slug (public) — used by ProductDetails page
 router.get('/slug/:slug', async (req, res) => {
   try {
+    await cleanupExpiredFlashSales();
     const perfume = await Perfume.findOne({ slug: req.params.slug, isDeleted: { $ne: true } });
     if (!perfume) return res.status(404).json({ success: false, message: 'Elixir not found' });
     res.json(perfume);

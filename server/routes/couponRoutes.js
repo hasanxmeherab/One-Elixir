@@ -1,11 +1,20 @@
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const Coupon = require('../models/Coupon');
 const { verifyAdmin } = require('../middleware/authMiddleware');
 const { validate, createCouponSchema } = require('../middleware/validate');
 
+const couponLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many coupon attempts, please try again later.' }
+});
+
 // 1. VALIDATE COUPON (For Customers at Checkout)
-router.post('/validate', async (req, res) => {
+router.post('/validate', couponLimiter, async (req, res) => {
   const { code } = req.body;
   try {
     const coupon = await Coupon.findOne({ 

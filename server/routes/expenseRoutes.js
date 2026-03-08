@@ -9,7 +9,7 @@ router.get('/', verifyAdmin, async (req, res) => {
     try {
         if (req.query.page) {
             const page = parseInt(req.query.page);
-            const limit = parseInt(req.query.limit) || 50;
+            const limit = Math.min(parseInt(req.query.limit) || 50, 100);
             const skip = (page - 1) * limit;
             const total = await Expense.countDocuments();
             const expenses = await Expense.find().sort({ date: -1 }).skip(skip).limit(limit);

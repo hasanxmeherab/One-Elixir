@@ -1,16 +1,15 @@
 const { Resend } = require('resend');
 
 const sendEmail = async (options) => {
-  // Initialize INSIDE the function to ensure the API key is loaded from process.env
-  const resend = new Resend(process.env.RESEND_API_KEY);
-
   if (!process.env.RESEND_API_KEY) {
     throw new Error("Missing RESEND_API_KEY in environment variables.");
   }
 
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
   try {
     await resend.emails.send({
-      from: 'OneElixir <onboarding@resend.dev>',
+      from: process.env.EMAIL_FROM || 'OneElixir <onboarding@resend.dev>',
       to: options.email,
       subject: options.subject,
       html: options.html,

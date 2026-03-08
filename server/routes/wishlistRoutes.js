@@ -89,7 +89,7 @@ router.post('/notify-restock', async (req, res) => {
 
     const emailPromises = users.map(user =>
       resend.emails.send({
-        from: 'OneElixir <noreply@yourdomain.com>', // replace with your verified Resend domain
+        from: process.env.EMAIL_FROM || 'OneElixir <onboarding@resend.dev>',
         to: user.email,
         subject,
         html: `

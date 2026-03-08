@@ -39,7 +39,7 @@ router.get('/', verifyAdmin, async (req, res) => {
   try {
     if (req.query.page) {
       const page = parseInt(req.query.page);
-      const limit = parseInt(req.query.limit) || 50;
+      const limit = Math.min(parseInt(req.query.limit) || 50, 100);
       const skip = (page - 1) * limit;
       const total = await Order.countDocuments();
       const orders = await Order.find().sort({ createdAt: -1 }).skip(skip).limit(limit);
@@ -66,7 +66,7 @@ router.post('/', validate(createOrderSchema), async (req, res) => {
     if (newOrder.customerEmail) {
       try {
         await resend.emails.send({
-          from: 'OneElixir <onboarding@resend.dev>',
+          from: process.env.EMAIL_FROM || 'OneElixir <onboarding@resend.dev>',
           to: newOrder.customerEmail,
           subject: `Order Confirmed - #${newOrder._id.toString().slice(-6).toUpperCase()}`,
           html: `
@@ -94,7 +94,7 @@ router.post('/', validate(createOrderSchema), async (req, res) => {
 
 // 4. POST manual admin order
 router.post('/manual', verifyAdmin, validate(createOrderSchema), async (req, res) => {
-  const order = new Order({ ...req.body, isManual: true });
+  const order = new Order({ ...req.body, isManual: true, createdBy: req.admin.name });
   try {
     const newOrder = await order.save();
 
@@ -194,7 +194,7 @@ router.put('/:id', verifyAdmin, async (req, res) => {
     if (status && updatedOrder.customerEmail) {
       try {
         await resend.emails.send({
-          from: 'OneElixir <onboarding@resend.dev>',
+          from: process.env.EMAIL_FROM || 'OneElixir <onboarding@resend.dev>',
           to: updatedOrder.customerEmail,
           subject: `Order Update - #${updatedOrder._id.toString().slice(-6).toUpperCase()}`,
           html: `
@@ -206,7 +206,7 @@ router.put('/:id', verifyAdmin, async (req, res) => {
               <p style="font-size:10px;color:#999;margin-top:20px;text-align:center;">&copy; 2026 ONEELIXIR FRAGRANCES.</p>
             </div>`
         });
-      } catch (emailErr) { console.error('Status email failed:', emailErr.message); }
+      } catch (emailErr) { console.error('Status email failed:', emailErr); }
     }
 
     res.json(updatedOrder);

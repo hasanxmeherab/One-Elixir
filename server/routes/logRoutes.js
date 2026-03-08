@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Log = require('../models/Log');
-const { verifyAdmin } = require('../middleware/authMiddleware');
+const { verifyAdmin, verifySuperadmin } = require('../middleware/authMiddleware');
 
 // GET all logs — admin only, newest first, optional limit
 router.get('/', verifyAdmin, async (req, res) => {
@@ -26,7 +26,7 @@ router.get('/admin/:adminId', verifyAdmin, async (req, res) => {
 });
 
 // DELETE all logs — superadmin only
-router.delete('/', verifyAdmin, async (req, res) => {
+router.delete('/', verifySuperadmin, async (req, res) => {
   try {
     await Log.deleteMany({});
     res.json({ message: 'Logs cleared' });
