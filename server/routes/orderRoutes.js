@@ -5,7 +5,7 @@ const Perfume    = require('../models/Perfume');
 const Log        = require('../models/Log');
 const { Resend } = require('resend');
 
-const { verifyAdmin } = require('../middleware/authMiddleware');
+const { verifyAdmin, verifyUser } = require('../middleware/authMiddleware');
 const { validate, createOrderSchema, updateOrderSchema } = require('../middleware/validate');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -21,8 +21,8 @@ const writeLog = async (req, action, target, detail) => {
   } catch (e) { console.error('Log write failed:', e.message); }
 };
 
-// 1. GET customer history
-router.get('/customer/:email', async (req, res) => {
+// 1. GET customer history (auth required — user can only view own orders)
+router.get('/customer/:email', verifyUser, async (req, res) => {
   try {
     const orders = await Order.find({
       customerEmail: { $regex: new RegExp('^' + req.params.email + '$', 'i') },
@@ -125,8 +125,8 @@ router.put('/bulk-update', verifyAdmin, async (req, res) => {
   }
 });
 
-// 5. PUT user cancellation
-router.put('/:id/cancel', async (req, res) => {
+// 5. PUT user cancellation (auth required)
+router.put('/:id/cancel', verifyUser, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });

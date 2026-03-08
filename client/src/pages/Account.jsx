@@ -41,7 +41,10 @@ const Account = () => {
   const fetchOrderHistory = async () => {
     if (!user?.email) return;
     try {
-      const res = await axios.get(`${API_URL}/api/orders/customer/${user.email.toLowerCase()}`);
+      const token = localStorage.getItem('userToken');
+      const res = await axios.get(`${API_URL}/api/orders/customer/${user.email.toLowerCase()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setOrders(res.data);
     } catch (err) {
       console.error('Fetch failed', err);
@@ -150,7 +153,10 @@ const Account = () => {
   const handleCancel = async (orderId) => {
     if (!window.confirm('Are you sure you want to cancel this order?')) return;
     try {
-      await axios.put(`${API_URL}/api/orders/${orderId}/cancel`);
+      const token = localStorage.getItem('userToken');
+      await axios.put(`${API_URL}/api/orders/${orderId}/cancel`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       fetchOrderHistory();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Cancellation failed.');

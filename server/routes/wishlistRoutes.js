@@ -12,12 +12,14 @@ const router = express.Router();
 const User = require('../models/User');       // your existing User model
 const Perfume = require('../models/Perfume'); // your existing Perfume model
 const { Resend } = require('resend');
+const { verifyUser } = require('../middleware/authMiddleware');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // GET /api/wishlist/:userId — get user's wishlist
-router.get('/:userId', async (req, res) => {
+router.get('/:userId', verifyUser, async (req, res) => {
   try {
+    if (req.userId !== req.params.userId) return res.status(403).json({ message: 'Access denied' });
     const user = await User.findById(req.params.userId).populate('wishlist');
     if (!user) return res.status(404).json({ message: 'User not found' });
     res.json(user.wishlist || []);
@@ -27,8 +29,9 @@ router.get('/:userId', async (req, res) => {
 });
 
 // POST /api/wishlist/:userId/add — add item to wishlist
-router.post('/:userId/add', async (req, res) => {
+router.post('/:userId/add', verifyUser, async (req, res) => {
   try {
+    if (req.userId !== req.params.userId) return res.status(403).json({ message: 'Access denied' });
     const { perfumeId } = req.body;
     const user = await User.findById(req.params.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -43,8 +46,9 @@ router.post('/:userId/add', async (req, res) => {
 });
 
 // DELETE /api/wishlist/:userId/remove/:perfumeId — remove from wishlist
-router.delete('/:userId/remove/:perfumeId', async (req, res) => {
+router.delete('/:userId/remove/:perfumeId', verifyUser, async (req, res) => {
   try {
+    if (req.userId !== req.params.userId) return res.status(403).json({ message: 'Access denied' });
     const user = await User.findById(req.params.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
     user.wishlist = user.wishlist.filter(id => id.toString() !== req.params.perfumeId);
