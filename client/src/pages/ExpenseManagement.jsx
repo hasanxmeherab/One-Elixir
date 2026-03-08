@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import adminAxios from '../utils/adminAxios';
 import { useToast } from '../context/ToastContext';
+import { useOutletContext } from 'react-router-dom';
+import Select from 'react-select';
 
 
 
@@ -42,6 +44,7 @@ const Pagination = ({ page, totalPages, onPageChange }) => {
 
 const ExpenseManagement = () => {
   const toast = useToast();
+  const { perfumes = [] } = useOutletContext();
   const [expenses, setExpenses] = useState([]);
   const [page, setPage] = useState(1);
   const [formData, setFormData] = useState({
@@ -51,6 +54,25 @@ const ExpenseManagement = () => {
   });
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+  const perfumeOptions = useMemo(() => {
+    if (!perfumes.length) return [];
+    const options = [];
+    perfumes.forEach(p => {
+      if (p.variants && p.variants.length > 0) {
+        p.variants.forEach(v => {
+          options.push({ value: `${p.name} \u2014 ${v.label}`, label: `${p.name} \u2014 ${v.label} (${v.price} TK)` });
+        });
+      } else {
+        options.push({ value: p.name, label: `${p.name} (${p.price} TK)` });
+      }
+    });
+    return options;
+  }, [perfumes]);
+
+  const customSelectStyles = {
+    control: (p) => ({ ...p, padding: '5px', border: '1px solid #ddd', borderRadius: 0, fontSize: '13px', boxShadow: 'none', '&:hover': { border: '1px solid #000' } })
+  };
 
   const totalExpenses = expenses.reduce((acc, exp) => acc + Number(exp.amount), 0);
   const currentMonth = new Date().getMonth();
@@ -129,6 +151,14 @@ const ExpenseManagement = () => {
       {/* Log Form */}
       <form onSubmit={handleSubmit} className="flex flex-col gap-4 bg-[#fcfcfc] p-8 border border-[#eee] mb-12">
         <p className="text-[11px] font-bold tracking-wider">LOG NEW EXPENDITURE</p>
+
+        <Select
+          options={perfumeOptions}
+          onChange={(opt) => { if (opt) setFormData(f => ({...f, title: opt.value})); }}
+          placeholder="Quick-fill: Search a product..."
+          isClearable
+          styles={customSelectStyles}
+        />
 
         <div className="flex gap-2.5 flex-col sm:flex-row">
           <input

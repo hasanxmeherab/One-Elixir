@@ -29,10 +29,12 @@ const ManualOrder = () => {
   const [uploading, setUploading]         = useState(false);
 
   const [onlinePayment, setOnlinePayment] = useState({ senderNumber: '', transactionId: '', screenshot: null, screenshotUrl: '' });
-  const [selectedItems, setSelectedItems] = useState([{ perfumeId: '', quantity: 1, discountType: 'none', discountValue: 0 }]);
+  const [selectedItems, setSelectedItems] = useState([{ perfumeId: '', variantIdx: null, quantity: 1, discountType: 'none', discountValue: 0 }]);
   const [couponCode, setCouponCode]       = useState('');
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponLoading, setCouponLoading] = useState(false);
+  const [totalDiscountType, setTotalDiscountType] = useState('none');
+  const [totalDiscountValue, setTotalDiscountValue] = useState(0);
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const isOnlinePayment = ['Bkash', 'Nagad', 'Bank Transfer'].includes(paymentMethod);
@@ -43,20 +45,61 @@ const ManualOrder = () => {
     return district.value === 'Dhaka' ? 80 : 120;
   }, [district, freeDelivery]);
 
+  const perfumeOptions = useMemo(() => {
+    if (!perfumes.length) return [];
+    const options = [];
+    perfumes.forEach(p => {
+      if (p.variants && p.variants.length > 0) {
+        p.variants.forEach((v, idx) => {
+          options.push({
+            value: `${p._id}__${idx}`,
+            label: `${p.name} — ${v.label} (${v.price} TK) — Stock: ${v.stock}`,
+            perfumeId: p._id,
+            variantIdx: idx,
+            price: v.price,
+            stock: v.stock,
+            fullName: `${p.name} — ${v.label}`,
+          });
+        });
+      } else {
+        options.push({
+          value: p._id,
+          label: `${p.name} (${p.price} TK) — Stock: ${p.stock}`,
+          perfumeId: p._id,
+          variantIdx: null,
+          price: p.price,
+          stock: p.stock,
+          fullName: p.name,
+        });
+      }
+    });
+    return options;
+  }, [perfumes]);
+
+  const getSelectedOption = (item) => {
+    if (!item.perfumeId) return null;
+    const key = item.variantIdx != null ? `${item.perfumeId}__${item.variantIdx}` : item.perfumeId;
+    return perfumeOptions.find(opt => opt.value === key) || null;
+  };
+
   if (!perfumes || perfumes.length === 0)
     return <div className="p-10 text-center">Loading Perfume Data...</div>;
 
   const calculateSubtotal = () => selectedItems.reduce((sum, item) => {
-    const perfume = perfumes.find(p => p._id === item.perfumeId);
-    if (!perfume) return sum;
-    let itemPrice = perfume.price;
+    const opt = getSelectedOption(item);
+    if (!opt) return sum;
+    let itemPrice = opt.price;
     if (item.discountType === 'percentage') itemPrice -= (itemPrice * item.discountValue) / 100;
     else if (item.discountType === 'fixed')  itemPrice -= item.discountValue;
     return sum + (itemPrice * item.quantity);
   }, 0);
 
   const subtotal   = calculateSubtotal();
-  const grandTotal = subtotal - couponDiscount + shippingCost;
+  const afterCoupon = subtotal - couponDiscount;
+  const totalDiscountAmount = totalDiscountType === 'percentage'
+    ? (afterCoupon * totalDiscountValue) / 100
+    : totalDiscountType === 'fixed' ? totalDiscountValue : 0;
+  const grandTotal = afterCoupon - totalDiscountAmount + shippingCost;
 
   const handleApplyCoupon = async () => {
     if (!couponCode) return;
@@ -83,7 +126,7 @@ const ManualOrder = () => {
     return res.data.secure_url;
   };
 
-  const addMoreItems  = () => setSelectedItems([...selectedItems, { perfumeId: '', quantity: 1, discountType: 'none', discountValue: 0 }]);
+  const addMoreItems  = () => setSelectedItems([...selectedItems, { perfumeId: '', variantIdx: null, quantity: 1, discountType: 'none', discountValue: 0 }]);
   const removeItemRow = (index) => { if (selectedItems.length > 1) setSelectedItems(selectedItems.filter((_, i) => i !== index)); };
   const updateItemRow = (index, field, value) => {
     const updated = [...selectedItems]; updated[index][field] = value; setSelectedItems(updated);
@@ -102,12 +145,12 @@ const ManualOrder = () => {
 
     for (const item of selectedItems) {
       if (!item.perfumeId) continue;
-      const perfume = perfumes.find(p => p._id === item.perfumeId);
-      if (!perfume || perfume.stock < item.quantity) { alert(`Insufficient stock for ${perfume?.name || 'selected item'}`); return; }
-      let finalItemPrice = perfume.price;
-      if (item.discountType === 'percentage') finalItemPrice -= (perfume.price * item.discountValue) / 100;
+      const opt = getSelectedOption(item);
+      if (!opt || opt.stock < item.quantity) { alert(`Insufficient stock for ${opt?.fullName || 'selected item'}`); return; }
+      let finalItemPrice = opt.price;
+      if (item.discountType === 'percentage') finalItemPrice -= (opt.price * item.discountValue) / 100;
       else if (item.discountType === 'fixed')  finalItemPrice -= item.discountValue;
-      itemsToOrder.push({ perfumeId: perfume._id, name: perfume.name, price: perfume.price, quantity: item.quantity, discountType: item.discountType, discountValue: item.discountValue, finalItemPrice });
+      itemsToOrder.push({ perfumeId: item.perfumeId, name: opt.fullName, price: opt.price, quantity: item.quantity, discountType: item.discountType, discountValue: item.discountValue, finalItemPrice });
     }
 
     try {
@@ -122,7 +165,7 @@ const ManualOrder = () => {
         ...orderData,
         address: `${orderData.address}, ${district.label}, ${division.label}`,
         items: itemsToOrder, totalAmount: grandTotal, shippingCost, freeDelivery,
-        discountApplied: couponDiscount, paymentMethod, paymentStatus,
+        discountApplied: couponDiscount + totalDiscountAmount, paymentMethod, paymentStatus,
         isManual: true, createdBy: adminName,
         createdAt: orderData.orderDate ? new Date(orderData.orderDate).toISOString() : new Date().toISOString(),
         ...(isOnlinePayment && { paymentDetails: { platform: paymentMethod, senderNumber: onlinePayment.senderNumber, transactionId: onlinePayment.transactionId, screenshot: screenshotUrl } })
@@ -130,8 +173,9 @@ const ManualOrder = () => {
 
       setOrderData({ customerName: '', phone: '', address: '', orderDate: getLocalDate() });
       setDivision(null); setDistrict(null);
-      setSelectedItems([{ perfumeId: '', quantity: 1, discountType: 'none', discountValue: 0 }]);
+      setSelectedItems([{ perfumeId: '', variantIdx: null, quantity: 1, discountType: 'none', discountValue: 0 }]);
       setCouponDiscount(0); setCouponCode('');
+      setTotalDiscountType('none'); setTotalDiscountValue(0);
       setPaymentMethod('Cash on Delivery'); setPaymentStatus('Unpaid');
       setFreeDelivery(false);
       setOnlinePayment({ senderNumber: '', transactionId: '', screenshot: null, screenshotUrl: '' });
@@ -176,24 +220,34 @@ const ManualOrder = () => {
         {/* ── Items ── */}
         <p className="text-[10px] font-bold text-gray-400 tracking-wider mt-2">SELECT ITEMS & DISCOUNTS</p>
         {selectedItems.map((item, index) => {
-          const currentPerfume = perfumes.find(p => p._id === item.perfumeId);
-          let linePrice = currentPerfume ? currentPerfume.price : 0;
+          const currentOption = getSelectedOption(item);
+          let linePrice = currentOption ? currentOption.price : 0;
           if (item.discountType === 'percentage') linePrice -= (linePrice * item.discountValue) / 100;
           else if (item.discountType === 'fixed')  linePrice -= item.discountValue;
           const lineTotal = linePrice * item.quantity;
-          const otherIds  = selectedItems.filter((_, i) => i !== index).map(si => si.perfumeId);
+          const otherValues = selectedItems.filter((_, i) => i !== index).map(si => si.variantIdx != null ? `${si.perfumeId}__${si.variantIdx}` : si.perfumeId);
           return (
             <div key={index} className="border-b border-[#f0f0f0] pb-4 mb-1">
               <div className="flex flex-wrap gap-2.5 items-center">
-                <select value={item.perfumeId} onChange={e => updateItemRow(index, 'perfumeId', e.target.value)}
-                  required className="flex-[3] p-3 border border-[#ddd] outline-none text-[13px]">
-                  <option value="" disabled hidden>-- PICK PERFUME --</option>
-                  {perfumes.map(p => !otherIds.includes(p._id) && (
-                    <option key={p._id} value={p._id} disabled={p.stock <= 0}>
-                      {p.name} ({p.price} TK) — Stock: {p.stock}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex-[3] min-w-[200px]">
+                  <Select
+                    options={perfumeOptions.filter(opt => !otherValues.includes(opt.value))}
+                    isOptionDisabled={(opt) => opt.stock <= 0}
+                    value={currentOption}
+                    onChange={(opt) => {
+                      const updated = [...selectedItems];
+                      if (opt) {
+                        updated[index] = { ...updated[index], perfumeId: opt.perfumeId, variantIdx: opt.variantIdx };
+                      } else {
+                        updated[index] = { ...updated[index], perfumeId: '', variantIdx: null };
+                      }
+                      setSelectedItems(updated);
+                    }}
+                    placeholder="Search & pick perfume..."
+                    isClearable
+                    styles={customSelectStyles}
+                  />
+                </div>
                 <input type="number" placeholder="Qty" min="1" value={item.quantity}
                   onChange={e => updateItemRow(index, 'quantity', parseInt(e.target.value))} required
                   className="flex-1 p-3 border border-[#ddd] outline-none text-[13px]" />
@@ -320,11 +374,28 @@ const ManualOrder = () => {
           </button>
         </div>
 
+        {/* ── Total Discount ── */}
+        <p className="text-[10px] font-bold text-gray-400 tracking-wider mt-2">DISCOUNT ON TOTAL (OPTIONAL)</p>
+        <div className="flex flex-col sm:flex-row gap-2.5">
+          <select value={totalDiscountType} onChange={e => { setTotalDiscountType(e.target.value); if (e.target.value === 'none') setTotalDiscountValue(0); }}
+            className="flex-1 p-3 border border-[#ddd] outline-none text-[13px] bg-[#f9f9f9]">
+            <option value="none">No Discount</option>
+            <option value="fixed">Fixed (TK)</option>
+            <option value="percentage">Percentage (%)</option>
+          </select>
+          <input type="number" placeholder="Discount value" min="0"
+            disabled={totalDiscountType === 'none'}
+            value={totalDiscountValue || ''}
+            onChange={e => setTotalDiscountValue(parseFloat(e.target.value) || 0)}
+            className="flex-1 p-3 border border-[#ddd] outline-none text-[13px] disabled:opacity-40" />
+        </div>
+
         {/* ── Summary ── */}
         <div className="mt-5 p-5 bg-black text-white flex justify-between items-center">
           <div className="flex flex-col gap-1">
             <span className="text-[11px] opacity-70">SUBTOTAL: {subtotal.toLocaleString()} TK</span>
-            {couponDiscount > 0 && <span className="text-[11px] text-red-400">COUPON DISCOUNT: -{couponDiscount.toLocaleString()} TK</span>}
+            {couponDiscount > 0 && <span className="text-[11px] text-red-400">COUPON: -{couponDiscount.toLocaleString()} TK</span>}
+            {totalDiscountAmount > 0 && <span className="text-[11px] text-red-400">TOTAL DISCOUNT: -{totalDiscountAmount.toLocaleString()} TK</span>}
             <span className="text-[11px] opacity-70">SHIPPING: {freeDelivery ? '🎁 FREE' : `+${shippingCost} TK`}</span>
             <span className="text-xs tracking-[2px] mt-1">GRAND TOTAL</span>
           </div>

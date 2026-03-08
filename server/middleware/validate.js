@@ -76,6 +76,10 @@ const createOrderSchema = z.object({
     screenshot: z.string().optional(),
     amountPaid: z.number().optional(),
   }).optional(),
+  isManual: z.boolean().optional(),
+  createdBy: z.string().max(200).optional(),
+  createdAt: z.string().optional(),
+  freeDelivery: z.boolean().optional(),
 });
 
 const updateOrderSchema = z.object({
