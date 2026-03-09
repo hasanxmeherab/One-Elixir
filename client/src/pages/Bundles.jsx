@@ -82,7 +82,7 @@ const Bundles = () => {
                   }`}>
                     {bundle.products.slice(0, 4).map((p, i) => (
                       <div key={p._id || i} className="overflow-hidden">
-                        <img src={p.image} alt={p.name}
+                        <img src={p.image || p.variants?.[0]?.image} alt={p.name}
                           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                       </div>
                     ))}

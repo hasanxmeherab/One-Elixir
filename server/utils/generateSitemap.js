@@ -4,7 +4,7 @@ const path = require('path');
 const generateSitemap = async (Perfume) => {
   try {
     const perfumes  = await Perfume.find({}, 'slug updatedAt');
-    const base      = 'https://oneelixir.vercel.app';
+    const base      = 'https://www.oneelixir.live';
     const staticPages = [
       { url: '/',        priority: '1.0', freq: 'daily'   },
       { url: '/shop',    priority: '0.9', freq: 'daily'   },

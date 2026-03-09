@@ -306,7 +306,7 @@ const ProductDetails = ({ openCart }) => {
         "sku": product._id,
         "offers": {
           "@type": "Offer",
-          "url": `https://oneelixir.vercel.app/product/${product.slug || product._id}`,
+          "url": `https://www.oneelixir.live/product/${product.slug || product._id}`,
           "priceCurrency": "BDT",
           "price": displayPrice,
           "availability": product.stock > 0
@@ -325,9 +325,9 @@ const ProductDetails = ({ openCart }) => {
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
         "itemListElement": [
-          { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://oneelixir.vercel.app/" },
-          { "@type": "ListItem", "position": 2, "name": "Collection", "item": "https://oneelixir.vercel.app/collection" },
-          { "@type": "ListItem", "position": 3, "name": product.name, "item": `https://oneelixir.vercel.app/product/${product.slug || product._id}` },
+          { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.oneelixir.live/" },
+          { "@type": "ListItem", "position": 2, "name": "Collection", "item": "https://www.oneelixir.live/collection" },
+          { "@type": "ListItem", "position": 3, "name": product.name, "item": `https://www.oneelixir.live/product/${product.slug || product._id}` },
         ],
       }) }} />
 

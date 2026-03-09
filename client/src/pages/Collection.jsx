@@ -116,8 +116,8 @@ const Collection = () => {
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
         "itemListElement": [
-          { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://oneelixir.vercel.app/" },
-          { "@type": "ListItem", "position": 2, "name": "Collection", "item": "https://oneelixir.vercel.app/collection" },
+          { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.oneelixir.live/" },
+          { "@type": "ListItem", "position": 2, "name": "Collection", "item": "https://www.oneelixir.live/collection" },
         ],
       }) }} />
 

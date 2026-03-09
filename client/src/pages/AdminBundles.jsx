@@ -156,7 +156,7 @@ const AdminBundles = () => {
               return (
                 <div key={p._id} onClick={() => toggleProduct(p._id)}
                   className={`flex items-center gap-2 p-2 border cursor-pointer transition-colors ${selected ? 'border-black bg-black text-white' : 'border-[#eee] hover:border-black'}`}>
-                  <img src={p.image} alt={p.name} className="w-8 h-8 object-cover shrink-0" />
+                  <img src={p.image || p.variants?.[0]?.image} alt={p.name} className="w-8 h-8 object-cover shrink-0" />
                   <div className="min-w-0">
                     <p className={`text-[10px] font-bold truncate ${selected ? 'text-white' : ''}`}>{p.name}</p>
                     <p className={`text-[10px] ${selected ? 'text-gray-300' : 'text-[#888]'}`}>{p.price.toLocaleString()} TK</p>

@@ -2,7 +2,7 @@
 
 A full-stack e-commerce platform for premium perfumes — built with React and Node.js.
 
-**Live:** [oneelixir.vercel.app](https://oneelixir.vercel.app)
+**Live:** [oneelixir.live](https://www.oneelixir.live)
 
 ---
 
