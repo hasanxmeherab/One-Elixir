@@ -23,6 +23,7 @@ import Bundles from './pages/Bundles';
 import Navbar from './components/Navbar';
 import MobileTabBar from './components/MobileTabBar';
 import ProtectedRoute from './components/ProtectedRoute';
+import ScrollToTop from './components/ScrollToTop';
 
 // --- #18 LAZY-LOADED ADMIN PAGES ---
 const Admin = lazy(() => import('./pages/Admin'));
@@ -121,6 +122,7 @@ function App() {
         <ToastProvider>
           <WishlistProvider>
             <Router>
+              <ScrollToTop />
               <AppContent />
               <footer style={footerStyle}>
                 <p>&copy; 2026 OneElixir Fragrances. Crafted for Elegance.</p>
