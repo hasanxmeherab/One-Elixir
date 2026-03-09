@@ -28,7 +28,8 @@ app.use(cors({
   origin: [
     "http://localhost:5173",
     "https://oneelixir.vercel.app",
-    "https://oneelixir.live"
+    "https://oneelixir.live",
+    "https://www.oneelixir.live"
 
   ],
   credentials: true
