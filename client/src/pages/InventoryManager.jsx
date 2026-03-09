@@ -491,7 +491,7 @@ const InventoryManager = () => {
                     </td>
                     <td className="p-2.5">
                       <div className="flex gap-1">
-                        {(p.images?.length > 0 ? p.images : [p.image]).filter(Boolean).slice(0, 3).map((img, i) => (
+                        {(p.images?.length > 0 ? p.images : p.variants?.length > 0 ? p.variants.map(v => v.image).filter(Boolean) : [p.image]).filter(Boolean).slice(0, 3).map((img, i) => (
                           <img key={i} src={img} alt="" className="w-8 h-8 object-cover border border-[#eee]" />
                         ))}
                         {(p.images?.length || 0) > 3 && (
