@@ -6,10 +6,10 @@ const generateSitemap = async (Perfume) => {
     const perfumes  = await Perfume.find({}, 'slug updatedAt');
     const base      = 'https://www.oneelixir.live';
     const staticPages = [
-      { url: '/',        priority: '1.0', freq: 'daily'   },
-      { url: '/shop',    priority: '0.9', freq: 'daily'   },
-      { url: '/about',   priority: '0.5', freq: 'monthly' },
-      { url: '/contact', priority: '0.5', freq: 'monthly' },
+      { url: '/',           priority: '1.0', freq: 'daily'   },
+      { url: '/collection', priority: '0.9', freq: 'daily'   },
+      { url: '/bundles',    priority: '0.7', freq: 'weekly'  },
+      { url: '/track',      priority: '0.5', freq: 'monthly' },
     ];
 
     const productUrls = perfumes.map(p => ({
