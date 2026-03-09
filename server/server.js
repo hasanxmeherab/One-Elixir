@@ -11,7 +11,7 @@ const costRoutes = require('./routes/costRoutes');
 
 require('dotenv').config();
 
-// ── #4 Environment Validation ────────────────────────────────
+// ── Environment Validation ────────────────────────────────
 const requiredEnv = ['MONGO_URI', 'JWT_SECRET', 'JWT_REFRESH_SECRET', 'RESEND_API_KEY'];
 const missingEnv = requiredEnv.filter(key => !process.env[key]);
 if (missingEnv.length) {
@@ -21,17 +21,16 @@ if (missingEnv.length) {
 
 const app = express();
 
-// ── #2 Helmet Security Headers ───────────────────────────────
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+// ── Helmet Security Headers ───────────────────────────────
+app.use(helmet()); // default security headers
 
+// ── CORS Configuration ───────────────────────────────────
 app.use(cors({
   origin: [
     "http://localhost:5173",
     "https://oneelixir.vercel.app",
     "https://oneelixir.live",
     "https://www.oneelixir.live"
-    
-
   ],
   methods: ["GET","POST","PUT","DELETE","OPTIONS"],
   credentials: true
@@ -39,7 +38,7 @@ app.use(cors({
 
 app.use(express.json({ limit: '10mb' }));
 
-// ── Rate Limiting ────────────────────────────────────────────
+// ── Rate Limiting ─────────────────────────────────────────
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 200,                  // 200 requests per window per IP
@@ -62,10 +61,10 @@ app.use('/api/auth/signup', authLimiter);
 app.use('/api/auth/forgot-password', authLimiter);
 app.use('/api/admins/login', authLimiter);
 
-// ── Serve sitemap.xml statically ─────────────────────────────
+// ── Serve sitemap.xml statically ─────────────────────────
 app.use(express.static(path.join(__dirname)));
 
-// Routes
+// ── Routes ───────────────────────────────────────────────
 app.use('/api/perfumes',    require('./routes/perfumeRoutes'));
 app.use('/api/orders',      require('./routes/orderRoutes'));
 app.use('/api/auth',        require('./routes/authRoutes'));
@@ -81,7 +80,7 @@ app.use('/api/addresses',   require('./routes/addressRoutes'));
 app.use('/api/costs',       costRoutes);
 app.use('/api/bundles',     require('./routes/bundleRoutes'));
 
-// ── #20 Simple In-Memory Cache ───────────────────────────────
+// ── Simple In-Memory Cache ───────────────────────────────
 const cache = new Map();
 const CACHE_TTL = 60 * 1000; // 60 seconds
 
@@ -96,12 +95,12 @@ app.cacheDel = (prefix) => {
   for (const key of cache.keys()) { if (key.startsWith(prefix)) cache.delete(key); }
 };
 
-// ── #3 / #15 — 404 Handler (unknown routes) ─────────────────
+// ── 404 Handler ──────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });
 });
 
-// ── #3 Global Error Handler ──────────────────────────────────
+// ── Global Error Handler ─────────────────────────────────
 app.use((err, req, res, next) => {
   console.error(err.stack || err);
   const status = err.status || 500;
@@ -111,11 +110,10 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Connect to MongoDB — then generate sitemap on startup
+// ── Connect to MongoDB & Generate Sitemap ─────────────────
 mongoose.connect(process.env.MONGO_URI)
   .then(async () => {
     console.log("OneElixir Database Connected");
-    // Generate sitemap on startup so it's always fresh
     const generateSitemap = require('./utils/generateSitemap');
     const Perfume = require('./models/Perfume');
     await generateSitemap(Perfume);
