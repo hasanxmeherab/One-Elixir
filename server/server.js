@@ -30,8 +30,10 @@ app.use(cors({
     "https://oneelixir.vercel.app",
     "https://oneelixir.live",
     "https://www.oneelixir.live"
+    
 
   ],
+  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
   credentials: true
 }));
 
