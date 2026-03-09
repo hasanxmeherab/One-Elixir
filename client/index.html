@@ -12,6 +12,12 @@
     <meta property="og:title" content="OneElixir — Premium Handcrafted Fragrances" />
     <meta property="og:description" content="Shop exclusive scents crafted in small batches. Bespoke perfumes for the discerning." />
     <meta property="og:url" content="https://www.oneelixir.live/" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="OneElixir" />
+    <link rel="apple-touch-icon" href="/oneelixir.png" />
     <title>OneElixir — Premium Handcrafted Fragrances</title>
     <script type="application/ld+json">
     {
@@ -45,5 +51,14 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js');
+        });
+      }
+    </script>
+
   </body>
 </html>
