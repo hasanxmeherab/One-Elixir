@@ -24,6 +24,7 @@ import Navbar from './components/Navbar';
 import MobileTabBar from './components/MobileTabBar';
 import ProtectedRoute from './components/ProtectedRoute';
 import ScrollToTop from './components/ScrollToTop';
+import FloatingWhatsapp from './components/FloatingWhatsapp';
 
 // --- #18 LAZY-LOADED ADMIN PAGES ---
 const Admin = lazy(() => import('./pages/Admin'));
@@ -121,6 +122,7 @@ function App() {
       <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
         <ToastProvider>
           <WishlistProvider>
+          <FloatingWhatsapp />
             <Router>
               <ScrollToTop />
               <AppContent />
