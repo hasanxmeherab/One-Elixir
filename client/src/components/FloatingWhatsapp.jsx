@@ -34,7 +34,7 @@ export default function FloatingWhatsApp() {
 
       {/* POPUP CHAT BOX */}
       <div
-        className={`fixed bottom-[90px] right-5 z-[2000] w-[300px] bg-white rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 ${
+        className={`fixed bottom-[155px] md:bottom-[90px] right-5 z-[2000] w-[300px] bg-white rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 ${
           isOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-4 pointer-events-none'
         }`}
       >
@@ -104,7 +104,7 @@ export default function FloatingWhatsApp() {
       </div>
 
       {/* FLOATING BUTTON */}
-      <div className="fixed bottom-5 right-5 z-[2000] flex items-center gap-3">
+      <div className="fixed bottom-20 md:bottom-5 right-5 z-[2000] flex items-center gap-3">
         {/* "Chat with us" label */}
         {!isOpen && (
           <div className="bg-white text-[#25D366] text-[13px] font-semibold px-4 py-2 rounded-full shadow-lg whitespace-nowrap border border-[#25D366] animate-[chatLabel_4s_ease-in-out_infinite]">
