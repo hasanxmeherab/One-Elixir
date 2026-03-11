@@ -1,32 +1,255 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { HomeSkeleton } from '../components/Skeleton';
 import axios from 'axios';
 import { useCart } from '../context/CartContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { Star } from 'lucide-react';
+import { Star, ChevronLeft, ChevronRight } from 'lucide-react';
 import BannerManagement from './BannerManagement';
 import { optimizeImage } from '../utils/optimizeImage';
 
+/* ─── Horizontal scroll carousel hook ─── */
+const useCarousel = () => {
+  const ref = useRef(null);
+  const scroll = (dir) => {
+    if (ref.current) ref.current.scrollBy({ left: dir * 220, behavior: 'smooth' });
+  };
+  return { ref, scrollLeft: () => scroll(-1), scrollRight: () => scroll(1) };
+};
+
+/* ─── Single product card ─── */
+const ProductCard = ({ p, ratings, addToCart, navigate }) => {
+  const price         = p.variants?.length > 0 ? Math.min(...p.variants.map(v => v.price)) : p.price;
+  const originalPrice = p.originalPrice || p.compareAtPrice || null;
+  const discount      = originalPrice && originalPrice > price
+    ? Math.round(((originalPrice - price) / originalPrice) * 100)
+    : null;
+
+  return (
+    <div className="shrink-0 w-[170px] sm:w-[200px] bg-white rounded-2xl overflow-hidden hover:shadow-md transition-shadow duration-300 relative flex flex-col" style={{ border: '1px solid #efefef' }}>
+
+      {/* Discount badge */}
+      {discount && (
+        <div className="absolute top-2.5 left-2.5 bg-[#22c55e] text-white text-[11px] font-bold px-2.5 py-1 rounded-full z-10">
+          -{discount}%
+        </div>
+      )}
+      {p.stock === 0 && (
+        <div className="absolute top-2.5 right-2.5 bg-black text-white text-[9px] font-bold px-2 py-1 rounded-full z-10 tracking-wider">
+          SOLD OUT
+        </div>
+      )}
+
+      {/* Image — pure white bg like sheitech */}
+      <Link to={`/product/${p.slug || p._id}`} className="no-underline block">
+        <div className="w-full h-[160px] sm:h-[190px] bg-white flex items-center justify-center overflow-hidden">
+          <img
+            src={optimizeImage(p.image || p.variants?.[0]?.image, 400)}
+            alt={p.name}
+            className="w-full h-full object-contain p-2 transition-transform duration-500 hover:scale-105"
+            style={{ opacity: p.stock === 0 ? 0.5 : 1 }}
+            loading="lazy"
+          />
+        </div>
+      </Link>
+
+      {/* Info */}
+      <div className="px-3 pt-2.5 pb-3 flex flex-col flex-1 border-t border-[#f5f5f5]">
+        <p className="text-[12px] sm:text-[13px] font-bold text-[#111] leading-snug line-clamp-2 mb-1.5">
+          {p.name}
+        </p>
+
+        {/* Ratings */}
+        <div className="flex items-center gap-0.5 mb-1.5 min-h-[14px]">
+          {ratings?.[p._id] ? (
+            <>
+              {[1,2,3,4,5].map(i => (
+                <Star key={i} size={10}
+                  fill={i <= Math.round(ratings[p._id].avgRating) ? '#facc15' : 'none'}
+                  className="text-yellow-400" />
+              ))}
+              <span className="text-[10px] text-[#aaa] ml-1">({ratings[p._id].count})</span>
+            </>
+          ) : (
+            <span className="text-[10px] text-[#ccc] italic">No reviews yet</span>
+          )}
+        </div>
+
+        {/* Price */}
+        <div className="flex items-center gap-1.5 mb-auto flex-wrap">
+          {originalPrice && originalPrice > price && (
+            <span className="text-[11px] text-[#bbb] line-through">
+              {originalPrice.toLocaleString()} TK
+            </span>
+          )}
+          <span className="text-[13px] sm:text-[14px] font-bold text-[#e74c3c]">
+            {p.variants?.length > 0 ? `From ${price.toLocaleString()}` : price.toLocaleString()} TK
+          </span>
+        </div>
+
+        {/* Button */}
+        <button
+          onClick={() => p.variants?.length > 0
+            ? navigate(`/product/${p.slug || p._id}`)
+            : addToCart({ ...p, price: Number(p.price) })}
+          disabled={p.stock === 0 && !(p.variants?.length > 0)}
+          className="w-full mt-2.5 py-2 text-[10px] sm:text-[11px] font-bold tracking-widest rounded-xl border-none transition-colors duration-200"
+          style={{
+            backgroundColor: p.stock === 0 && !(p.variants?.length > 0) ? '#f0f0f0' : '#111',
+            color: p.stock === 0 && !(p.variants?.length > 0) ? '#999' : '#fff',
+            cursor: p.stock === 0 && !(p.variants?.length > 0) ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {p.stock === 0 && !(p.variants?.length > 0)
+            ? 'UNAVAILABLE'
+            : p.variants?.length > 0 ? 'SELECT SIZE' : 'ADD TO BAG'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+/* ─── Section wrapper with carousel ─── */
+const ProductSection = ({ title, products, loading, ratings, addToCart, navigate, bgColor = '#f0f0f0', viewAllLink }) => {
+  const { ref, scrollLeft, scrollRight } = useCarousel();
+
+  return (
+    <section style={{ backgroundColor: bgColor }} className="py-10 px-2 md:px-[5%]">
+      {/* Outer rounded box with legend title */}
+      <div className="relative bg-white rounded-3xl p-3 pt-7" style={{ border: '1px solid #e0e0e0' }}>
+
+        {/* Legend title on the border */}
+        <div className="absolute -top-[14px] left-6">
+          <span className="bg-[#e74c3c] text-white text-[14px] font-bold px-5 py-2 rounded-full shadow-sm">
+            {title}
+          </span>
+        </div>
+
+        {/* Cards row with side arrows */}
+        <div className="relative mt-2">
+          {/* Left arrow */}
+          <button onClick={scrollLeft} className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-9 h-9 rounded-full border border-[#ddd] flex items-center justify-center bg-white hover:bg-[#f5f5f5] transition-colors cursor-pointer shadow-sm z-10">
+            <ChevronLeft size={18} className="text-[#444]" />
+          </button>
+
+          <div
+            ref={ref}
+            className="flex gap-4 overflow-x-auto py-1 scroll-smooth px-1"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            {loading
+              ? Array(5).fill(0).map((_, i) => (
+                  <div key={i} className="shrink-0 w-[220px] h-[340px] bg-[#f0f0f0] rounded-2xl animate-pulse" />
+                ))
+              : products.map(p => (
+                  <ProductCard
+                    key={p._id}
+                    p={p}
+                    ratings={ratings}
+                    addToCart={addToCart}
+                    navigate={navigate}
+                  />
+                ))
+            }
+          </div>
+
+          {/* Right arrow */}
+          <button onClick={scrollRight} className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 w-9 h-9 rounded-full border border-[#ddd] flex items-center justify-center bg-white hover:bg-[#f5f5f5] transition-colors cursor-pointer shadow-sm z-10">
+            <ChevronRight size={18} className="text-[#444]" />
+          </button>
+        </div>
+
+        {/* See all — bottom right */}
+        {viewAllLink && (
+          <div className="flex justify-end mt-5">
+            <Link
+              to={viewAllLink}
+              className="bg-black text-white text-[12px] font-bold tracking-wider px-5 py-2.5 rounded-full no-underline hover:bg-[#333] transition-colors"
+            >
+              See all products →
+            </Link>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
+
+/* ─── Flash Deals carousel ─── */
+const FlashCarousel = ({ products, getCountdown, addToCart, navigate }) => {
+  const { ref, scrollLeft, scrollRight } = useCarousel();
+  return (
+    <>
+      <button onClick={scrollLeft} className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-9 h-9 rounded-full border border-[#444] flex items-center justify-center bg-[#222] hover:bg-[#333] transition-colors cursor-pointer shadow-sm z-10">
+        <ChevronLeft size={18} className="text-white" />
+      </button>
+      <div ref={ref} className="flex gap-4 overflow-x-auto py-1 scroll-smooth px-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        {products.map(p => {
+          const cd = getCountdown(p.flashSale.endsAt);
+          const discount = Math.round(((p.price - p.flashSale.salePrice) / p.price) * 100);
+          return (
+            <div key={p._id} className="shrink-0 w-[160px] sm:w-[220px] bg-[#1a1a1a] border border-[#333] rounded-2xl overflow-hidden">
+              <div className="relative">
+                <div className="absolute top-3 left-3 bg-[#dc2626] text-white text-[11px] font-bold px-2.5 py-1 rounded-full z-10">
+                  🔥 -{discount}%
+                </div>
+                <Link to={`/product/${p.slug || p._id}`} className="block">
+                  <div className="w-full h-[150px] sm:h-[200px] bg-[#222] flex items-center justify-center overflow-hidden rounded-t-2xl">
+                    <img src={optimizeImage(p.image || p.variants?.[0]?.image, 400)} alt={p.name}
+                      className="w-full h-full object-contain p-3 hover:scale-105 transition-transform duration-500" loading="lazy" />
+                  </div>
+                </Link>
+              </div>
+              <div className="p-4 border-t border-[#222]">
+                <p className="text-[13px] font-semibold text-white leading-tight line-clamp-2 mb-2">{p.name}</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[14px] font-bold text-[#e74c3c]">{p.flashSale.salePrice.toLocaleString()} TK</span>
+                  <span className="text-[12px] text-[#555] line-through">{p.price.toLocaleString()} TK</span>
+                </div>
+                {cd && (
+                  <div className="flex gap-1.5 mb-3">
+                    {[['h','HRS'],['m','MIN'],['s','SEC']].map(([k,l]) => (
+                      <div key={k} className="bg-[#111] rounded-lg px-2 py-1 text-center flex-1">
+                        <span className="text-white text-[13px] font-bold block">{cd[k]}</span>
+                        <span className="text-[#555] text-[8px] tracking-wider">{l}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={() => addToCart({ ...p, price: p.flashSale.salePrice })}
+                  disabled={p.stock === 0}
+                  className="w-full py-2.5 text-[11px] font-bold tracking-widest rounded-xl border-none cursor-pointer"
+                  style={{ backgroundColor: p.stock === 0 ? '#333' : '#dc2626', color: '#fff' }}
+                >
+                  {p.stock === 0 ? 'UNAVAILABLE' : 'GRAB DEAL'}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <button onClick={scrollRight} className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 w-9 h-9 rounded-full border border-[#444] flex items-center justify-center bg-[#222] hover:bg-[#333] transition-colors cursor-pointer shadow-sm z-10">
+        <ChevronRight size={18} className="text-white" />
+      </button>
+    </>
+  );
+};
+
+/* ══════════════════════════════════════ */
 const Home = () => {
-  const [perfumes, setPerfumes]         = useState([]);
-  const [bestSellers, setBestSellers]   = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [bsLoading, setBsLoading]       = useState(true);
-  const [now, setNow]                   = useState(new Date());
-  const [ratings, setRatings]           = useState({});
+  const [perfumes, setPerfumes]       = useState([]);
+  const [bestSellers, setBestSellers] = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [bsLoading, setBsLoading]     = useState(true);
+  const [now, setNow]                 = useState(new Date());
+  const [ratings, setRatings]         = useState({});
   const { addToCart } = useCart();
   const navigate = useNavigate();
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-  const sectionGap = '60px';
-
   const brandLogos = [
-    "logos/chanel.png",
-    "logos/dior.png",
-    "logos/gucci.png",
-    "logos/creed.png",
-    "logos/dunhill.png",
-    "logos/oneelixir.png",
+    "logos/chanel.png","logos/dior.png","logos/gucci.png",
+    "logos/creed.png","logos/dunhill.png","logos/oneelixir.png",
   ];
 
   useEffect(() => {
@@ -34,33 +257,37 @@ const Home = () => {
       try {
         const [perfumesRes, bsRes] = await Promise.all([
           axios.get(`${API_URL}/api/perfumes`),
-          axios.get(`${API_URL}/api/perfumes/best-sellers`),
+          axios.get(`${API_URL}/api/perfumes/best-sellers?limit=12`),
         ]);
         setPerfumes(perfumesRes.data);
-        setBestSellers(bsRes.data);
+        // If best sellers < 8, supplement with other products
+        const bs = bsRes.data;
+        if (bs.length < 8) {
+          const bsIds = new Set(bs.map(p => p._id));
+          const extra = perfumesRes.data.filter(p => !bsIds.has(p._id)).slice(0, 8 - bs.length);
+          setBestSellers([...bs, ...extra]);
+        } else {
+          setBestSellers(bs);
+        }
       } catch (err) { console.error(err); }
       finally { setLoading(false); setBsLoading(false); }
     };
     fetchData();
   }, [API_URL]);
 
-  // ── Fetch aggregated ratings ────────────────────────────────
   useEffect(() => {
     axios.get(`${API_URL}/api/perfumes/ratings`)
       .then(res => setRatings(res.data))
       .catch(() => {});
   }, [API_URL]);
 
-  // Featured = products with featured flag, fallback to first 4
-  const featuredProducts = perfumes.filter(p => p.featured).slice(0, 4);
-  const displayProducts  = featuredProducts.length >= 2 ? featuredProducts : perfumes.slice(0, 4);
+  const featuredProducts = perfumes.filter(p => p.featured).slice(0, 8);
+  const displayProducts  = featuredProducts.length >= 2 ? featuredProducts : perfumes.slice(0, 8);
 
-  // New Arrivals — most recently added products (use _id for reliable creation order)
   const newArrivals = [...perfumes]
     .sort((a, b) => (a._id > b._id ? -1 : 1))
-    .slice(0, 4);
+    .slice(0, 8);
 
-  // ── Flash sale products + live countdown ────────────────────
   const flashSaleProducts = perfumes.filter(p =>
     p.flashSale?.active && p.flashSale?.salePrice && new Date(p.flashSale.endsAt) > now
   );
@@ -80,252 +307,80 @@ const Home = () => {
     return { h, m, s };
   };
 
-  const ProductCard = ({ p }) => (
-    <div key={p._id} style={cardStyle} className="product-card">
-      {p.stock === 0 && <div style={badgeStyle}>SOLD OUT</div>}
-      <Link to={`/product/${p.slug || p._id}`} style={{ textDecoration: 'none' }}>
-        <div style={imageContainer} className="image-container">
-          <img src={optimizeImage(p.image || p.variants?.[0]?.image, 400)} alt={p.name} style={{
-            width: '100%', height: '100%', objectFit: 'cover',
-            opacity: p.stock === 0 ? 0.6 : 1
-          }} className="product-image-hover" loading="lazy" />
-        </div>
-      </Link>
-      <div style={{ padding: '20px 0', textAlign: 'center' }}>
-        <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', letterSpacing: '1px' }}>{p.name.toUpperCase()}</h4>
-        {ratings[p._id] && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginBottom: '6px' }}>
-            {[1,2,3,4,5].map(i => (
-              <Star key={i} size={12}
-                fill={i <= Math.round(ratings[p._id].avgRating) ? '#000' : 'none'}
-                style={{ color: '#000' }} />
-            ))}
-            <span style={{ fontSize: '10px', color: '#999', letterSpacing: '1px', marginLeft: '2px' }}>
-              {ratings[p._id].avgRating} ({ratings[p._id].count})
-            </span>
-          </div>
-        )}
-        <p style={{ fontWeight: 'bold', fontSize: '15px', color: '#333' }}>
-          {p.variants?.length > 0 ? `From ${Math.min(...p.variants.map(v => v.price)).toLocaleString()} TK` : `${p.price.toLocaleString()} TK`}
-        </p>
-        <button
-          onClick={() => p.variants?.length > 0 ? navigate(`/product/${p.slug || p._id}`) : addToCart({ ...p, price: Number(p.price) })}
-          disabled={p.stock === 0 && !(p.variants?.length > 0)}
-          style={{
-            ...btnStyle,
-            backgroundColor: p.stock === 0 && !(p.variants?.length > 0) ? '#ebebeb' : '#000',
-            color: p.stock === 0 && !(p.variants?.length > 0) ? '#999' : '#fff',
-            cursor: p.stock === 0 && !(p.variants?.length > 0) ? 'not-allowed' : 'pointer'
-          }}
-        >
-          {p.stock === 0 && !(p.variants?.length > 0) ? 'UNAVAILABLE' : p.variants?.length > 0 ? 'SELECT SIZE' : 'ADD TO BAG'}
-        </button>
-      </div>
-    </div>
-  );
-
   return (
     <div style={{ backgroundColor: '#fff' }}>
-      {/* 1. BANNER SECTION */}
-      <section>
-        <BannerManagement />
-      </section>
 
-      {/* 2. TRANSPARENT LOGO CAROUSEL */}
-      <section style={{ ...carouselSection, marginTop: sectionGap, marginBottom: sectionGap }}>
+      {/* 1. BANNER */}
+      <section><BannerManagement /></section>
+
+      {/* 2. BRAND LOGOS */}
+      <section style={{ width: '100%', overflow: 'hidden', padding: '20px 0', backgroundColor: '#fff' }}>
         <div className="carousel-track">
-          {brandLogos.map((logo, index) => (
-            <img key={`logo-1-${index}`} src={logo} alt="brand logo" style={logoStyle} className="brand-logo-img" />
-          ))}
-          {brandLogos.map((logo, index) => (
-            <img key={`logo-2-${index}`} src={logo} alt="brand logo" style={logoStyle} className="brand-logo-img" />
-          ))}
-          {brandLogos.map((logo, index) => (
-            <img key={`logo-3-${index}`} src={logo} alt="brand logo" style={logoStyle} className="brand-logo-img" />
+          {[...brandLogos, ...brandLogos, ...brandLogos].map((logo, i) => (
+            <img key={i} src={logo} alt="brand" style={{ height: '60px', margin: '0 60px', opacity: 0.85, filter: 'grayscale(100%)', objectFit: 'contain' }} />
           ))}
         </div>
       </section>
 
-      {/* NEW ARRIVALS */}
-      {newArrivals.length > 0 && !loading && (
-        <section className="collection-container" style={{ padding: '0 10% 80px 10%' }}>
-          <div style={sectionHeader}>
-            <p style={{ fontSize: '11px', letterSpacing: '4px', color: '#888', margin: '0 0 12px 0' }}>JUST DROPPED</p>
-            <h2 style={{ letterSpacing: '8px', fontSize: '24px', margin: 0 }}>NEW ARRIVALS</h2>
-            <div style={headerLine}></div>
-          </div>
-          <div style={gridStyle} className="product-grid">
-            {newArrivals.map(p => (
-              <div key={p._id} style={cardStyle} className="product-card">
-                <div style={newBadge}>NEW</div>
-                {p.stock === 0 && <div style={{ ...badgeStyle, left: 'auto', right: '15px' }}>SOLD OUT</div>}
-                <Link to={`/product/${p.slug || p._id}`} style={{ textDecoration: 'none' }}>
-                  <div style={imageContainer} className="image-container">
-                    <img src={optimizeImage(p.image || p.variants?.[0]?.image, 400)} alt={p.name} style={{
-                      width: '100%', height: '100%', objectFit: 'cover',
-                      opacity: p.stock === 0 ? 0.6 : 1
-                    }} className="product-image-hover" loading="lazy" />
-                  </div>
-                </Link>
-                <div style={{ padding: '20px 0', textAlign: 'center' }}>
-                  <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', letterSpacing: '1px' }}>{p.name.toUpperCase()}</h4>
-                  {ratings[p._id] && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginBottom: '6px' }}>
-                      {[1,2,3,4,5].map(i => (
-                        <Star key={i} size={12}
-                          fill={i <= Math.round(ratings[p._id].avgRating) ? '#000' : 'none'}
-                          style={{ color: '#000' }} />
-                      ))}
-                      <span style={{ fontSize: '10px', color: '#999', letterSpacing: '1px', marginLeft: '2px' }}>
-                        {ratings[p._id].avgRating} ({ratings[p._id].count})
-                      </span>
-                    </div>
-                  )}
-                  <p style={{ fontWeight: 'bold', fontSize: '15px', color: '#333' }}>
-                    {p.variants?.length > 0 ? `From ${Math.min(...p.variants.map(v => v.price)).toLocaleString()} TK` : `${p.price.toLocaleString()} TK`}
-                  </p>
-                  <button
-                    onClick={() => p.variants?.length > 0 ? navigate(`/product/${p.slug || p._id}`) : addToCart({ ...p, price: Number(p.price) })}
-                    disabled={p.stock === 0 && !(p.variants?.length > 0)}
-                    style={{
-                      ...btnStyle,
-                      backgroundColor: p.stock === 0 && !(p.variants?.length > 0) ? '#ebebeb' : '#000',
-                      color: p.stock === 0 && !(p.variants?.length > 0) ? '#999' : '#fff',
-                      cursor: p.stock === 0 && !(p.variants?.length > 0) ? 'not-allowed' : 'pointer'
-                    }}
-                  >
-                    {p.stock === 0 && !(p.variants?.length > 0) ? 'UNAVAILABLE' : p.variants?.length > 0 ? 'SELECT SIZE' : 'ADD TO BAG'}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+      {/* 3. NEW ARRIVALS */}
+      {!loading && newArrivals.length > 0 && (
+        <ProductSection
+          title="New Arrivals"
+          products={newArrivals}
+          loading={loading}
+          ratings={ratings}
+          addToCart={addToCart}
+          navigate={navigate}
+          bgColor="#fff"
+          viewAllLink="/collection"
+        />
       )}
 
-      {/* FLASH DEALS */}
+      {/* 4. FLASH DEALS */}
       {flashSaleProducts.length > 0 && (
-        <section style={{ padding: '0 10% 80px 10%', backgroundColor: '#111' }}>
-          <div style={{ textAlign: 'center', marginBottom: '40px', paddingTop: '60px' }}>
-            <p style={{ fontSize: '11px', letterSpacing: '4px', color: '#e74c3c', margin: '0 0 12px 0', fontWeight: 'bold' }}>⚡ LIMITED TIME OFFERS</p>
-            <h2 style={{ letterSpacing: '8px', fontSize: '24px', margin: 0, color: '#fff' }}>FLASH DEALS</h2>
-            <div style={{ width: '40px', height: '2px', backgroundColor: '#e74c3c', margin: '15px auto' }}></div>
-          </div>
-          <div style={gridStyle} className="product-grid">
-            {flashSaleProducts.map(p => {
-              const cd = getCountdown(p.flashSale.endsAt);
-              const discount = Math.round(((p.price - p.flashSale.salePrice) / p.price) * 100);
-              return (
-                <div key={p._id} style={{ position: 'relative', overflow: 'hidden' }} className="product-card">
-                  <div style={{ position: 'absolute', top: 15, left: 15, backgroundColor: '#dc2626', color: '#fff', padding: '6px 15px', fontSize: '10px', fontWeight: 'bold', letterSpacing: '2px', zIndex: 2 }}>
-                    🔥 {discount}% OFF
-                  </div>
-                  <Link to={`/product/${p.slug || p._id}`} style={{ textDecoration: 'none' }}>
-                    <div style={imageContainer} className="image-container">
-                      <img src={optimizeImage(p.image || p.variants?.[0]?.image, 400)} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} className="product-image-hover" loading="lazy" />
-                    </div>
-                  </Link>
-                  <div style={{ padding: '20px 0', textAlign: 'center' }}>
-                    <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', letterSpacing: '1px', color: '#fff' }}>{p.name.toUpperCase()}</h4>
-                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                      <span style={{ color: '#e74c3c', fontWeight: 'bold', fontSize: '16px' }}>{p.flashSale.salePrice.toLocaleString()} TK</span>
-                      <span style={{ color: '#666', textDecoration: 'line-through', fontSize: '13px' }}>{p.price.toLocaleString()} TK</span>
-                    </div>
-                    {cd && (
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '14px' }}>
-                        {[['h','HRS'], ['m','MIN'], ['s','SEC']].map(([k, l]) => (
-                          <div key={k} style={{ background: '#222', borderRadius: '4px', padding: '6px 10px', minWidth: '38px', textAlign: 'center' }}>
-                            <span style={{ color: '#fff', fontSize: '14px', fontWeight: 'bold', display: 'block' }}>{cd[k]}</span>
-                            <span style={{ color: '#666', fontSize: '7px', letterSpacing: '1px' }}>{l}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <button
-                      onClick={() => addToCart({ ...p, price: p.flashSale.salePrice })}
-                      disabled={p.stock === 0}
-                      style={{ ...btnStyle, backgroundColor: p.stock === 0 ? '#333' : '#dc2626', color: '#fff', cursor: p.stock === 0 ? 'not-allowed' : 'pointer' }}
-                    >
-                      {p.stock === 0 ? 'UNAVAILABLE' : 'GRAB DEAL'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+        <section className="py-10 px-2 md:px-[5%] bg-white">
+          <div className="bg-[#111] rounded-3xl p-6 pt-8 relative" style={{ border: '2px solid #dc2626' }}>
+            {/* Legend title */}
+            <div className="absolute -top-[14px] left-6">
+              <span className="bg-[#dc2626] text-white text-[14px] font-bold px-5 py-2 rounded-full shadow-sm">
+                ⚡ Flash Deals
+              </span>
+            </div>
+
+            {/* Cards with side arrows */}
+            <div className="relative mt-2">
+              <FlashCarousel products={flashSaleProducts} getCountdown={getCountdown} addToCart={addToCart} navigate={navigate} />
+            </div>
           </div>
         </section>
       )}
 
-      {/* 3. EXCLUSIVE COLLECTION */}
-      <section className="collection-container" style={{ padding: '0 10% 80px 10%' }}>
-        <div style={sectionHeader}>
-          <h2 style={{ letterSpacing: '8px', fontSize: '24px', margin: 0 }}>EXCLUSIVE</h2>
-          <div style={headerLine}></div>
-        </div>
-        <div style={gridStyle} className="product-grid">
-          {loading ? <HomeSkeleton count={4} /> : displayProducts.map(p => <ProductCard key={p._id} p={p} />)}
-        </div>
-      </section>
+      {/* 5. EXCLUSIVE */}
+      <ProductSection
+        title="Exclusive"
+        products={displayProducts}
+        loading={loading}
+        ratings={ratings}
+        addToCart={addToCart}
+        navigate={navigate}
+        bgColor="#f8f8f8"
+        viewAllLink="/collection"
+      />
 
-      {/* 4. BEST SELLERS */}
+      {/* 6. BEST SELLERS */}
       {(bsLoading || bestSellers.length > 0) && (
-        <section className="collection-container" style={{ padding: '0 10% 80px 10%', backgroundColor: '#fafafa' }}>
-          <div style={sectionHeader}>
-            <p style={{ fontSize: '11px', letterSpacing: '4px', color: '#888', margin: '0 0 12px 0' }}>CUSTOMER FAVOURITES</p>
-            <h2 style={{ letterSpacing: '8px', fontSize: '24px', margin: 0 }}>BEST SELLERS</h2>
-            <div style={headerLine}></div>
-          </div>
-          <div style={gridStyle} className="product-grid">
-            {bsLoading ? <HomeSkeleton count={4} /> : bestSellers.map((p, i) => (
-              <div key={p._id} style={cardStyle} className="product-card">
-                {/* Rank badge */}
-                <div style={rankBadge}>#{i + 1}</div>
-                {p.stock === 0 && <div style={{ ...badgeStyle, left: 'auto', right: '15px' }}>SOLD OUT</div>}
-                <Link to={`/product/${p.slug || p._id}`} style={{ textDecoration: 'none' }}>
-                  <div style={imageContainer} className="image-container">
-                    <img src={optimizeImage(p.image || p.variants?.[0]?.image, 400)} alt={p.name} style={{
-                      width: '100%', height: '100%', objectFit: 'cover',
-                      opacity: p.stock === 0 ? 0.6 : 1
-                    }} className="product-image-hover" loading="lazy" />
-                  </div>
-                </Link>
-                <div style={{ padding: '20px 0', textAlign: 'center' }}>
-                  <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', letterSpacing: '1px' }}>{p.name.toUpperCase()}</h4>
-                  {ratings[p._id] && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginBottom: '6px' }}>
-                      {[1,2,3,4,5].map(i => (
-                        <Star key={i} size={12}
-                          fill={i <= Math.round(ratings[p._id].avgRating) ? '#000' : 'none'}
-                          style={{ color: '#000' }} />
-                      ))}
-                      <span style={{ fontSize: '10px', color: '#999', letterSpacing: '1px', marginLeft: '2px' }}>
-                        {ratings[p._id].avgRating} ({ratings[p._id].count})
-                      </span>
-                    </div>
-                  )}
-                  <p style={{ fontWeight: 'bold', fontSize: '15px', color: '#333' }}>
-                    {p.variants?.length > 0 ? `From ${Math.min(...p.variants.map(v => v.price)).toLocaleString()} TK` : `${p.price.toLocaleString()} TK`}
-                  </p>
-                  <button
-                    onClick={() => p.variants?.length > 0 ? navigate(`/product/${p.slug || p._id}`) : addToCart({ ...p, price: Number(p.price) })}
-                    disabled={p.stock === 0 && !(p.variants?.length > 0)}
-                    style={{
-                      ...btnStyle,
-                      backgroundColor: p.stock === 0 && !(p.variants?.length > 0) ? '#ebebeb' : '#000',
-                      color: p.stock === 0 && !(p.variants?.length > 0) ? '#999' : '#fff',
-                      cursor: p.stock === 0 && !(p.variants?.length > 0) ? 'not-allowed' : 'pointer'
-                    }}
-                  >
-                    {p.stock === 0 && !(p.variants?.length > 0) ? 'UNAVAILABLE' : p.variants?.length > 0 ? 'SELECT SIZE' : 'ADD TO BAG'}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+        <ProductSection
+          title="Best Sellers"
+          products={bestSellers}
+          loading={bsLoading}
+          ratings={ratings}
+          addToCart={addToCart}
+          navigate={navigate}
+          bgColor="#fff"
+          viewAllLink="/collection"
+        />
       )}
 
-      {/* RESPONSIVE CSS */}
       <style>{`
         @keyframes infiniteScroll {
           0% { transform: translateX(0); }
@@ -336,49 +391,14 @@ const Home = () => {
           width: max-content;
           animation: infiniteScroll 40s linear infinite;
         }
-        .product-image-hover:hover {
-          transform: scale(1.05);
-          transition: transform 0.5s ease;
-        }
+        .product-card-new::-webkit-scrollbar { display: none; }
+        div::-webkit-scrollbar { display: none; }
         @media (max-width: 768px) {
-          .collection-container { padding: 0 5% 50px 5% !important; }
-          .product-grid {
-            grid-template-columns: repeat(2, 1fr) !important;
-            gap: 15px !important;
-          }
-          .image-container { height: 250px !important; }
-          .brand-logo-img {
-            height: 40px !important;
-            margin: 0 30px !important;
-          }
-        }
-        @media (max-width: 480px) {
-          .product-grid { grid-template-columns: 1fr !important; }
-          .image-container { height: 350px !important; }
+          .product-card-new { width: 160px !important; }
         }
       `}</style>
     </div>
   );
 };
-
-// --- STYLES ---
-const carouselSection = {
-  width: '100%', backgroundColor: 'transparent', padding: '10px 0',
-  overflow: 'hidden', display: 'flex', alignItems: 'center'
-};
-const logoStyle = {
-  height: '75px', margin: '0 80px', opacity: 0.9,
-  filter: 'grayscale(100%) brightness(1.1)', transition: '0.3s',
-  cursor: 'pointer', objectFit: 'contain'
-};
-const sectionHeader = { textAlign: 'center', marginBottom: '40px' };
-const headerLine    = { width: '40px', height: '2px', backgroundColor: '#000', margin: '15px auto' };
-const gridStyle     = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '40px' };
-const cardStyle     = { position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.3s' };
-const imageContainer = { width: '100%', height: '380px', backgroundColor: '#f9f9f9', overflow: 'hidden' };
-const btnStyle      = { width: '100%', padding: '12px', border: 'none', marginTop: '10px', fontWeight: 'bold', letterSpacing: '2px', fontSize: '11px', transition: '0.3s' };
-const badgeStyle    = { position: 'absolute', top: '15px', left: '15px', backgroundColor: '#000', color: '#fff', padding: '6px 15px', fontSize: '10px', fontWeight: 'bold', letterSpacing: '2px', zIndex: 2 };
-const rankBadge     = { position: 'absolute', top: '15px', left: '15px', backgroundColor: '#000', color: '#fff', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', zIndex: 2 };
-const newBadge      = { position: 'absolute', top: '15px', left: '15px', backgroundColor: '#16a34a', color: '#fff', padding: '6px 15px', fontSize: '10px', fontWeight: 'bold', letterSpacing: '2px', zIndex: 2 };
 
 export default Home;

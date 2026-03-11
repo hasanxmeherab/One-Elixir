@@ -200,9 +200,9 @@ const Navbar = () => {
         </div>
 
         {/* ── MAIN NAVBAR ── */}
-        <nav className="flex items-center gap-4 px-[5%] h-[70px] bg-black">
+        <nav className="flex items-center px-[5%] h-[60px] md:h-[70px] bg-black gap-4">
 
-          {/* MENU ICON */}
+          {/* MENU ICON — always visible */}
           <button
             aria-label="Open menu"
             className="bg-transparent border-none cursor-pointer text-white p-0 shrink-0"
@@ -211,12 +211,12 @@ const Navbar = () => {
             <Menu size={24} />
           </button>
 
-          {/* LOGO */}
-          <Link to="/" className="text-[22px] font-bold tracking-[3px] no-underline text-white shrink-0 mr-2">
+          {/* LOGO — centered on mobile, left-aligned on desktop */}
+          <Link to="/" className="text-[20px] md:text-[22px] font-bold tracking-[3px] no-underline text-white shrink-0 md:mr-2 absolute left-1/2 -translate-x-1/2 md:static md:left-auto md:translate-x-0">
             ONEELIXIR
           </Link>
 
-          {/* INLINE SEARCH BAR WITH DROPDOWN */}
+          {/* DESKTOP: INLINE SEARCH BAR WITH DROPDOWN */}
           <div ref={inlineSearchRef} className="flex-1 hidden md:flex flex-col relative max-w-[600px]">
             <div className="flex items-center bg-[#f0f0f0] rounded-md overflow-hidden pr-1.5">
               <input
@@ -264,14 +264,10 @@ const Navbar = () => {
             {searchQuery.trim().length > 1 && (
               <div className="absolute top-full left-0 right-0 bg-white shadow-xl border border-[#eee] rounded-b-md z-[3000] max-h-[400px] overflow-y-auto">
                 {searchLoading && (
-                  <div className="px-4 py-4 text-[13px] text-[#888] text-center tracking-wider">
-                    SEARCHING...
-                  </div>
+                  <div className="px-4 py-4 text-[13px] text-[#888] text-center tracking-wider">SEARCHING...</div>
                 )}
                 {!searchLoading && suggestions.length === 0 && (
-                  <div className="px-4 py-4 text-[13px] text-[#888] text-center tracking-wider">
-                    NO RESULTS FOUND
-                  </div>
+                  <div className="px-4 py-4 text-[13px] text-[#888] text-center tracking-wider">NO RESULTS FOUND</div>
                 )}
                 {!searchLoading && suggestions.map((item) => (
                   <div
@@ -316,21 +312,12 @@ const Navbar = () => {
           </div>
 
           {/* RIGHT ICONS */}
-          <div className="flex items-center gap-5 ml-auto">
+          <div className="flex items-center gap-4 ml-auto">
 
-            {/* Mobile search button */}
-            <button
-              aria-label="Search products"
-              className="bg-transparent border-none cursor-pointer text-white p-0 md:hidden"
-              onClick={() => setIsSearchOpen(true)}
-            >
-              <Search size={22} />
-            </button>
-
-            {/* Cart */}
+            {/* Cart — desktop only */}
             <button
               aria-label={`Shopping cart${cartCount > 0 ? `, ${cartCount} items` : ''}`}
-              className="relative cursor-pointer bg-transparent border-none p-0 text-white"
+              className="relative cursor-pointer bg-transparent border-none p-0 text-white hidden md:block"
               onClick={() => navigate('/cart')}
             >
               <ShoppingCart size={26} />
@@ -339,17 +326,17 @@ const Navbar = () => {
               </span>
             </button>
 
-            {/* Divider */}
+            {/* Divider — desktop only */}
             <span className="hidden md:block w-px h-8 bg-[#333]" />
 
-            {/* Account */}
+            {/* Account — desktop: full button with text | mobile: icon only */}
             <button
               aria-label={user ? 'My account' : 'Register or Login'}
-              className="hidden md:flex items-center gap-2.5 bg-transparent border-none cursor-pointer text-white"
+              className="flex items-center gap-2.5 bg-transparent border-none cursor-pointer text-white"
               onClick={() => user ? navigate('/account') : navigate('/signin')}
             >
-              <User size={28} className="text-red-500" strokeWidth={1.5} />
-              <div className="text-left">
+              <User size={26} className="text-red-500 md:text-red-500" strokeWidth={1.5} />
+              <div className="text-left hidden md:block">
                 <p className="text-[13px] font-semibold tracking-wider leading-tight text-white">
                   {user ? user.name?.split(' ')[0]?.toUpperCase() || 'ACCOUNT' : 'Account'}
                 </p>
@@ -360,6 +347,102 @@ const Navbar = () => {
             </button>
           </div>
         </nav>
+
+        {/* ── MOBILE SEARCH BAR (below black navbar) ── */}
+        <div ref={inlineSearchRef} className="md:hidden bg-white px-3 py-2 relative">
+          <div className="flex items-center bg-[#f0f0f0] border border-black rounded-md overflow-hidden pr-1">
+            <input
+              type="text"
+              placeholder="Search for products"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && searchQuery.trim()) {
+                  navigate(`/collection?search=${encodeURIComponent(searchQuery.trim())}`);
+                  setSearchQuery('');
+                  setSuggestions([]);
+                }
+                if (e.key === 'Escape') {
+                  setSearchQuery('');
+                  setSuggestions([]);
+                }
+              }}
+              className="flex-1 px-4 py-2.5 bg-transparent border-none outline-none text-[14px] text-black placeholder-[#999]"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => { setSearchQuery(''); setSuggestions([]); }}
+                className="bg-transparent border-none cursor-pointer p-1 text-[#999] hover:text-black transition-colors"
+                aria-label="Clear search"
+              >
+                <X size={15} />
+              </button>
+            )}
+            <button
+              onClick={() => {
+                if (searchQuery.trim()) {
+                  navigate(`/collection?search=${encodeURIComponent(searchQuery.trim())}`);
+                  setSearchQuery('');
+                  setSuggestions([]);
+                }
+              }}
+              className="px-3 py-2 bg-black hover:bg-[#333] transition-colors border-none cursor-pointer rounded-full my-1"
+            >
+              <Search size={16} className="text-white" />
+            </button>
+          </div>
+
+          {/* MOBILE DROPDOWN SUGGESTIONS */}
+          {searchQuery.trim().length > 1 && (
+            <div className="absolute top-full left-0 right-0 bg-white shadow-xl border border-[#eee] z-[3000] max-h-[400px] overflow-y-auto">
+              {searchLoading && (
+                <div className="px-4 py-4 text-[13px] text-[#888] text-center tracking-wider">SEARCHING...</div>
+              )}
+              {!searchLoading && suggestions.length === 0 && (
+                <div className="px-4 py-4 text-[13px] text-[#888] text-center tracking-wider">NO RESULTS FOUND</div>
+              )}
+              {!searchLoading && suggestions.map((item) => (
+                <div
+                  key={item._id}
+                  className="flex items-center gap-4 px-4 py-3 border-b border-[#f5f5f5] cursor-pointer hover:bg-[#f9f9f9] transition-colors"
+                  onClick={() => {
+                    navigate(`/product/${item.slug || item._id}`);
+                    setSearchQuery('');
+                    setSuggestions([]);
+                  }}
+                >
+                  <img
+                    src={optimizeImage(item.image || item.variants?.[0]?.image, 80)}
+                    alt={item.name}
+                    className="w-12 h-12 object-contain bg-[#f5f5f5] shrink-0 rounded-sm"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold text-black truncate">{item.name}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {item.originalPrice && item.originalPrice > item.price && (
+                        <span className="text-[12px] text-[#aaa] line-through">{item.originalPrice.toLocaleString()} TK</span>
+                      )}
+                      <span className="text-[13px] font-bold text-black">{item.price?.toLocaleString()} TK</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {!searchLoading && suggestions.length > 0 && (
+                <div
+                  className="px-4 py-3 text-center text-[12px] font-bold tracking-[2px] text-[#555] hover:bg-[#f5f5f5] cursor-pointer transition-colors"
+                  onClick={() => {
+                    navigate(`/collection?search=${encodeURIComponent(searchQuery.trim())}`);
+                    setSearchQuery('');
+                    setSuggestions([]);
+                  }}
+                >
+                  VIEW ALL RESULTS →
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
       </div>
 
       {/* ── SIDEBAR DRAWER ── */}
@@ -373,16 +456,6 @@ const Navbar = () => {
               </button>
             </div>
             <ul className="list-none p-0 m-0 flex flex-col gap-1">
-              {/* Mobile Search */}
-              <li className="md:hidden">
-                <div
-                  className="flex items-center text-white text-sm font-bold tracking-sm py-4 border-b-2 border-[#333] cursor-pointer"
-                  onClick={() => { setIsSearchOpen(true); setIsSidebarOpen(false); }}
-                >
-                  <Search size={18} className="mr-3" /> SEARCH
-                </div>
-              </li>
-
               <li>
                 <Link
                   to="/collection"

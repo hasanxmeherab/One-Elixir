@@ -139,9 +139,9 @@ export default function FloatingWhatsApp() {
         }
         @keyframes chatLabel {
           0%   { opacity: 0; transform: translateX(10px); }
-          10%  { opacity: 1; transform: translateX(0); }
-          70%  { opacity: 1; transform: translateX(0); }
-          85%  { opacity: 0; transform: translateX(10px); }
+          50%  { opacity: 1; transform: translateX(0); }
+          75%  { opacity: 1; transform: translateX(0); }
+          90%  { opacity: 0; transform: translateX(10px); }
           100% { opacity: 0; transform: translateX(10px); }
         }
       `}</style>
