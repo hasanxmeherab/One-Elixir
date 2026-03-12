@@ -25,6 +25,7 @@ import MobileTabBar from './components/MobileTabBar';
 import ProtectedRoute from './components/ProtectedRoute';
 import ScrollToTop from './components/ScrollToTop';
 import FloatingWhatsapp from './components/FloatingWhatsapp';
+import Footer from './components/Footer';
 
 // --- #18 LAZY-LOADED ADMIN PAGES ---
 const Admin = lazy(() => import('./pages/Admin'));
@@ -123,12 +124,11 @@ function App() {
         <ToastProvider>
           <WishlistProvider>
           <FloatingWhatsapp />
+
             <Router>
               <ScrollToTop />
               <AppContent />
-              <footer style={footerStyle}>
-                <p>&copy; 2026 OneElixir Fragrances. Crafted for Elegance.</p>
-              </footer>
+              <Footer />
             </Router>
           </WishlistProvider>
         </ToastProvider>
