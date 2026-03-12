@@ -10,15 +10,15 @@ A full-stack e-commerce platform for premium perfumes — built with React and N
 
 | Layer | Technologies |
 |-------|-------------|
-| **Frontend** | React 19, React Router 7, Tailwind CSS 4, Vite 7, Recharts |
-| **Backend** | Node.js, Express 5, MongoDB, Mongoose 9 |
-| **Auth** | JWT (access + refresh tokens), Google OAuth |
-| **Validation** | Zod (server-side schema validation) |
-| **Services** | Cloudinary (images), Resend (emails) |
-| **Security** | Helmet, CORS, express-rate-limit, bcryptjs |
-| **Export** | jsPDF + jspdf-autotable (PDF), XLSX (Excel) |
-| **SEO** | react-helmet-async, auto-generated sitemap |
-| **Deployment** | Vercel (client + analytics), MongoDB Atlas (database) |
+	| **Frontend** | React 19, React Router 7, Tailwind CSS 4, Vite 7, Recharts |
+	| **Backend** | Node.js, Express 5, MongoDB, Mongoose 9 |
+	| **Auth** | JWT (access + refresh tokens), Google OAuth |
+	| **Validation** | Zod (server-side schema validation) |
+	| **Services** | Cloudinary (images), Resend (emails) |
+	| **Security** | Helmet, CORS, express-rate-limit, bcryptjs |
+	| **Export** | jsPDF + jspdf-autotable (PDF), XLSX (Excel) |
+	| **SEO** | react-helmet-async, auto-generated sitemap |
+	| **Deployment** | Vercel (client + analytics), MongoDB Atlas (database) |
 
 ---
 
@@ -78,6 +78,14 @@ client/
 ├── src/
 │   ├── components/       # Navbar, AdminNavbar, MobileTabBar, ProtectedRoute, Skeleton
 │   ├── context/          # React Context — User, Cart, Wishlist, Toast
+│   ├── pages/
+│   │   ├── admin/        # All admin panel pages (Dashboard, Inventory, Orders, Financials, Marketing, Team, Customers, Exports)
+│   │   ├── ...           # User-facing pages
+│   ├── utils/            # Utility functions
+│   ├── data/             # Static data
+│   ├── assets/           # Images, icons, etc.
+│   ├── styles/           # CSS files
+```
 │   ├── pages/            # 29 page components (14 public + 15 admin)
 │   ├── data/             # Static data (location/division/district lists)
 │   ├── utils/            # adminAxios with auto token refresh, image optimizer

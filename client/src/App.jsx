@@ -19,7 +19,7 @@ import Wishlist from './pages/Wishlist';
 import OrderTracking from './pages/OrderTracking';
 import Bundles from './pages/Bundles';
 
-// --- COMPONENTS --- (#17 Navbar moved to components/)
+// --- COMPONENTS ---
 import Navbar from './components/Navbar';
 import MobileTabBar from './components/MobileTabBar';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -28,21 +28,21 @@ import FloatingWhatsapp from './components/FloatingWhatsapp';
 import Footer from './components/Footer';
 
 // --- #18 LAZY-LOADED ADMIN PAGES ---
-const Admin = lazy(() => import('./pages/Admin'));
-const AdminManagement = lazy(() => import('./pages/AdminManagement'));
-const AdminLogin = lazy(() => import('./pages/AdminLogin'));
-const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
-const InventoryManager = lazy(() => import('./pages/InventoryManager'));
-const ManualOrder = lazy(() => import('./pages/ManualOrder'));
-const OrderList = lazy(() => import('./pages/OrderList'));
-const ExpenseManagement = lazy(() => import('./pages/ExpenseManagement'));
-const InvestmentTracker = lazy(() => import('./pages/InvestmentTracker'));
-const CouponManagement = lazy(() => import('./pages/CouponManagement'));
-const BannerManagement = lazy(() => import('./pages/BannerManagement'));
-const CustomerList = lazy(() => import('./pages/CustomerList'));
-const CostCalculator = lazy(() => import('./pages/CostCalculator'));
-const ActivityLogs = lazy(() => import('./pages/ActivityLogs'));
-const AdminBundles = lazy(() => import('./pages/AdminBundles'));
+const Admin = lazy(() => import('./pages/admin/Admin'));
+const AdminManagement = lazy(() => import('./pages/admin/AdminManagement'));
+const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const InventoryManager = lazy(() => import('./pages/admin/InventoryManager'));
+const ManualOrder = lazy(() => import('./pages/admin/ManualOrder'));
+const OrderList = lazy(() => import('./pages/admin/OrderList'));
+const ExpenseManagement = lazy(() => import('./pages/admin/ExpenseManagement'));
+const InvestmentTracker = lazy(() => import('./pages/admin/InvestmentTracker'));
+const CouponManagement = lazy(() => import('./pages/admin/CouponManagement'));
+const BannerManagement = lazy(() => import('./pages/admin/BannerManagement'));
+const CustomerList = lazy(() => import('./pages/admin/CustomerList'));
+const CostCalculator = lazy(() => import('./pages/admin/CostCalculator'));
+const ActivityLogs = lazy(() => import('./pages/admin/ActivityLogs'));
+const AdminBundles = lazy(() => import('./pages/admin/AdminBundles'));
 
 // --- CONTEXT ---
 import { WishlistProvider } from './context/WishlistContext';
