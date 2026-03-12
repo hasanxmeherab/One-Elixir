@@ -68,11 +68,19 @@ const addToRecentlyViewed = (product) => {
   try {
     const existing = getRecentlyViewed().filter(p => p._id !== product._id);
     const updated = [
-      { _id: product._id, name: product.name, price: product.price,
-        image: product.image, slug: product.slug, stock: product.stock,
-        scentProfile: product.scentProfile },
+      {
+        _id: product._id,
+        name: product.name,
+        price: product.price,
+        // ✅ always save first image correctly
+        image: product.images?.[0] || product.image || product.variants?.[0]?.image || '',
+
+        slug: product.slug,
+        stock: product.stock,
+        scentProfile: product.scentProfile,
+      },
       ...existing
-    ].slice(0, MAX_RECENT + 1); // +1 so we can exclude current product when rendering
+    ].slice(0, MAX_RECENT + 1);
     localStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(updated));
   } catch {}
 };
@@ -97,7 +105,11 @@ const ProductDetails = ({ openCart }) => {
   // --- SIZE VARIANT ---
   const [selectedVariant, setSelectedVariant] = useState(null);
 
-  const images = product?.images?.length ? product.images : product ? [product.image] : [];
+  const images = product?.images?.length 
+    ? product.images 
+    : product 
+      ? [product.images?.[0] || product.image || product.variants?.[0]?.image].filter(Boolean)
+      : [];
   const currentIndex = images.indexOf(selectedImage || product?.image);
 
   const goToImage = useCallback((dir) => {
@@ -123,13 +135,17 @@ const ProductDetails = ({ openCart }) => {
   // --- RECENTLY VIEWED ---
   const [recentlyViewed, setRecentlyViewed] = useState([]);
 
+  // ✅ Helper to extract image from a product object (handles both old & new format)
+  const getProductImage = (p) => 
+  p?.images?.[0] || p?.image || p?.variants?.[0]?.image || null;
+
   const fetchRelated = async (currentProduct) => {
     try {
-      const res = await axios.get(`${API_URL}/api/perfumes`);
+      // ✅ Cache-busting timestamp so stale server cache is bypassed
+      const res = await axios.get(`${API_URL}/api/perfumes?_t=${Date.now()}`);
       const all = res.data.filter(p => p._id !== currentProduct._id);
-      // Score by matching scent notes
       const scored = all.map(p => {
-        const matches = p.scentProfile.filter(note =>
+        const matches = (p.scentProfile || []).filter(note =>
           currentProduct.scentProfile.includes(note)
         ).length;
         return { ...p, score: matches };
@@ -183,7 +199,6 @@ const ProductDetails = ({ openCart }) => {
     try {
       setSubmitLoading(true);
       setUploadingReview(reviewImages.length > 0);
-      // Upload photos to Cloudinary
       const CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'dluvmed0b';
       const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'one_elixir_uploads';
       const imageUrls = await Promise.all(
@@ -228,7 +243,6 @@ const ProductDetails = ({ openCart }) => {
         const res = await axios.get(endpoint);
         setProduct(res.data);
         setSelectedImage(res.data.images?.[0] || res.data.image);
-        // Auto-select first variant if available
         if (res.data.variants?.length > 0) {
           setSelectedVariant(res.data.variants[0]);
           if (res.data.variants[0].image) setSelectedImage(res.data.variants[0].image);
@@ -237,7 +251,6 @@ const ProductDetails = ({ openCart }) => {
         }
         fetchRelated(res.data);
         fetchReviews(res.data._id);
-        // ── Save to recently viewed ──────────────────────────
         addToRecentlyViewed(res.data);
         setRecentlyViewed(getRecentlyViewed().filter(p => p._id !== res.data._id).slice(0, MAX_RECENT));
       } catch (err) {
@@ -249,7 +262,6 @@ const ProductDetails = ({ openCart }) => {
 
   if (!product) return <ProductDetailsSkeleton />;
 
-  // ── Flash sale active? ──────────────────────────────────────
   const flashActive = product.flashSale?.active && product.flashSale?.salePrice && new Date(product.flashSale.endsAt) > new Date();
   const hasVariants = product.variants?.length > 0;
   const basePrice = selectedVariant ? selectedVariant.price : product.price;
@@ -275,7 +287,6 @@ const ProductDetails = ({ openCart }) => {
 
   return (
     <>
-      {/* ── Meta Tags ─────────────────────────────────────────── */}
       {typeof document !== 'undefined' && (() => {
         document.title = `${product.name} — OneElixir`;
         let metaDesc = document.querySelector('meta[name="description"]');
@@ -291,11 +302,10 @@ const ProductDetails = ({ openCart }) => {
         metaOGDesc.content = metaDesc.content;
         let metaOGImg = document.querySelector('meta[property="og:image"]');
         if (!metaOGImg) { metaOGImg = document.createElement('meta'); metaOGImg.setAttribute('property', 'og:image'); document.head.appendChild(metaOGImg); }
-        metaOGImg.content = product.image || '';
+        metaOGImg.content = getProductImage(product) || '';
         return null;
       })()}
 
-      {/* ── JSON-LD Product + BreadcrumbList ──────────────────── */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
         "@context": "https://schema.org",
         "@type": "Product",
@@ -309,17 +319,9 @@ const ProductDetails = ({ openCart }) => {
           "url": `https://www.oneelixir.live/product/${product.slug || product._id}`,
           "priceCurrency": "BDT",
           "price": displayPrice,
-          "availability": product.stock > 0
-            ? "https://schema.org/InStock"
-            : "https://schema.org/OutOfStock",
+          "availability": product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
         },
-        ...(avgRating ? {
-          "aggregateRating": {
-            "@type": "AggregateRating",
-            "ratingValue": avgRating,
-            "reviewCount": reviews.length,
-          }
-        } : {}),
+        ...(avgRating ? { "aggregateRating": { "@type": "AggregateRating", "ratingValue": avgRating, "reviewCount": reviews.length } } : {}),
       }) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
         "@context": "https://schema.org",
@@ -334,7 +336,6 @@ const ProductDetails = ({ openCart }) => {
       <div className="flex min-h-screen px-[8%] pt-28 pb-20 gap-20 flex-wrap">      
         {/* Left: Product Image Gallery */}
         <div className="flex-1 min-w-[300px] max-w-[480px] bg-[#fcfcfc]">
-          {/* Main image with hover zoom & swipe */}
           <div
             className="relative w-full overflow-hidden bg-[#f8f8f8] mb-3 cursor-zoom-in select-none"
             onMouseEnter={() => setIsZooming(true)}
@@ -346,20 +347,18 @@ const ProductDetails = ({ openCart }) => {
             onClick={() => setLightboxOpen(true)}
           >
             <img
-              src={selectedImage || product.image}
+              src={selectedImage || getProductImage(product)}
               alt={product.name}
               draggable={false}
               className="w-full h-[380px] object-contain transition-opacity duration-300"
               style={isZooming ? { transform: 'scale(2)', transformOrigin: `${zoomPos.x}% ${zoomPos.y}%`, transition: 'transform 0.1s ease-out' } : {}}
             />
-            {/* Image counter */}
             {images.length > 1 && (
               <span className="absolute bottom-3 right-3 bg-black/50 text-white text-[10px] font-bold px-2 py-1 rounded-sm tracking-wider pointer-events-none">
                 {(currentIndex >= 0 ? currentIndex : 0) + 1} / {images.length}
               </span>
             )}
           </div>
-          {/* Thumbnails — only when multiple images */}
           {product.images?.length > 1 && (
             <div className="flex gap-2 overflow-x-auto pb-1">
               {product.images.map((img, i) => (
@@ -390,7 +389,6 @@ const ProductDetails = ({ openCart }) => {
             {product.name.toUpperCase()}
           </h1>
 
-          {/* ── Price: flash sale banner OR normal price ── */}
           {flashActive ? (
             <FlashSaleBanner
               salePrice={product.flashSale.salePrice}
@@ -401,7 +399,6 @@ const ProductDetails = ({ openCart }) => {
             <p className="text-xl text-[#555] mb-8">{displayPrice.toLocaleString()} TK</p>
           )}
 
-          {/* ── Size Selector ── */}
           {hasVariants && (
             <div className="mb-8">
               <p className="text-[10px] tracking-[3px] font-bold mb-3 text-[#888]">SELECT SIZE</p>
@@ -430,53 +427,32 @@ const ProductDetails = ({ openCart }) => {
 
           <p className="text-[15px] leading-relaxed text-[#444] mb-10">{product.description}</p>
 
-          {/* Scent Architecture */}
           <div className="mb-12">
             <p className="text-[10px] tracking-[3px] font-bold mb-4 text-[#888]">SCENT ARCHITECTURE</p>
             <div className="flex gap-2.5 flex-wrap mb-12">
               {product.scentProfile.map((note, index) => (
-                <span
-                  key={index}
-                  className="px-4 py-2 border border-[#ddd] text-xs tracking-wider hover:border-black transition-colors"
-                >
+                <span key={index} className="px-4 py-2 border border-[#ddd] text-xs tracking-wider hover:border-black transition-colors">
                   {note}
                 </span>
               ))}
             </div>
           </div>
 
-          {/* Purchase Actions */}
           <div className="flex gap-5 mb-5 flex-wrap">
             {effectiveStock > 0 ? (
               <>
-                {/* Quantity Selector */}
                 <div className="flex items-center border border-black">
-                  <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="stepper-btn px-4 py-2.5 bg-transparent border-none cursor-pointer text-lg hover:bg-gray-50"
-                  >-</button>
+                  <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="stepper-btn px-4 py-2.5 bg-transparent border-none cursor-pointer text-lg hover:bg-gray-50">-</button>
                   <span className="px-5 font-bold">{quantity}</span>
-                  <button
-                    onClick={() => setQuantity(Math.min(effectiveStock, quantity + 1))}
-                    className="stepper-btn px-4 py-2.5 bg-transparent border-none cursor-pointer text-lg hover:bg-gray-50"
-                  >+</button>
+                  <button onClick={() => setQuantity(Math.min(effectiveStock, quantity + 1))} className="stepper-btn px-4 py-2.5 bg-transparent border-none cursor-pointer text-lg hover:bg-gray-50">+</button>
                 </div>
-
-                {/* Add to Cart Button */}
-                <button
-                  onClick={handleAddToCart}
-                  className="btn-press flex-1 bg-black text-white border-none font-bold tracking-[2px] cursor-pointer text-xs hover:bg-gray-800 transition-colors px-6 py-3"
-                >
+                <button onClick={handleAddToCart} className="btn-press flex-1 bg-black text-white border-none font-bold tracking-[2px] cursor-pointer text-xs hover:bg-gray-800 transition-colors px-6 py-3">
                   ADD TO COLLECTION
                 </button>
-
-                {/* Wishlist Button */}
                 <button
                   onClick={() => toggleWishlist(product)}
                   className={`btn-press flex items-center gap-2 px-5 py-3 border font-bold text-xs tracking-wider transition-colors ${
-                    isWishlisted(product._id)
-                      ? 'border-red-300 bg-red-50 text-red-500 hover:bg-red-100'
-                      : 'border-black text-black hover:bg-gray-50'
+                    isWishlisted(product._id) ? 'border-red-300 bg-red-50 text-red-500 hover:bg-red-100' : 'border-black text-black hover:bg-gray-50'
                   }`}
                 >
                   <Heart size={14} className={`${isWishlisted(product._id) ? 'fill-red-500 heart-pop' : ''}`} />
@@ -485,18 +461,13 @@ const ProductDetails = ({ openCart }) => {
               </>
             ) : (
               <div className="flex gap-3 flex-wrap w-full">
-                <button
-                  disabled
-                  className="flex-1 bg-[#eee] text-[#888] border-none cursor-not-allowed tracking-[2px] py-3 text-xs"
-                >
+                <button disabled className="flex-1 bg-[#eee] text-[#888] border-none cursor-not-allowed tracking-[2px] py-3 text-xs">
                   CURRENTLY UNAVAILABLE
                 </button>
                 <button
                   onClick={() => toggleWishlist(product)}
                   className={`btn-press flex items-center gap-2 px-5 py-3 border font-bold text-xs tracking-wider transition-colors ${
-                    isWishlisted(product._id)
-                      ? 'border-red-300 bg-red-50 text-red-500 hover:bg-red-100'
-                      : 'border-black text-black hover:bg-gray-50'
+                    isWishlisted(product._id) ? 'border-red-300 bg-red-50 text-red-500 hover:bg-red-100' : 'border-black text-black hover:bg-gray-50'
                   }`}
                 >
                   <Heart size={14} className={`${isWishlisted(product._id) ? 'fill-red-500 heart-pop' : ''}`} />
@@ -522,6 +493,7 @@ const ProductDetails = ({ openCart }) => {
                   onClick={() => { navigate(`/product/${p.slug || p._id}`); window.scrollTo(0, 0); }}
                   className="cursor-pointer group transition-shadow duration-300 hover:shadow-lg">
                   <div className="relative w-full h-[220px] bg-[#fcfcfc] overflow-hidden mb-4">
+                    {/* ✅ recently viewed uses saved `image` field from addToRecentlyViewed */}
                     <img src={p.image || null} alt={p.name}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                     {p.stock === 0 && (
@@ -550,14 +522,14 @@ const ProductDetails = ({ openCart }) => {
                   className="cursor-pointer group transition-shadow duration-300 hover:shadow-lg"
                 >
                   <div className="relative w-full h-[220px] bg-[#fcfcfc] overflow-hidden mb-4">
+                    {/* ✅ getProductImage handles both images[] and image field */}
                     <img
-                      src={p.image || null} alt={p.name}
+                      src={getProductImage(p)}
+                      alt={p.name}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                     {p.stock === 0 && (
-                      <div className="absolute top-2 left-2 bg-black text-white px-2 py-0.5 text-[9px] font-bold tracking-wider">
-                        SOLD OUT
-                      </div>
+                      <div className="absolute top-2 left-2 bg-black text-white px-2 py-0.5 text-[9px] font-bold tracking-wider">SOLD OUT</div>
                     )}
                   </div>
                   <h4 className="text-xs font-bold tracking-wider mb-1 group-hover:underline">
@@ -578,29 +550,22 @@ const ProductDetails = ({ openCart }) => {
           <div className="h-px bg-[#eee] mb-16"></div>
 
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-16">
-
-            {/* LEFT: Rating Summary */}
             <div>
               <p className="text-[10px] tracking-[3px] font-bold text-[#888] mb-8">CUSTOMER REVIEWS</p>
 
               {reviews.length > 0 ? (
                 <>
-                  {/* Average */}
                   <div className="flex items-end gap-4 mb-6">
                     <span className="text-6xl font-light">{avgRating}</span>
                     <div className="pb-2">
                       <div className="flex gap-1 mb-1">
                         {[1,2,3,4,5].map(s => (
-                          <Star key={s} size={16}
-                            className={s <= Math.round(avgRating) ? 'fill-black text-black' : 'text-[#ddd]'}
-                          />
+                          <Star key={s} size={16} className={s <= Math.round(avgRating) ? 'fill-black text-black' : 'text-[#ddd]'} />
                         ))}
                       </div>
                       <p className="text-xs text-[#888]">{reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}</p>
                     </div>
                   </div>
-
-                  {/* Bar breakdown */}
                   <div className="flex flex-col gap-2 mb-10">
                     {ratingCounts.map(({ star, count, pct }) => (
                       <div key={star} className="flex items-center gap-3">
@@ -621,7 +586,6 @@ const ProductDetails = ({ openCart }) => {
                 </div>
               )}
 
-              {/* Review list */}
               <div className="flex flex-col gap-8">
                 {reviewsLoading ? (
                   <ReviewsSkeleton count={3} />
@@ -635,9 +599,7 @@ const ProductDetails = ({ openCart }) => {
                     </div>
                     <div className="flex gap-0.5 mb-3">
                       {[1,2,3,4,5].map(s => (
-                        <Star key={s} size={12}
-                          className={s <= review.rating ? 'fill-black text-black' : 'text-[#ddd]'}
-                        />
+                        <Star key={s} size={12} className={s <= review.rating ? 'fill-black text-black' : 'text-[#ddd]'} />
                       ))}
                     </div>
                     <p className="text-sm text-[#444] leading-relaxed">{review.comment}</p>
@@ -656,38 +618,26 @@ const ProductDetails = ({ openCart }) => {
               </div>
             </div>
 
-            {/* RIGHT: Submit Review Form */}
             <div>
               <p className="text-[10px] tracking-[3px] font-bold text-[#888] mb-8">WRITE A REVIEW</p>
               <form onSubmit={handleReviewSubmit} className="flex flex-col gap-5">
-
                 <input
                   type="text" placeholder="Your Name" required
                   value={reviewForm.userName}
                   onChange={e => setReviewForm({ ...reviewForm, userName: e.target.value })}
                   className="p-3 border border-[#ddd] outline-none text-sm"
                 />
-
-                {/* Star Rating Picker */}
                 <div>
                   <p className="text-[10px] tracking-wider text-[#888] mb-3">YOUR RATING</p>
                   <div className="flex gap-2">
                     {[1,2,3,4,5].map(s => (
-                      <button
-                        key={s} type="button"
+                      <button key={s} type="button"
                         onClick={() => setReviewForm({ ...reviewForm, rating: s })}
                         onMouseEnter={() => setHoverRating(s)}
                         onMouseLeave={() => setHoverRating(0)}
                         className="bg-transparent border-none cursor-pointer p-0"
                       >
-                        <Star
-                          size={28}
-                          className={`transition-colors ${
-                            s <= (hoverRating || reviewForm.rating)
-                              ? 'fill-black text-black'
-                              : 'text-[#ddd]'
-                          }`}
-                        />
+                        <Star size={28} className={`transition-colors ${s <= (hoverRating || reviewForm.rating) ? 'fill-black text-black' : 'text-[#ddd]'}`} />
                       </button>
                     ))}
                   </div>
@@ -697,7 +647,6 @@ const ProductDetails = ({ openCart }) => {
                     </p>
                   )}
                 </div>
-
                 <textarea
                   placeholder="Share your experience with this fragrance..."
                   required rows={5}
@@ -705,8 +654,6 @@ const ProductDetails = ({ openCart }) => {
                   onChange={e => setReviewForm({ ...reviewForm, comment: e.target.value })}
                   className="p-3 border border-[#ddd] outline-none text-sm resize-none leading-relaxed"
                 />
-
-                {/* Photo upload */}
                 <div>
                   <p className="text-[10px] tracking-wider text-[#888] mb-2">ADD PHOTOS <span className="font-normal text-[#bbb]">(optional, up to 3)</span></p>
                   <label className={`flex items-center gap-3 p-3 border-2 border-dashed cursor-pointer transition-colors ${reviewImages.length > 0 ? 'border-black bg-gray-50' : 'border-[#ddd] hover:border-black'}`}>
@@ -729,16 +676,9 @@ const ProductDetails = ({ openCart }) => {
                     </div>
                   )}
                 </div>
-
-                {reviewError && (
-                  <p className="text-xs text-red-500 tracking-wider">{reviewError}</p>
-                )}
-                {reviewSuccess && (
-                  <p className="text-xs text-green-600 tracking-wider">✓ YOUR REVIEW HAS BEEN SUBMITTED</p>
-                )}
-
-                <button
-                  type="submit" disabled={submitLoading}
+                {reviewError && <p className="text-xs text-red-500 tracking-wider">{reviewError}</p>}
+                {reviewSuccess && <p className="text-xs text-green-600 tracking-wider">✓ YOUR REVIEW HAS BEEN SUBMITTED</p>}
+                <button type="submit" disabled={submitLoading}
                   className="py-4 bg-black text-white text-xs font-bold tracking-[3px] hover:bg-gray-800 transition-colors disabled:opacity-50 cursor-pointer border-none"
                 >
                   {uploadingReview ? 'UPLOADING PHOTOS...' : submitLoading ? 'SUBMITTING...' : 'SUBMIT REVIEW'}
@@ -751,37 +691,24 @@ const ProductDetails = ({ openCart }) => {
 
       {/* ── Fullscreen Lightbox ── */}
       {lightboxOpen && (
-        <div
-          className="fixed inset-0 z-[3000] bg-black/90 flex items-center justify-center"
-          onClick={() => setLightboxOpen(false)}
-        >
-          <button
-            onClick={() => setLightboxOpen(false)}
-            className="absolute top-6 right-6 text-white bg-transparent border-none cursor-pointer z-10"
-            aria-label="Close lightbox"
-          >
+        <div className="fixed inset-0 z-[3000] bg-black/90 flex items-center justify-center" onClick={() => setLightboxOpen(false)}>
+          <button onClick={() => setLightboxOpen(false)} className="absolute top-6 right-6 text-white bg-transparent border-none cursor-pointer z-10" aria-label="Close lightbox">
             <X size={28} />
           </button>
           {images.length > 1 && (
             <>
-              <button
-                onClick={(e) => { e.stopPropagation(); goToImage(-1); }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-white bg-white/10 hover:bg-white/20 border-none rounded-full w-10 h-10 flex items-center justify-center cursor-pointer transition-colors"
-                aria-label="Previous image"
-              >
+              <button onClick={(e) => { e.stopPropagation(); goToImage(-1); }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-white bg-white/10 hover:bg-white/20 border-none rounded-full w-10 h-10 flex items-center justify-center cursor-pointer transition-colors" aria-label="Previous image">
                 <ChevronLeft size={22} />
               </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); goToImage(1); }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-white bg-white/10 hover:bg-white/20 border-none rounded-full w-10 h-10 flex items-center justify-center cursor-pointer transition-colors"
-                aria-label="Next image"
-              >
+              <button onClick={(e) => { e.stopPropagation(); goToImage(1); }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-white bg-white/10 hover:bg-white/20 border-none rounded-full w-10 h-10 flex items-center justify-center cursor-pointer transition-colors" aria-label="Next image">
                 <ChevronRight size={22} />
               </button>
             </>
           )}
           <img
-            src={selectedImage || product.image}
+            src={selectedImage || getProductImage(product)}
             alt={product.name}
             onClick={(e) => e.stopPropagation()}
             className="max-h-[85vh] max-w-[90vw] object-contain select-none"

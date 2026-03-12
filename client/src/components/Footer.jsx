@@ -2,8 +2,9 @@ import { Link } from 'react-router-dom';
 
 export default function Footer() {
   return (
-    <footer className="bg-black text-white">
-      <div className="px-[5%] py-14">
+    <footer className="bg-white text-white">
+      <div className="bg-black mx-2 md:mx-[5%] rounded-xl border-t-4 border-[#e74c3c]">
+      <div className="px-[6%] py-14">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr_1fr] gap-12">
 
           {/* ── COL 1: SUPPORT ── */}
@@ -48,7 +49,7 @@ export default function Footer() {
                 </svg>
               </a>
               <a
-                href="https://www.instagram.com/oneelixir/"
+                href="https://www.instagram.com/one_elixir/"
                 target="_blank" rel="noreferrer"
                 className="w-10 h-10 rounded-full bg-[#833AB4] flex items-center justify-center hover:opacity-80 transition-opacity"
               >
@@ -144,14 +145,17 @@ export default function Footer() {
           </div>
         </div>
       </div>
+      </div>
 
       {/* Bottom bar */}
-      <div className="border-t border-[#1f1f1f] px-[5%] py-5 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div className="bg-white px-[8%] py-5">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
         <p className="text-[#555] text-[12px] tracking-widest uppercase">
           © {new Date().getFullYear()} OneElixir. All rights reserved.
         </p>
-        <p className="text-[#444] text-[11px]">Made with ❤️ in Bangladesh</p>
+        <p className="text-[#888] text-[11px]">Made with ❤️ in Bangladesh</p>
+        </div>
       </div>
-    </footer>
+  </footer>
   );
 }
