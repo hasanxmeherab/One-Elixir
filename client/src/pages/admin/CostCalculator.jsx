@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import adminAxios from '../utils/adminAxios';
+import adminAxios from '../../utils/adminAxios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import adminAxios from '../utils/adminAxios';
+import adminAxios from '../../utils/adminAxios';
 import { ImagePlus } from 'lucide-react';
-import { useToast } from '../context/ToastContext';
+import { useToast } from '../../context/ToastContext';
 
 const BannerManagement = ({ isAdmin }) => {
   const toast = useToast();

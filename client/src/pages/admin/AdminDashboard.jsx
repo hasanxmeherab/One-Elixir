@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
-import { DashboardSkeleton } from '../components/Skeleton';
-import adminAxios from '../utils/adminAxios';
+import { DashboardSkeleton } from '../../components/Skeleton';
+import adminAxios from '../../utils/adminAxios';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell

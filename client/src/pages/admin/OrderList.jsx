@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import adminAxios from '../utils/adminAxios';
+import adminAxios from '../../utils/adminAxios';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useOutletContext } from 'react-router-dom';
-import { useToast } from '../context/ToastContext';
+import { useToast } from '../../context/ToastContext';
 
 
 const PAGE_SIZE = 15;
@@ -51,14 +51,12 @@ const OrderList = () => {
   const CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
   const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
   const API_URL       = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-  const authHeader    = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } });
 
   useEffect(() => {
     const interval = setInterval(() => fetchData(), 30000);
     return () => clearInterval(interval);
   }, []);
 
-  // Reset to page 1 when filters change
   useEffect(() => { setPage(1); }, [searchTerm, paymentStatusFilter, paymentMethodFilter, orderStatusFilter, showArchived]);
 
   if (!orders) return <div className="p-10 text-center">Loading Order Data...</div>;
@@ -75,7 +73,12 @@ const OrderList = () => {
 
   const openEditPayment = (order) => {
     setEditPaymentOrder(order);
-    setEditPaymentForm({ senderNumber: order.paymentDetails?.senderNumber || '', transactionId: order.paymentDetails?.transactionId || '', screenshot: null, screenshotUrl: order.paymentDetails?.screenshot || '' });
+    setEditPaymentForm({
+      senderNumber: order.paymentDetails?.senderNumber || '',
+      transactionId: order.paymentDetails?.transactionId || '',
+      screenshot: null,
+      screenshotUrl: order.paymentDetails?.screenshot || ''
+    });
   };
 
   const savePaymentDetails = async () => {
@@ -93,7 +96,12 @@ const OrderList = () => {
         screenshotUrl = res.data.secure_url;
       }
       await adminAxios.put(`${API_URL}/api/orders/${editPaymentOrder._id}`, {
-        paymentDetails: { platform: editPaymentOrder.paymentMethod, senderNumber: editPaymentForm.senderNumber, transactionId: editPaymentForm.transactionId, screenshot: screenshotUrl }
+        paymentDetails: {
+          platform: editPaymentOrder.paymentMethod,
+          senderNumber: editPaymentForm.senderNumber,
+          transactionId: editPaymentForm.transactionId,
+          screenshot: screenshotUrl
+        }
       });
       toast.success('Payment details saved.');
       setEditPaymentOrder(null);
@@ -143,34 +151,33 @@ const OrderList = () => {
     } catch (error) { console.error('PDF Error:', error); }
   };
 
-  // ── Excel Export ─────────────────────────────────────────────
-const exportToExcel = () => {
-  const rows = allFiltered.map(order => ({
-    'Date':           new Date(order.createdAt).toLocaleDateString('en-GB'),
-    'Order ID':       order._id.slice(-6).toUpperCase(),
-    'Customer':       order.customerName,
-    'Phone':          order.phone,
-    'Address':        order.address || '',
-    'Items':          order.items.map(i => `${i.quantity}x ${i.name}`).join(', '),
-    'Shipping (TK)':  order.shippingCost || 0,
-    'Total (TK)':     order.totalAmount,
-    'Payment Method': order.paymentMethod,
-    'Payment Status': order.paymentStatus || 'Unpaid',
-    'Order Status':   order.status,
-    'Created By':     order.createdBy || (order.isManual ? 'Admin' : 'Customer'),
-  }));
-  const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = [
-    { wch: 12 }, { wch: 10 }, { wch: 20 }, { wch: 15 },
-    { wch: 30 }, { wch: 40 }, { wch: 14 }, { wch: 12 },
-    { wch: 18 }, { wch: 15 }, { wch: 14 }, { wch: 15 },
-  ];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Orders');
-  const date = new Date().toISOString().split('T')[0];
-  XLSX.writeFile(wb, `OneElixir_Orders_${date}.xlsx`);
-  toast.success(`Exported ${rows.length} orders to Excel`);
-};
+  const exportToExcel = () => {
+    const rows = allFiltered.map(order => ({
+      'Date':           new Date(order.createdAt).toLocaleDateString('en-GB'),
+      'Order ID':       order._id.slice(-6).toUpperCase(),
+      'Customer':       order.customerName,
+      'Phone':          order.phone,
+      'Address':        order.address || '',
+      'Items':          order.items.map(i => `${i.quantity}x ${i.name}`).join(', '),
+      'Shipping (TK)':  order.shippingCost || 0,
+      'Total (TK)':     order.totalAmount,
+      'Payment Method': order.paymentMethod,
+      'Payment Status': order.paymentStatus || 'Unpaid',
+      'Order Status':   order.status,
+      'Created By':     order.createdBy || (order.isManual ? 'Admin' : 'Customer'),
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [
+      { wch: 12 }, { wch: 10 }, { wch: 20 }, { wch: 15 },
+      { wch: 30 }, { wch: 40 }, { wch: 14 }, { wch: 12 },
+      { wch: 18 }, { wch: 15 }, { wch: 14 }, { wch: 15 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Orders');
+    const date = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `OneElixir_Orders_${date}.xlsx`);
+    toast.success(`Exported ${rows.length} orders to Excel`);
+  };
 
   const baseFiltered    = orders.filter(o => showArchived ? o.status === 'Canceled' : o.status !== 'Canceled');
   const allFiltered = baseFiltered.filter(order => {
@@ -190,6 +197,10 @@ const exportToExcel = () => {
     if (status === 'Shipped')    return 'bg-violet-100 text-violet-800';
     return 'bg-amber-100 text-amber-800';
   };
+
+  // ✅ Check if order has payment details (works for COD + Full Payment)
+  const hasPaymentDetails = (order) =>
+    !!(order.paymentDetails?.senderNumber || order.paymentDetails?.transactionId);
 
   return (
     <div className="w-full">
@@ -265,21 +276,37 @@ const exportToExcel = () => {
                   <select value={order.paymentStatus || 'Unpaid'} onChange={e => updatePaymentStatus(order._id, e.target.value)}
                     className={`p-1 text-[10px] font-bold border border-[#ddd] cursor-pointer outline-none ${order.paymentStatus === 'Paid' ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}>
                     <option value="Unpaid">Unpaid</option>
+                    <option value="Pending Verification">Pending Verification</option>
                     <option value="Paid">Paid</option>
                   </select>
                 </td>
+
+                {/* ✅ INFO column — shows for ANY order with payment details, including COD */}
                 <td className="py-2.5 px-2 text-center align-middle">
-                  {order.paymentMethod !== 'Cash on Delivery' ? (
+                  {hasPaymentDetails(order) ? (
                     <div className="flex flex-col gap-1 items-center justify-center">
-                      <button onClick={() => setSelectedPayment({ platform: order.paymentDetails?.platform || order.paymentMethod, senderNumber: order.paymentDetails?.senderNumber || '—', transactionId: order.paymentDetails?.transactionId || '—', amountPaid: order.paymentDetails?.amountPaid || null, screenshot: order.paymentDetails?.screenshot || null })}
-                        className="bg-black text-white border-none px-2 py-1 text-[9px] cursor-pointer font-bold">VIEW</button>
-                      <button onClick={() => openEditPayment(order)}
-                        className="bg-[#555] text-white border-none px-2 py-1 text-[9px] cursor-pointer font-bold">EDIT</button>
+                      <button
+                        onClick={() => setSelectedPayment({
+                          platform: order.paymentDetails?.platform || order.paymentMethod,
+                          senderNumber: order.paymentDetails?.senderNumber || '—',
+                          transactionId: order.paymentDetails?.transactionId || '—',
+                          amountPaid: order.paymentDetails?.amountPaid || null,
+                          screenshot: order.paymentDetails?.screenshot || null,
+                        })}
+                        className="bg-black text-white border-none px-2 py-1 text-[9px] cursor-pointer font-bold">
+                        VIEW
+                      </button>
+                      <button
+                        onClick={() => openEditPayment(order)}
+                        className="bg-[#555] text-white border-none px-2 py-1 text-[9px] cursor-pointer font-bold">
+                        EDIT
+                      </button>
                     </div>
                   ) : (
-                    <span className="text-[11px] text-gray-200 block text-center">—</span>
+                    <span className="text-[11px] text-gray-300 block text-center">—</span>
                   )}
                 </td>
+
                 <td className="py-2.5 px-2 text-[11px] text-gray-500">{order.createdBy || (order.isManual ? 'Admin' : 'Customer')}</td>
                 <td className="py-2.5 px-2">
                   <span className={`px-2 py-0.5 rounded-sm text-[10px] font-bold ${getStatusClass(order.status)}`}>
@@ -324,31 +351,31 @@ const exportToExcel = () => {
             <div className="flex flex-col gap-2.5">
               {selectedPayment.platform && (
                 <div className="flex justify-between items-center py-2 border-b border-[#f0f0f0]">
-                  <span className="text-[10px] font-bold tracking-wider text-gray-300">PLATFORM</span>
+                  <span className="text-[10px] font-bold tracking-wider text-gray-400">PLATFORM</span>
                   <span className="text-xs text-gray-600">{selectedPayment.platform}</span>
                 </div>
               )}
               <div className="flex justify-between items-center py-2 border-b border-[#f0f0f0]">
-                <span className="text-[10px] font-bold tracking-wider text-gray-300">SENDER NUMBER</span>
+                <span className="text-[10px] font-bold tracking-wider text-gray-400">SENDER NUMBER</span>
                 <span className="text-xs text-gray-600">{selectedPayment.senderNumber || '—'}</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-[#f0f0f0]">
-                <span className="text-[10px] font-bold tracking-wider text-gray-300">TRANSACTION ID</span>
+                <span className="text-[10px] font-bold tracking-wider text-gray-400">TRANSACTION ID</span>
                 <span className="text-xs font-mono font-bold text-black tracking-wider">{selectedPayment.transactionId || '—'}</span>
               </div>
               {selectedPayment.amountPaid && (
                 <div className="flex justify-between items-center py-2 border-b border-[#f0f0f0]">
-                  <span className="text-[10px] font-bold tracking-wider text-gray-300">AMOUNT PAID</span>
+                  <span className="text-[10px] font-bold tracking-wider text-gray-400">AMOUNT PAID</span>
                   <span className="text-xs font-bold text-emerald-700">{selectedPayment.amountPaid} TK</span>
                 </div>
               )}
             </div>
             {selectedPayment.screenshot && (
               <div className="mt-2">
-                <p className="text-[10px] font-bold tracking-wider text-gray-300 mb-2">PAYMENT SCREENSHOT</p>
+                <p className="text-[10px] font-bold tracking-wider text-gray-400 mb-2">PAYMENT SCREENSHOT</p>
                 <a href={selectedPayment.screenshot} target="_blank" rel="noreferrer">
                   <img src={selectedPayment.screenshot} alt="Payment proof" className="w-full max-h-[280px] object-contain border border-[#eee] cursor-zoom-in" />
-                  <p className="text-[10px] text-gray-300 text-center mt-1">Click to open full size</p>
+                  <p className="text-[10px] text-gray-400 text-center mt-1">Click to open full size</p>
                 </a>
               </div>
             )}
@@ -395,6 +422,7 @@ const exportToExcel = () => {
           </div>
         </div>
       )}
+
       <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
     </div>
   );

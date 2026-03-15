@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import adminAxios from '../utils/adminAxios';
-import { useToast } from '../context/ToastContext';
+import adminAxios from '../../utils/adminAxios';
+import { useToast } from '../../context/ToastContext';
 import { X, ImagePlus } from 'lucide-react';
 
 const API_URL       = import.meta.env.VITE_API_URL || 'http://localhost:5000';

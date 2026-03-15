@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import axios from 'axios';
-import adminAxios from '../utils/adminAxios';
+import adminAxios from '../../utils/adminAxios';
 import { useOutletContext } from 'react-router-dom';
 import Select from 'react-select';
-import locationData from '../data/locationData.json';
+import locationData from '../../data/locationData.json';
 import { ImagePlus } from 'lucide-react';
 
 const CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;

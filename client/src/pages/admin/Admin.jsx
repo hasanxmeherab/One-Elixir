@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import adminAxios from '../utils/adminAxios';
+import adminAxios from '../../utils/adminAxios';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 const LINKS = [

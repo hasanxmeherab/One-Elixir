@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import adminAxios from '../utils/adminAxios';
+import adminAxios from '../../utils/adminAxios';
 import { UserPlus, ShieldCheck, Trash2, BadgeCheck } from 'lucide-react';
-import { useToast } from '../context/ToastContext';
+import { useToast } from '../../context/ToastContext';
 
 const AdminManagement = () => {
   const toast = useToast();

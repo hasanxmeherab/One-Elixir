@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import adminAxios from '../utils/adminAxios';
-import { useToast } from '../context/ToastContext';
+import adminAxios from '../../utils/adminAxios';
+import { useToast } from '../../context/ToastContext';
 
 const CouponManagement = () => {
   const toast = useToast();

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import adminAxios from '../utils/adminAxios';
-import { TableSkeleton } from '../components/Skeleton';
+import adminAxios from '../../utils/adminAxios';
+import { TableSkeleton } from '../../components/Skeleton';
 import { RefreshCw, Trash2, Filter } from 'lucide-react';
-import { useToast } from '../context/ToastContext';
+import { useToast } from '../../context/ToastContext';
 
 const ACTION_COLORS = {
   CREATE_PRODUCT: 'bg-green-100 text-green-800',

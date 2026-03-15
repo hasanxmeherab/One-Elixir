@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import adminAxios from '../utils/adminAxios';
+import adminAxios from '../../utils/adminAxios';
 import { useOutletContext } from 'react-router-dom';
-import { useToast } from '../context/ToastContext';
+import { useToast } from '../../context/ToastContext';
 import { Plus, X, ImagePlus } from 'lucide-react';
 
 // ── Stock display cell ────────────────────────────────────────

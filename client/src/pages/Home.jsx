@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useCart } from '../context/CartContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { Star, ChevronLeft, ChevronRight } from 'lucide-react';
-import BannerManagement from './BannerManagement';
+import BannerManagement from './admin/BannerManagement';
 import { optimizeImage } from '../utils/optimizeImage';
 
 /* ─── Horizontal scroll carousel hook ─── */
@@ -43,7 +43,7 @@ const ProductCard = ({ p, ratings, addToCart, navigate }) => {
       <Link to={`/product/${p.slug || p._id}`} className="no-underline block">
         <div className="w-full h-[160px] sm:h-[190px] bg-white flex items-center justify-center overflow-hidden">
           <img
-            src={optimizeImage(p.image || p.variants?.[0]?.image, 400)}
+            src={optimizeImage(p.images?.[0] || p.image || p.variants?.[0]?.image, 400)}
             alt={p.name}
             className="w-full h-full object-contain p-2 transition-transform duration-500 hover:scale-105"
             style={{ opacity: p.stock === 0 ? 0.5 : 1 }}
