@@ -13,14 +13,14 @@ const BannerManagement = ({ isAdmin }) => {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-  const CLOUD_NAME = "dluvmed0b";
+  const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 
   // Cloudinary image optimizer — adds auto-format + auto-quality + width cap
   const optimizeCloudinaryUrl = (url, width = 1920) => {
     if (!url || !url.includes('cloudinary.com')) return url;
     return url.replace('/upload/', `/upload/f_auto,q_auto,w_${width}/`);
   };
-  const UPLOAD_PRESET = "one_elixir_uploads";
+  const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
   const timerRef = useRef(null);
 
   useEffect(() => {

@@ -7,7 +7,7 @@ import { useToast } from '../context/ToastContext';
 import { MapPin, Plus, Trash2, Star, Home, Briefcase, Map, Camera, Eye, EyeOff, User, ShoppingBag } from 'lucide-react';
 
 const LABEL_ICONS = { Home: <Home size={13}/>, Work: <Briefcase size={13}/>, Other: <Map size={13}/> };
-const CLOUD_NAME = 'dluvmed0b';
+const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 
 const Account = () => {
   const toast = useToast();
@@ -100,7 +100,7 @@ const Account = () => {
     try {
       const data = new FormData();
       data.append('file', file);
-      data.append('upload_preset', 'one_elixir_uploads');
+      data.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
       data.append('cloud_name', CLOUD_NAME);
       const res = await axios.post(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, data);
       const avatarUrl = res.data.secure_url.replace('/upload/', '/upload/f_auto,q_auto,w_200,h_200,c_fill,g_face/');

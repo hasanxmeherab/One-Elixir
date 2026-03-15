@@ -128,8 +128,8 @@ const InventoryManager = () => {
 
   const API_URL       = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const authHeader    = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } });
-  const CLOUD_NAME    = 'dluvmed0b';
-  const UPLOAD_PRESET = 'one_elixir_uploads';
+  const CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+  const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
   const optimizeCloudinaryUrl = (url, width = 800) => {
     if (!url || !url.includes('cloudinary.com')) return url;

@@ -82,8 +82,8 @@ const Checkout = () => {
       try {
         const data = new FormData();
         data.append("file", mobilePayment.screenshot);
-        data.append("upload_preset", "one_elixir_uploads");
-        const res = await axios.post(`https://api.cloudinary.com/v1_1/dluvmed0b/image/upload`, data);
+        data.append("upload_preset", import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
+        const res = await axios.post(`https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`, data);
         screenshotUrl = res.data.secure_url;
       } catch (err) {
         setLoading(false);

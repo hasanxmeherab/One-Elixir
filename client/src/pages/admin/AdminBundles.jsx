@@ -5,8 +5,8 @@ import { useToast } from '../../context/ToastContext';
 import { X, ImagePlus } from 'lucide-react';
 
 const API_URL       = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-const CLOUD_NAME    = 'dluvmed0b';
-const UPLOAD_PRESET = 'one_elixir_uploads';
+const CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
 const AdminBundles = () => {
   const toast = useToast();

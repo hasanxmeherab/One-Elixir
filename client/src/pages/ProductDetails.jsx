@@ -199,8 +199,8 @@ const ProductDetails = ({ openCart }) => {
     try {
       setSubmitLoading(true);
       setUploadingReview(reviewImages.length > 0);
-      const CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'dluvmed0b';
-      const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'one_elixir_uploads';
+      const CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+      const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
       const imageUrls = await Promise.all(
         reviewImages.map(async (file) => {
           const data = new FormData();
