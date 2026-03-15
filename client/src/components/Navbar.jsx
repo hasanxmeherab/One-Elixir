@@ -21,12 +21,13 @@ const Navbar = () => {
   const searchInputRef = useRef(null);
   const sidebarRef = useRef(null);
   const searchOverlayRef = useRef(null);
-  const inlineSearchRef = useRef(null);
+  const desktopSearchRef = useRef(null);
+  const mobileSearchRef = useRef(null);
 
-  // Close inline search dropdown on outside click
+  // Close desktop search dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (inlineSearchRef.current && !inlineSearchRef.current.contains(e.target)) {
+      if (desktopSearchRef.current && !desktopSearchRef.current.contains(e.target)) {
         setSuggestions([]);
         setSearchQuery('');
       }
@@ -217,7 +218,7 @@ const Navbar = () => {
           </Link>
 
           {/* DESKTOP: INLINE SEARCH BAR WITH DROPDOWN */}
-          <div ref={inlineSearchRef} className="flex-1 hidden md:flex flex-col relative max-w-[600px]">
+          <div ref={desktopSearchRef} className="flex-1 hidden md:flex flex-col relative max-w-[600px]">
             <div className="flex items-center bg-[#f0f0f0] rounded-md overflow-hidden pr-1.5">
               <input
                 type="text"
@@ -273,14 +274,15 @@ const Navbar = () => {
                   <div
                     key={item._id}
                     className="flex items-center gap-4 px-4 py-3 border-b border-[#f5f5f5] cursor-pointer hover:bg-[#f9f9f9] transition-colors"
-                    onClick={() => {
+                    onClick={e => {
+                      e.preventDefault();
                       navigate(`/product/${item.slug || item._id}`);
                       setSearchQuery('');
                       setSuggestions([]);
                     }}
                   >
                     <img
-                      src={optimizeImage(item.image || item.variants?.[0]?.image, 80)}
+                      src={optimizeImage(item.images?.[0] || item.image || item.variants?.[0]?.image, 80)}
                       alt={item.name}
                       className="w-14 h-14 object-contain bg-[#f5f5f5] shrink-0 rounded-sm"
                     />
@@ -349,7 +351,7 @@ const Navbar = () => {
         </nav>
 
         {/* ── MOBILE SEARCH BAR (below black navbar) ── */}
-        <div ref={inlineSearchRef} className="md:hidden bg-white px-3 py-2 relative">
+        <div ref={mobileSearchRef} className="md:hidden bg-white px-3 py-2 relative">
           <div className="flex items-center bg-[#f0f0f0] border border-black rounded-md overflow-hidden pr-1">
             <input
               type="text"
@@ -405,14 +407,15 @@ const Navbar = () => {
                 <div
                   key={item._id}
                   className="flex items-center gap-4 px-4 py-3 border-b border-[#f5f5f5] cursor-pointer hover:bg-[#f9f9f9] transition-colors"
-                  onClick={() => {
+                  onClick={e => {
+                    e.preventDefault();
                     navigate(`/product/${item.slug || item._id}`);
                     setSearchQuery('');
                     setSuggestions([]);
                   }}
                 >
                   <img
-                    src={optimizeImage(item.image || item.variants?.[0]?.image, 80)}
+                    src={optimizeImage(item.images?.[0] || item.image || item.variants?.[0]?.image, 80)}
                     alt={item.name}
                     className="w-12 h-12 object-contain bg-[#f5f5f5] shrink-0 rounded-sm"
                   />
@@ -606,9 +609,9 @@ const Navbar = () => {
                 <div
                   key={item._id}
                   className="flex items-center gap-5 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
-                  onClick={() => { navigate(`/product/${item.slug || item._id}`); setIsSearchOpen(false); setSearchQuery(''); }}
+                  onClick={e => { e.preventDefault(); navigate(`/product/${item.slug || item._id}`); setIsSearchOpen(false); setSearchQuery(''); }}
                 >
-                  {item.image && <img src={optimizeImage(item.image, 120)} alt={item.name} className="w-16 h-16 object-cover" />}
+                  <img src={optimizeImage(item.images?.[0] || item.image || item.variants?.[0]?.image, 120)} alt={item.name} className="w-16 h-16 object-cover" />
                   <div>
                     <div className="font-bold text-sm tracking-wider">{item.name.toUpperCase()}</div>
                     <div className="text-gray-500 text-xs mt-1">{item.price?.toLocaleString()} TK</div>

@@ -101,7 +101,6 @@ router.put('/restore-stock', verifyAdmin, async (req, res) => {
   }
 });
 
-
 // GET single perfume by slug (public) — used by ProductDetails page
 router.get('/slug/:slug', async (req, res) => {
   try {
@@ -114,7 +113,7 @@ router.get('/slug/:slug', async (req, res) => {
   }
 });
 
-// GET best sellers — top 4 products by units sold
+// GET best sellers — top products by units sold
 router.get('/best-sellers', async (req, res) => {
   try {
     const cached = req.app.cacheGet?.('perfumes:best-sellers');
@@ -140,31 +139,53 @@ router.get('/best-sellers', async (req, res) => {
   }
 });
 
-// #8 Search autocomplete — GET /api/perfumes/search?q=
+// ✅ #8 Search autocomplete — GET /api/perfumes/search?q=
 router.get('/search', async (req, res) => {
   try {
     const { q } = req.query;
     if (!q || q.trim().length < 2) return res.json([]);
     const term = q.trim();
 
-    // Try full-text search first (matches whole words, ranked by relevance)
+    // ✅ Shared projection — always returns image fields regardless of search path
+    const imageProjection = {
+      _id: 1,
+      name: 1,
+      slug: 1,
+      price: 1,
+      image: 1,
+      images: 1,
+      'variants.image': 1,
+      'variants.price': 1,
+      'variants.label': 1,
+    };
+
     let results = [];
+
+    // Try full-text search first (matches whole words, ranked by relevance)
+    // ✅ Merge textScore into projection instead of using separate .select()
     try {
       results = await Perfume.find(
         { $text: { $search: term }, isDeleted: { $ne: true } },
-        { score: { $meta: 'textScore' } }
-      ).sort({ score: { $meta: 'textScore' } }).limit(5).select('name slug image price');
+        { ...imageProjection, score: { $meta: 'textScore' } }
+      )
+        .sort({ score: { $meta: 'textScore' } })
+        .limit(5);
     } catch {}
 
     // Fall back to regex for partial matches (e.g. "ros" → "Rose")
     if (results.length === 0) {
-      results = await Perfume.find({
-        name: { $regex: term, $options: 'i' },
-        isDeleted: { $ne: true }
-      }).limit(5).select('name slug image price');
+      results = await Perfume.find(
+        { name: { $regex: term, $options: 'i' }, isDeleted: { $ne: true } },
+        imageProjection
+      ).limit(5);
     }
 
-    res.json(results);
+    // Ensure every result has both _id and slug (for navigation)
+    res.json(results.map(p => ({
+      ...p.toObject(),
+      _id: p._id,
+      slug: p.slug || p._id // fallback to _id if slug is missing
+    })));
   } catch {
     res.json([]);
   }
@@ -222,7 +243,6 @@ router.post('/', verifyAdmin, validate(createPerfumeSchema), async (req, res) =>
     images:       req.body.images || [],
     stock:        req.body.stock || 0,
     variants:     req.body.variants || [],
-    // ── Flash Sale ──────────────────────────────────────────
     flashSale: {
       active:    req.body.flashSale?.active    || false,
       salePrice: req.body.flashSale?.salePrice || null,
@@ -268,7 +288,6 @@ router.put('/:id', verifyAdmin, async (req, res) => {
     const before = await Perfume.findById(req.params.id);
     const updatedPerfume = await Perfume.findByIdAndUpdate(req.params.id, req.body, { new: true });
 
-    // Build a specific detail message about what changed
     const changes = [];
     if (req.body.price !== undefined && before.price !== req.body.price)
       changes.push(`price ${before.price} → ${req.body.price} TK`);
@@ -276,7 +295,6 @@ router.put('/:id', verifyAdmin, async (req, res) => {
       changes.push(`stock ${before.stock} → ${req.body.stock}`);
     if (req.body.name !== undefined && before.name !== req.body.name)
       changes.push(`name "${before.name}" → "${req.body.name}"`);
-    // ── Flash Sale log ──────────────────────────────────────
     if (req.body.flashSale?.active === true)
       changes.push(`flash sale activated at ${req.body.flashSale.salePrice} TK`);
     if (req.body.flashSale?.active === false)
