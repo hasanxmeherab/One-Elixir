@@ -194,7 +194,7 @@ const FlashCarousel = ({ products, getCountdown, addToCart, navigate }) => {
                 </div>
                 <Link to={`/product/${p.slug || p._id}`} className="block">
                   <div className="w-full h-[150px] sm:h-[200px] bg-[#222] flex items-center justify-center overflow-hidden rounded-t-2xl">
-                    <img src={optimizeImage(p.image || p.variants?.[0]?.image, 400)} alt={p.name}
+                    <img src={optimizeImage(p.images?.[0] || p.image || p.variants?.[0]?.image, 400)} alt={p.name}
                       className="w-full h-full object-contain p-3 hover:scale-105 transition-transform duration-500" loading="lazy" />
                   </div>
                 </Link>

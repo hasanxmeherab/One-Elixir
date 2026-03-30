@@ -5,6 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { Heart, Star, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { optimizeImage } from '../utils/optimizeImage';
 
 // ── Flash Sale Countdown Hook ─────────────────────────────────
 const useCountdown = (endsAt) => {
@@ -347,7 +348,7 @@ const ProductDetails = ({ openCart }) => {
             onClick={() => setLightboxOpen(true)}
           >
             <img
-              src={selectedImage || getProductImage(product)}
+              src={optimizeImage(selectedImage || getProductImage(product), 1200)}
               alt={product.name}
               draggable={false}
               className="w-full h-[380px] object-contain transition-opacity duration-300"
@@ -369,7 +370,7 @@ const ProductDetails = ({ openCart }) => {
                     selectedImage === img ? 'border-black' : 'border-transparent hover:border-[#ccc]'
                   }`}
                 >
-                  <img src={img} alt={`View ${i + 1}`} className="w-full h-full object-cover" />
+                  <img src={optimizeImage(img, 80)} alt={`View ${i + 1}`} className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
@@ -494,7 +495,7 @@ const ProductDetails = ({ openCart }) => {
                   className="cursor-pointer group transition-shadow duration-300 hover:shadow-lg">
                   <div className="relative w-full h-[220px] bg-[#fcfcfc] overflow-hidden mb-4">
                     {/* ✅ recently viewed uses saved `image` field from addToRecentlyViewed */}
-                    <img src={p.image || null} alt={p.name}
+                    <img src={optimizeImage(p.image, 400) || null} alt={p.name}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                     {p.stock === 0 && (
                       <div className="absolute top-2 left-2 bg-black text-white px-2 py-0.5 text-[9px] font-bold tracking-wider">SOLD OUT</div>
@@ -524,7 +525,7 @@ const ProductDetails = ({ openCart }) => {
                   <div className="relative w-full h-[220px] bg-[#fcfcfc] overflow-hidden mb-4">
                     {/* ✅ getProductImage handles both images[] and image field */}
                     <img
-                      src={getProductImage(p)}
+                      src={optimizeImage(getProductImage(p), 400)}
                       alt={p.name}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
@@ -708,7 +709,7 @@ const ProductDetails = ({ openCart }) => {
             </>
           )}
           <img
-            src={selectedImage || getProductImage(product)}
+            src={optimizeImage(selectedImage || getProductImage(product), 1200)}
             alt={product.name}
             onClick={(e) => e.stopPropagation()}
             className="max-h-[85vh] max-w-[90vw] object-contain select-none"
