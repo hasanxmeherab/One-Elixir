@@ -1,27 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const Admin = require('../models/Admin');
-const Log = require('../models/Log');
+const writeLog = require('../utils/writeLog');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { verifyAdmin, verifySuperadmin } = require('../middleware/authMiddleware');
 const { validate, adminLoginSchema, adminRegisterSchema } = require('../middleware/validate');
 
-// Helper — write an activity log
-const writeLog = async (req, action, target, detail) => {
-  try {
-    await Log.create({
-      adminId:   req.admin?.id   || null,
-      adminName: req.admin?.name || 'System',
-      action,
-      target,
-      detail,
-      ip: req.ip || ''
-    });
-  } catch (e) {
-    console.error('Log write failed:', e.message);
-  }
-};
+
 
 // ── 1. REGISTER new admin (superadmin only, or first-run if no admins exist)
 router.post('/register', verifyAdmin, validate(adminRegisterSchema), async (req, res) => {

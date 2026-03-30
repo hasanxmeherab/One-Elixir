@@ -10,16 +10,7 @@ const { validate, createOrderSchema, updateOrderSchema } = require('../middlewar
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const writeLog = async (req, action, target, detail) => {
-  try {
-    await Log.create({
-      adminId:   req.admin?.id   || null,
-      adminName: req.admin?.name || 'System',
-      action, target, detail,
-      ip: req.ip || ''
-    });
-  } catch (e) { console.error('Log write failed:', e.message); }
-};
+const writeLog = require('../utils/writeLog');
 
 // 1. GET customer history (auth required — user can only view own orders)
 router.get('/customer/:email', verifyUser, async (req, res) => {

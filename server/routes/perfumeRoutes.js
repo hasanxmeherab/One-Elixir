@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Perfume = require('../models/Perfume');
-const Log = require('../models/Log');
+const writeLog = require('../utils/writeLog');
 const Order = require('../models/Order');
 const Review = require('../models/Review');
 const generateSitemap = require('../utils/generateSitemap');
@@ -9,19 +9,7 @@ const sendEmail = require('../utils/sendEmail');
 const { verifyAdmin } = require('../middleware/authMiddleware');
 const { validate, createPerfumeSchema, updatePerfumeSchema } = require('../middleware/validate');
 
-// Helper — write activity log silently
-const writeLog = async (req, action, target, detail) => {
-  try {
-    await Log.create({
-      adminId:   req.admin?.id   || null,
-      adminName: req.admin?.name || 'Admin',
-      action, target, detail,
-      ip: req.ip || ''
-    });
-  } catch (e) {
-    console.error('Log write failed:', e.message);
-  }
-};
+
 
 // Helper — deactivate all expired flash sales (runs at most once per 60s)
 let lastFlashSaleCleanup = 0;
