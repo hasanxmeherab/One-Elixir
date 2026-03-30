@@ -62,8 +62,8 @@ app.use('/api/auth/signup', authLimiter);
 app.use('/api/auth/forgot-password', authLimiter);
 app.use('/api/admins/login', authLimiter);
 
-// ── Serve sitemap.xml statically ─────────────────────────
-app.use(express.static(path.join(__dirname)));
+// ── Serve static files (sitemap.xml, etc.) from 'public/' only ──
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Routes ───────────────────────────────────────────────
 app.use('/api/perfumes',    require('./routes/perfumeRoutes'));

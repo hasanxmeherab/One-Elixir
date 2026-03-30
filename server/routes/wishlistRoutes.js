@@ -12,7 +12,7 @@ const router = express.Router();
 const User = require('../models/User');       // your existing User model
 const Perfume = require('../models/Perfume'); // your existing Perfume model
 const { Resend } = require('resend');
-const { verifyUser } = require('../middleware/authMiddleware');
+const { verifyUser, verifyAdmin } = require('../middleware/authMiddleware');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -71,7 +71,7 @@ router.delete('/:userId/remove/:perfumeId', verifyUser, async (req, res) => {
 //     await axios.post(`${BASE_URL}/api/wishlist/notify-restock`, { perfumeId: id, type: 'restock' });
 //   }
 // ============================================================
-router.post('/notify-restock', async (req, res) => {
+router.post('/notify-restock', verifyAdmin, async (req, res) => {
   try {
     const { perfumeId, type = 'restock' } = req.body; // type: 'restock' | 'sale'
 

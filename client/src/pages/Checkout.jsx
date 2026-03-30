@@ -65,6 +65,10 @@ const Checkout = () => {
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
+    if (!cart || cart.length === 0) {
+      toast.warning("Your cart is empty.");
+      return navigate('/collection');
+    }
     if (!user) return navigate('/signin', { state: { from: '/checkout' } });
     if (!formData.division || !formData.district || !formData.phone || !formData.address) {
       return toast.warning("Please complete the shipping details form first.");

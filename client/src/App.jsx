@@ -102,11 +102,17 @@ const AppContent = () => {
           
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/account" element={<Account />} />
-          <Route path="/manual-order" element={<ManualOrder />} />
           <Route path="/wishlist" element={<Wishlist />} />
           <Route path="/track/:orderId" element={<OrderTracking />} />
           <Route path="/track" element={<OrderTracking />} />
           <Route path="/bundles" element={<Bundles />} />
+          <Route path="*" element={
+            <div style={{ textAlign: 'center', padding: '120px 20px', minHeight: '60vh' }}>
+              <h1 style={{ fontSize: '72px', fontWeight: 200, letterSpacing: '8px', marginBottom: '16px' }}>404</h1>
+              <p style={{ fontSize: '12px', letterSpacing: '3px', color: '#888', marginBottom: '32px' }}>PAGE NOT FOUND</p>
+              <a href="/" style={{ background: '#000', color: '#fff', padding: '14px 36px', textDecoration: 'none', fontSize: '11px', fontWeight: 'bold', letterSpacing: '3px' }}>BACK TO HOME</a>
+            </div>
+          } />
         </Routes>
         </div>
         </Suspense>
@@ -138,10 +144,5 @@ function App() {
     </>
   );
 }
-
-const footerStyle = {
-  textAlign: 'center', padding: '40px 0', marginTop: '50px',
-  fontSize: '12px', color: '#999', borderTop: '1px solid #eee'
-};
 
 export default App;

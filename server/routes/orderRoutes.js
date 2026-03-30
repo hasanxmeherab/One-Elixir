@@ -56,11 +56,25 @@ router.get('/', verifyAdmin, async (req, res) => {
 router.post('/', validate(createOrderSchema), async (req, res) => {
   const order = new Order(req.body);
   try {
+    // Validate stock before accepting the order
+    for (const item of order.items) {
+      if (!item.perfumeId) continue;
+      const perfume = await Perfume.findById(item.perfumeId);
+      if (!perfume) {
+        return res.status(400).json({ message: `Product "${item.name}" not found` });
+      }
+      if (perfume.stock < item.quantity) {
+        return res.status(400).json({ message: `"${item.name}" only has ${perfume.stock} units available` });
+      }
+    }
+
     const newOrder = await order.save();
 
-    // Deduct stock immediately on order placement
+    // Deduct stock after validation
     await Promise.all(newOrder.items.map(item =>
-      Perfume.findByIdAndUpdate(item.perfumeId, { $inc: { stock: -item.quantity } })
+      item.perfumeId
+        ? Perfume.findByIdAndUpdate(item.perfumeId, { $inc: { stock: -item.quantity } })
+        : Promise.resolve()
     ));
 
     if (newOrder.customerEmail) {
@@ -139,6 +153,12 @@ router.put('/:id/cancel', verifyUser, async (req, res) => {
       return res.status(400).json({ message: 'Cannot cancel order once processed.' });
     }
     order.status = 'Cancelled';
+    // Restore stock on user cancellation
+    await Promise.all(order.items.map(item =>
+      item.perfumeId
+        ? Perfume.findByIdAndUpdate(item.perfumeId, { $inc: { stock: item.quantity } })
+        : Promise.resolve()
+    ));
     await order.save();
     res.json({ message: 'Order cancelled by user', order });
   } catch (err) {
@@ -231,12 +251,23 @@ router.delete('/:id', verifyAdmin, async (req, res) => {
   }
 });
 
-// 8. GET single order by ID (for tracking)
+// 8. GET single order by ID (for tracking — limited data for public access)
 router.get('/:id', async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
-    res.json(order);
+    // Only return safe fields for public tracking
+    res.json({
+      _id: order._id,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      items: order.items.map(i => ({ name: i.name, quantity: i.quantity, price: i.price })),
+      totalAmount: order.totalAmount,
+      shippingCost: order.shippingCost,
+      createdAt: order.createdAt,
+      // Mask customer info
+      customerName: order.customerName ? order.customerName.split(' ')[0] + ' ***' : '',
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
