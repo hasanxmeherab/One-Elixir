@@ -30,7 +30,8 @@ app.use(cors({
     "http://localhost:5173",
     "https://oneelixir.vercel.app",
     "https://oneelixir.live",
-    "https://www.oneelixir.live"
+    "https://www.oneelixir.live",
+    "https://one-elixir-backend.vercel.app"
   ],
   methods: ["GET","POST","PUT","DELETE","OPTIONS"],
   credentials: true
@@ -120,5 +121,11 @@ mongoose.connect(process.env.MONGO_URI)
   })
   .catch(err => console.log(err));
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// ── Export for Vercel Serverless ──────────────────────────
+module.exports = app;
+
+// ── Local Development Server ─────────────────────────────
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}
