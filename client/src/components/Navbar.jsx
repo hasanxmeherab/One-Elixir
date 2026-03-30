@@ -27,7 +27,10 @@ const Navbar = () => {
   // Close desktop search dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (desktopSearchRef.current && !desktopSearchRef.current.contains(e.target)) {
+      if (
+        desktopSearchRef.current && !desktopSearchRef.current.contains(e.target) &&
+        mobileSearchRef.current && !mobileSearchRef.current.contains(e.target)
+      ) {
         setSuggestions([]);
         setSearchQuery('');
       }
@@ -407,7 +410,7 @@ const Navbar = () => {
                 <div
                   key={item._id}
                   className="flex items-center gap-4 px-4 py-3 border-b border-[#f5f5f5] cursor-pointer hover:bg-[#f9f9f9] transition-colors"
-                  onClick={e => {
+                  onMouseDown={e => {
                     e.preventDefault();
                     navigate(`/product/${item.slug || item._id}`);
                     setSearchQuery('');
@@ -433,7 +436,8 @@ const Navbar = () => {
               {!searchLoading && suggestions.length > 0 && (
                 <div
                   className="px-4 py-3 text-center text-[12px] font-bold tracking-[2px] text-[#555] hover:bg-[#f5f5f5] cursor-pointer transition-colors"
-                  onClick={() => {
+                  onMouseDown={(e) => {
+                    e.preventDefault();
                     navigate(`/collection?search=${encodeURIComponent(searchQuery.trim())}`);
                     setSearchQuery('');
                     setSuggestions([]);
