@@ -15,7 +15,11 @@ require('dotenv').config();
 const requiredEnv = ['MONGO_URI', 'JWT_SECRET', 'JWT_REFRESH_SECRET', 'RESEND_API_KEY'];
 const missingEnv = requiredEnv.filter(key => !process.env[key]);
 if (missingEnv.length) {
-  console.error(`⚠️ Missing env vars: ${missingEnv.join(', ')} — some features may not work`);
+  const message = `Missing env vars: ${missingEnv.join(', ')}`;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(message);
+  }
+  console.error(`⚠️ ${message} — some features may not work`);
 }
 
 const app = express();

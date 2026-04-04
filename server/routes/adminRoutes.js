@@ -80,7 +80,12 @@ router.post('/refresh', async (req, res) => {
 
     const payload = { id: admin._id, role: admin.role, name: admin.name };
     const newAccessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '15m' });
-    res.json({ accessToken: newAccessToken });
+    const newRefreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
+
+    admin.refreshToken = await bcrypt.hash(newRefreshToken, 10);
+    await admin.save();
+
+    res.json({ accessToken: newAccessToken, refreshToken: newRefreshToken });
   } catch {
     res.status(403).json({ message: 'Expired or invalid refresh token' });
   }

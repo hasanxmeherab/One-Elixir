@@ -47,6 +47,9 @@ adminAxios.interceptors.response.use(
 
       const { data } = await axios.post(`${API_URL}/api/admins/refresh`, { refreshToken });
       localStorage.setItem('adminToken', data.accessToken);
+      if (data.refreshToken) {
+        localStorage.setItem('adminRefreshToken', data.refreshToken);
+      }
       processQueue(null, data.accessToken);
 
       original.headers.Authorization = `Bearer ${data.accessToken}`;

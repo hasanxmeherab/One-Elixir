@@ -34,6 +34,9 @@ export const UserProvider = ({ children }) => {
       if (!res.ok) return null;
       const data = await res.json();
       localStorage.setItem('userToken', data.token);
+      if (data.refreshToken) {
+        localStorage.setItem('userRefreshToken', data.refreshToken);
+      }
       setUser(prev => prev ? { ...prev, token: data.token } : prev);
       return data.token;
     } catch {
