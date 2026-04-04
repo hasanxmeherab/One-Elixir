@@ -31,7 +31,7 @@ A full-stack e-commerce platform for premium perfumes — built with React and N
 - Shopping cart with quantity management (stock-limited), coupon validation, and guest/user cart merge on login
 - Wishlist with per-user persistent storage and cross-tab sync via localStorage events
 - Multi-step checkout — shipping address (with saved addresses & location-based shipping: Dhaka 80 TK / Outside 120 TK) → payment method → order confirmation
-- Order tracking by order ID + customer email verification
+- Order tracking by order ID
 - Curated product bundles at discounted prices
 - User accounts with Google sign-in, password reset via email, avatar uploads, and address book management
 - SEO — dynamic meta tags (react-helmet-async), auto-generated sitemap from product catalog
@@ -51,7 +51,7 @@ A full-stack e-commerce platform for premium perfumes — built with React and N
 
 ### Security
 - JWT access tokens (15-min expiry) with automatic refresh via axios interceptors and pending request queue
-- Refresh token rotation with bcrypt hashing (7-day expiry)
+- Refresh tokens with bcrypt hashing (7-day expiry)
 - Rate limiting — 200 req/15min general, 15 req/15min for auth endpoints
 - Zod schema validation on all API inputs with detailed error messages
 - Helmet security headers (CSP, X-Frame-Options, etc.)
@@ -188,7 +188,7 @@ The client runs on `http://localhost:5173` and the server on `http://localhost:5
 | POST | `/signup` | User registration with Zod validation |
 | POST | `/signin` | Email/password login (returns access + refresh tokens) |
 | POST | `/google` | Google OAuth sign-in (verifies ID token) |
-| POST | `/refresh` | Rotate refresh token and return new access token |
+| POST | `/refresh` | Refresh access token |
 | POST | `/logout` | Clear refresh token |
 | GET | `/me` | Get current user profile |
 | PUT | `/profile` | Update name, password, or avatar |
@@ -199,7 +199,7 @@ The client runs on `http://localhost:5173` and the server on `http://localhost:5
 |--------|-------|-------------|
 | POST | `/login` | Admin login |
 | POST | `/register` | Create admin account (admin only) |
-| POST | `/refresh` | Rotate admin refresh token and return new access token |
+| POST | `/refresh` | Refresh admin access token |
 | POST | `/logout` | Clear admin refresh token |
 | GET | `/list` | List all admins |
 | DELETE | `/:id` | Delete admin (superadmin only) |
@@ -224,7 +224,7 @@ The client runs on `http://localhost:5173` and the server on `http://localhost:5
 |--------|-------|-------------|
 | GET | `/` | All orders with pagination (admin only) |
 | GET | `/customer/:email` | Order history by customer email |
-| GET | `/:id?email=` | Track single order (requires matching customer email) |
+| GET | `/:id` | Track single order by ID |
 | POST | `/` | Create order (website checkout) |
 | POST | `/manual` | Create manual order (admin only) |
 | PUT | `/:id` | Update order status/payment (admin only) |

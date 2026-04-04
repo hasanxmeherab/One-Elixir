@@ -3,7 +3,6 @@ const router     = express.Router();
 const Order      = require('../models/Order');
 const Perfume    = require('../models/Perfume');
 const Log        = require('../models/Log');
-const User       = require('../models/User');
 const { Resend } = require('resend');
 
 const { verifyAdmin, verifyUser } = require('../middleware/authMiddleware');
@@ -13,20 +12,11 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 const writeLog = require('../utils/writeLog');
 
-// 1. GET customer history (auth required — user can only view own orders)
+// 1. GET customer history (auth required)
 router.get('/customer/:email', verifyUser, async (req, res) => {
   try {
-    const currentUser = await User.findById(req.userId).select('email');
-    if (!currentUser) return res.status(401).json({ message: 'Unauthorized' });
-
-    const requestedEmail = String(req.params.email || '').trim().toLowerCase();
-    const currentUserEmail = String(currentUser.email || '').trim().toLowerCase();
-    if (requestedEmail !== currentUserEmail) {
-      return res.status(403).json({ message: 'Forbidden: you can only view your own orders' });
-    }
-
     const orders = await Order.find({
-      customerEmail: currentUserEmail,
+      customerEmail: { $regex: new RegExp(`^${req.params.email}$`, 'i') },
       isManual: false
     }).sort({ createdAt: -1 });
     res.json(orders);
@@ -111,25 +101,11 @@ router.post('/', validate(createOrderSchema), async (req, res) => {
 router.post('/manual', verifyAdmin, validate(createOrderSchema), async (req, res) => {
   const order = new Order({ ...req.body, isManual: true, createdBy: req.admin.name });
   try {
-    // Validate stock before accepting the manual order
-    for (const item of order.items) {
-      if (!item.perfumeId) continue;
-      const perfume = await Perfume.findById(item.perfumeId);
-      if (!perfume) {
-        return res.status(400).json({ message: `Product "${item.name}" not found` });
-      }
-      if (perfume.stock < item.quantity) {
-        return res.status(400).json({ message: `"${item.name}" only has ${perfume.stock} units available` });
-      }
-    }
-
     const newOrder = await order.save();
 
     // Deduct stock immediately on order placement
     await Promise.all(newOrder.items.map(item =>
-      item.perfumeId
-        ? Perfume.findByIdAndUpdate(item.perfumeId, { $inc: { stock: -item.quantity } })
-        : Promise.resolve()
+      Perfume.findByIdAndUpdate(item.perfumeId, { $inc: { stock: -item.quantity } })
     ));
 
     await writeLog(req, 'CREATE_ORDER', 'Order',
