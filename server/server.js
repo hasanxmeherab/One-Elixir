@@ -55,11 +55,21 @@ const authLimiter = rateLimit({
   message: { message: 'Too many login attempts, please try again later.' }
 });
 
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,                  // refresh attempts per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many refresh attempts, please try again later.' }
+});
+
 app.use('/api/', generalLimiter);
 app.use('/api/auth/signin', authLimiter);
 app.use('/api/auth/signup', authLimiter);
 app.use('/api/auth/forgot-password', authLimiter);
 app.use('/api/admins/login', authLimiter);
+app.use('/api/auth/refresh', refreshLimiter);
+app.use('/api/admins/refresh', refreshLimiter);
 
 // ── Serve static files (sitemap.xml, etc.) from 'public/' only ──
 app.use(express.static(path.join(__dirname, 'public')));
