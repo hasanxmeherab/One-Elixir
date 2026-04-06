@@ -26,7 +26,6 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ScrollToTop from './components/ScrollToTop';
 import FloatingWhatsapp from './components/FloatingWhatsapp';
 import Footer from './components/Footer';
-import CartRecovery from './components/CartRecovery';
 
 // --- #18 LAZY-LOADED ADMIN PAGES ---
 const Admin = lazy(() => import('./pages/admin/Admin'));
@@ -49,21 +48,12 @@ const AdminBundles = lazy(() => import('./pages/admin/AdminBundles'));
 import { WishlistProvider } from './context/WishlistContext';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { ToastProvider } from './context/ToastContext';
-import { ComparisonProvider } from './context/ComparisonContext';
 
 // --- MODALS ---
-import ComparisonModal from './components/ComparisonModal';
-
-// --- HOOKS ---
-import { useCartAbandonment } from './hooks/useCartAbandonment';
 
 const AppContent = () => {
   const location = useLocation();
-  const [showComparison, setShowComparison] = React.useState(false);
   
-  // ✅ FEATURE #5: Track cart abandonment
-  useCartAbandonment();
-
   // Scroll to top on route change
   useEffect(() => { window.scrollTo(0, 0); }, [location.pathname]);
 
@@ -80,7 +70,6 @@ const AppContent = () => {
           <Route path="/" element={<Home />} />
           <Route path="/product/:slug" element={<ProductDetails />} />
           <Route path="/cart" element={<Cart />} />
-          <Route path="/recover" element={<CartRecovery />} />
           <Route path="/thank-you" element={<ThankYou />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />
@@ -132,22 +121,6 @@ const AppContent = () => {
       </div>
 
       {!isHideNavbar && <MobileTabBar />}
-      
-      {/* ✅ FEATURE #3: Comparison Modal */}
-      <ComparisonModal isOpen={showComparison} onClose={() => setShowComparison(false)} />
-      
-      {/* ✅ FEATURE #3: Floating Comparison Button */}
-      {!isHideNavbar && (
-        <button
-          onClick={() => setShowComparison(true)}
-          className="fixed bottom-20 md:bottom-6 right-4 md:right-6 bg-purple-600 hover:bg-purple-700 text-white rounded-full p-3 shadow-lg transition-all duration-300 z-30"
-          title="Open product comparison"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 4h18M3 8h18M3 12h18M3 16h18M3 20h18" />
-          </svg>
-        </button>
-      )}
     </>
   );
 };
@@ -158,16 +131,13 @@ function App() {
       <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
         <ToastProvider>
           <WishlistProvider>
-            {/* ✅ FEATURE #3: Comparison Provider */}
-            <ComparisonProvider>
-              <FloatingWhatsapp />
+            <FloatingWhatsapp />
 
-              <Router>
-                <ScrollToTop />
-                <AppContent />
-                <Footer />
-              </Router>
-            </ComparisonProvider>
+            <Router>
+              <ScrollToTop />
+              <AppContent />
+              <Footer />
+            </Router>
           </WishlistProvider>
         </ToastProvider>
       </GoogleOAuthProvider>

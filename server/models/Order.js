@@ -11,7 +11,6 @@ const orderSchema = new mongoose.Schema({
       name: String,
       price: Number, 
       quantity: { type: Number, default: 1 },
-      // ✅ FEATURE #2: Track which variant was ordered (if any)
       variantLabel: { type: String, default: null },  // e.g., "50ml", "100ml"
       variantPrice: { type: Number, default: null },
       discountType: { type: String, enum: ['fixed', 'percentage', 'none'], default: 'none' },

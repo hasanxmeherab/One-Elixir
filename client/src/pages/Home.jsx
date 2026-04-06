@@ -6,8 +6,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Star, ChevronLeft, ChevronRight } from 'lucide-react';
 import BannerManagement from './admin/BannerManagement';
 import { optimizeImage } from '../utils/optimizeImage';
-import PersonalizedRecs from '../components/PersonalizedRecs';
-import TrendingProducts from '../components/TrendingProducts';
 
 /* ─── Horizontal scroll carousel hook ─── */
 const useCarousel = () => {
@@ -383,15 +381,7 @@ const Home = () => {
         />
       )}
 
-      {/* ✅ FEATURE #6: Personalized Recommendations (for logged-in users) */}
-      <div className="px-2 md:px-[5%]">
-        <PersonalizedRecs limit={6} showTitle={true} />
-      </div>
 
-      {/* ✅ FEATURE #6: Trending Products */}
-      <div className="px-2 md:px-[5%]">
-        <TrendingProducts limit={10} showTitle={true} />
-      </div>
 
       <style>{`
         @keyframes infiniteScroll {

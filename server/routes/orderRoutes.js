@@ -18,30 +18,14 @@ const decrementStockAtomic = async (items, session = null) => {
   for (const item of items) {
     if (!item.perfumeId) continue;
     
-    // ✅ FEATURE #2: If variant was selected, decrement variant stock
-    if (item.variantLabel) {
-      const result = await Perfume.findByIdAndUpdate(
-        item.perfumeId,
-        { $inc: { 'variants.$[v].stock': -item.quantity } },
-        { 
-          arrayFilters: [{ 'v.label': item.variantLabel }],
-          new: true,
-          session
-        }
-      );
-      if (!result) {
-        throw new Error(`Product variant "${item.variantLabel}" for "${item.name}" not found`);
-      }
-    } else {
-      // Decrement base product stock
-      const result = await Perfume.findByIdAndUpdate(
-        item.perfumeId,
-        { $inc: { stock: -item.quantity } },
-        { new: true, session }
-      );
-      if (!result || result.stock < 0) {
-        throw new Error(`Insufficient stock for "${item.name}". Transaction rolled back.`);
-      }
+    // Decrement base product stock
+    const result = await Perfume.findByIdAndUpdate(
+      item.perfumeId,
+      { $inc: { stock: -item.quantity } },
+      { new: true, session }
+    );
+    if (!result || result.stock < 0) {
+      throw new Error(`Insufficient stock for "${item.name}". Transaction rolled back.`);
     }
   }
 };
@@ -51,24 +35,12 @@ const restoreStockAtomic = async (items, session = null) => {
   for (const item of items) {
     if (!item.perfumeId) continue;
     
-    // ✅ FEATURE #2: If variant was selected, restore variant stock
-    if (item.variantLabel) {
-      await Perfume.findByIdAndUpdate(
-        item.perfumeId,
-        { $inc: { 'variants.$[v].stock': item.quantity } },
-        { 
-          arrayFilters: [{ 'v.label': item.variantLabel }],
-          session
-        }
-      );
-    } else {
-      // Restore base product stock
-      await Perfume.findByIdAndUpdate(
-        item.perfumeId,
-        { $inc: { stock: item.quantity } },
-        { session }
-      );
-    }
+    // Restore base product stock
+    await Perfume.findByIdAndUpdate(
+      item.perfumeId,
+      { $inc: { stock: item.quantity } },
+      { session }
+    );
   }
 };
 
@@ -103,7 +75,7 @@ router.get('/', verifyAdmin, async (req, res) => {
   }
 });
 
-// 3. POST standard website order (✅ ATOMIC STOCK DECREMENT + VARIANT TRACKING)
+// 3. POST standard website order (✅ ATOMIC STOCK DECREMENT)
 router.post('/', validate(createOrderSchema), async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -111,7 +83,7 @@ router.post('/', validate(createOrderSchema), async (req, res) => {
   try {
     const order = new Order(req.body);
 
-    // ✅ FEATURE #2: Validate and reserve stock (including variants)
+    // Validate and reserve stock (base products only)
     for (const item of order.items) {
       if (!item.perfumeId) continue;
       const perfume = await Perfume.findById(item.perfumeId).session(session);
@@ -120,29 +92,12 @@ router.post('/', validate(createOrderSchema), async (req, res) => {
         return res.status(400).json({ message: `Product "${item.name}" not found` });
       }
       
-      // Check variant stock if variant was selected
-      if (item.variantLabel) {
-        const variant = perfume.variants?.find(v => v.label === item.variantLabel);
-        if (!variant) {
-          await session.abortTransaction();
-          return res.status(400).json({ 
-            message: `Variant "${item.variantLabel}" not available for "${item.name}"` 
-          });
-        }
-        if ((variant.stock || 0) < item.quantity) {
-          await session.abortTransaction();
-          return res.status(400).json({ 
-            message: `"${item.name} (${item.variantLabel})" only has ${variant.stock || 0} units available (you requested ${item.quantity})` 
-          });
-        }
-      } else {
-        // Check base product stock
-        if (perfume.stock < item.quantity) {
-          await session.abortTransaction();
-          return res.status(400).json({ 
-            message: `"${item.name}" only has ${perfume.stock} units available (you requested ${item.quantity})` 
-          });
-        }
+      // Check base product stock
+      if (perfume.stock < item.quantity) {
+        await session.abortTransaction();
+        return res.status(400).json({ 
+          message: `"${item.name}" only has ${perfume.stock} units available (you requested ${item.quantity})` 
+        });
       }
     }
 
@@ -167,7 +122,7 @@ router.post('/', validate(createOrderSchema), async (req, res) => {
               <p>Your order has been placed successfully!</p>
               <hr/>
               <p><strong>Order ID:</strong> #${newOrder._id}</p>
-              <ul>${newOrder.items.map(i => `<li>${i.quantity}x ${i.name}${i.variantLabel ? ` (${i.variantLabel})` : ''} - ${i.price} TK</li>`).join('')}</ul>
+              <ul>${newOrder.items.map(i => `<li>${i.quantity}x ${i.name} - ${i.price} TK</li>`).join('')}</ul>
               <p><strong>Total:</strong> ${newOrder.totalAmount} TK</p>
               <p><strong>Address:</strong> ${newOrder.address}</p>
             </div>`
