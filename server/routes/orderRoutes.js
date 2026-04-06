@@ -1,5 +1,6 @@
 const express    = require('express');
 const router     = express.Router();
+const mongoose   = require('mongoose');
 const Order      = require('../models/Order');
 const Perfume    = require('../models/Perfume');
 const Log        = require('../models/Log');
@@ -11,6 +12,65 @@ const { validate, createOrderSchema, updateOrderSchema } = require('../middlewar
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const writeLog = require('../utils/writeLog');
+
+// ✅ Atomic stock decrement with transaction support
+const decrementStockAtomic = async (items, session = null) => {
+  for (const item of items) {
+    if (!item.perfumeId) continue;
+    
+    // ✅ FEATURE #2: If variant was selected, decrement variant stock
+    if (item.variantLabel) {
+      const result = await Perfume.findByIdAndUpdate(
+        item.perfumeId,
+        { $inc: { 'variants.$[v].stock': -item.quantity } },
+        { 
+          arrayFilters: [{ 'v.label': item.variantLabel }],
+          new: true,
+          session
+        }
+      );
+      if (!result) {
+        throw new Error(`Product variant "${item.variantLabel}" for "${item.name}" not found`);
+      }
+    } else {
+      // Decrement base product stock
+      const result = await Perfume.findByIdAndUpdate(
+        item.perfumeId,
+        { $inc: { stock: -item.quantity } },
+        { new: true, session }
+      );
+      if (!result || result.stock < 0) {
+        throw new Error(`Insufficient stock for "${item.name}". Transaction rolled back.`);
+      }
+    }
+  }
+};
+
+// ✅ Restore stock with transaction support
+const restoreStockAtomic = async (items, session = null) => {
+  for (const item of items) {
+    if (!item.perfumeId) continue;
+    
+    // ✅ FEATURE #2: If variant was selected, restore variant stock
+    if (item.variantLabel) {
+      await Perfume.findByIdAndUpdate(
+        item.perfumeId,
+        { $inc: { 'variants.$[v].stock': item.quantity } },
+        { 
+          arrayFilters: [{ 'v.label': item.variantLabel }],
+          session
+        }
+      );
+    } else {
+      // Restore base product stock
+      await Perfume.findByIdAndUpdate(
+        item.perfumeId,
+        { $inc: { stock: item.quantity } },
+        { session }
+      );
+    }
+  }
+};
 
 // 1. GET customer history (auth required)
 router.get('/customer/:email', verifyUser, async (req, res) => {
@@ -43,31 +103,57 @@ router.get('/', verifyAdmin, async (req, res) => {
   }
 });
 
-// 3. POST standard website order
+// 3. POST standard website order (✅ ATOMIC STOCK DECREMENT + VARIANT TRACKING)
 router.post('/', validate(createOrderSchema), async (req, res) => {
-  const order = new Order(req.body);
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
-    // Validate stock before accepting the order
+    const order = new Order(req.body);
+
+    // ✅ FEATURE #2: Validate and reserve stock (including variants)
     for (const item of order.items) {
       if (!item.perfumeId) continue;
-      const perfume = await Perfume.findById(item.perfumeId);
+      const perfume = await Perfume.findById(item.perfumeId).session(session);
       if (!perfume) {
+        await session.abortTransaction();
         return res.status(400).json({ message: `Product "${item.name}" not found` });
       }
-      if (perfume.stock < item.quantity) {
-        return res.status(400).json({ message: `"${item.name}" only has ${perfume.stock} units available` });
+      
+      // Check variant stock if variant was selected
+      if (item.variantLabel) {
+        const variant = perfume.variants?.find(v => v.label === item.variantLabel);
+        if (!variant) {
+          await session.abortTransaction();
+          return res.status(400).json({ 
+            message: `Variant "${item.variantLabel}" not available for "${item.name}"` 
+          });
+        }
+        if ((variant.stock || 0) < item.quantity) {
+          await session.abortTransaction();
+          return res.status(400).json({ 
+            message: `"${item.name} (${item.variantLabel})" only has ${variant.stock || 0} units available (you requested ${item.quantity})` 
+          });
+        }
+      } else {
+        // Check base product stock
+        if (perfume.stock < item.quantity) {
+          await session.abortTransaction();
+          return res.status(400).json({ 
+            message: `"${item.name}" only has ${perfume.stock} units available (you requested ${item.quantity})` 
+          });
+        }
       }
     }
 
-    const newOrder = await order.save();
+    // ✅ Create order and decrement stock atomically
+    const newOrder = await order.save({ session });
+    await decrementStockAtomic(newOrder.items, session);
 
-    // Deduct stock after validation
-    await Promise.all(newOrder.items.map(item =>
-      item.perfumeId
-        ? Perfume.findByIdAndUpdate(item.perfumeId, { $inc: { stock: -item.quantity } })
-        : Promise.resolve()
-    ));
+    // Commit transaction
+    await session.commitTransaction();
 
+    // Send confirmation email (outside transaction)
     if (newOrder.customerEmail) {
       try {
         await resend.emails.send({
@@ -81,7 +167,7 @@ router.post('/', validate(createOrderSchema), async (req, res) => {
               <p>Your order has been placed successfully!</p>
               <hr/>
               <p><strong>Order ID:</strong> #${newOrder._id}</p>
-              <ul>${newOrder.items.map(i => `<li>${i.quantity}x ${i.name} - ${i.price} TK</li>`).join('')}</ul>
+              <ul>${newOrder.items.map(i => `<li>${i.quantity}x ${i.name}${i.variantLabel ? ` (${i.variantLabel})` : ''} - ${i.price} TK</li>`).join('')}</ul>
               <p><strong>Total:</strong> ${newOrder.totalAmount} TK</p>
               <p><strong>Address:</strong> ${newOrder.address}</p>
             </div>`
@@ -93,26 +179,36 @@ router.post('/', validate(createOrderSchema), async (req, res) => {
 
     res.status(201).json(newOrder);
   } catch (err) {
+    await session.abortTransaction();
     res.status(400).json({ message: err.message });
+  } finally {
+    session.endSession();
   }
 });
 
-// 4. POST manual admin order
+// 4. POST manual admin order (✅ ATOMIC STOCK DECREMENT)
 router.post('/manual', verifyAdmin, validate(createOrderSchema), async (req, res) => {
-  const order = new Order({ ...req.body, isManual: true, createdBy: req.admin.name });
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
-    const newOrder = await order.save();
+    const order = new Order({ ...req.body, isManual: true, createdBy: req.admin.name });
+    const newOrder = await order.save({ session });
 
-    // Deduct stock immediately on order placement
-    await Promise.all(newOrder.items.map(item =>
-      Perfume.findByIdAndUpdate(item.perfumeId, { $inc: { stock: -item.quantity } })
-    ));
+    // ✅ Decrement stock atomically within transaction
+    await decrementStockAtomic(newOrder.items, session);
+
+    // Commit transaction
+    await session.commitTransaction();
 
     await writeLog(req, 'CREATE_ORDER', 'Order',
       `Manual order created for ${newOrder.customerName} — ${newOrder.totalAmount} TK`);
     res.status(201).json(newOrder);
   } catch (err) {
+    await session.abortTransaction();
     res.status(400).json({ message: err.message });
+  } finally {
+    session.endSession();
   }
 });
 
@@ -135,54 +231,78 @@ router.put('/bulk-update', verifyAdmin, async (req, res) => {
   }
 });
 
-// 5. PUT user cancellation (auth required)
+// 5. PUT user cancellation (auth required) (✅ ATOMIC STOCK RESTORATION)
 router.put('/:id/cancel', verifyUser, async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
-    const order = await Order.findById(req.params.id);
-    if (!order) return res.status(404).json({ message: 'Order not found' });
+    const order = await Order.findById(req.params.id).session(session);
+    if (!order) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: 'Order not found' });
+    }
     if (order.status.toLowerCase() !== 'pending') {
+      await session.abortTransaction();
       return res.status(400).json({ message: 'Cannot cancel order once processed.' });
     }
+    
     order.status = 'Cancelled';
-    // Restore stock on user cancellation
-    await Promise.all(order.items.map(item =>
-      item.perfumeId
-        ? Perfume.findByIdAndUpdate(item.perfumeId, { $inc: { stock: item.quantity } })
-        : Promise.resolve()
-    ));
-    await order.save();
-    res.json({ message: 'Order cancelled by user', order });
+    
+    // ✅ Save cancellation and restore stock atomically
+    const savedOrder = await order.save({ session });
+    await restoreStockAtomic(order.items, session);
+    
+    await session.commitTransaction();
+    
+    res.json({ message: 'Order cancelled and stock restored', order: savedOrder });
   } catch (err) {
+    await session.abortTransaction();
     res.status(500).json({ message: err.message });
+  } finally {
+    session.endSession();
   }
 });
 
-// 6. PUT update status & payment status (Admin)
+// 6. PUT update status & payment status (Admin) (✅ ATOMIC STOCK MANAGEMENT)
 router.put('/:id', verifyAdmin, async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   const { status, paymentStatus } = req.body;
   try {
-    const order = await Order.findById(req.params.id);
-    if (!order) return res.status(404).json({ message: 'Order not found' });
+    const order = await Order.findById(req.params.id).session(session);
+    if (!order) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: 'Order not found' });
+    }
 
     const oldStatus = order.status?.toLowerCase();
     const newStatus = status?.toLowerCase();
 
-    // Restore stock only if order is being CANCELLED (refund stock)
+    // ✅ Restore stock only if order is being CANCELLED (refund stock)
     if ((newStatus === 'canceled' || newStatus === 'cancelled') &&
         oldStatus !== 'canceled' && oldStatus !== 'cancelled') {
-      await Promise.all(order.items.map(item =>
-        Perfume.findByIdAndUpdate(item.perfumeId, { $inc: { stock: item.quantity } })
-      ));
+      await restoreStockAtomic(order.items, session);
     }
-    // If restoring a cancelled order back to active — deduct stock again
+    // ✅ If restoring a cancelled order back to active — deduct stock again atomically
     else if ((oldStatus === 'canceled' || oldStatus === 'cancelled') &&
              newStatus && newStatus !== 'canceled' && newStatus !== 'cancelled') {
-      await Promise.all(order.items.map(item =>
-        Perfume.findByIdAndUpdate(item.perfumeId, { $inc: { stock: -item.quantity } })
-      ));
+      await decrementStockAtomic(order.items, session);
     }
 
-    // Log what changed
+    // Update order fields
+    if (status)        order.status        = status;
+    if (paymentStatus) order.paymentStatus = paymentStatus;
+    if (req.body.paymentDetails) {
+      order.paymentDetails = req.body.paymentDetails;
+      order.markModified('paymentDetails');
+    }
+
+    const updatedOrder = await order.save({ session });
+    await session.commitTransaction();
+
+    // Log what changed (outside transaction)
     if (status && status !== order.status) {
       await writeLog(req, 'UPDATE_ORDER', 'Order',
         `Order #${order._id.toString().slice(-6).toUpperCase()} status: ${order.status} → ${status}`);
@@ -192,16 +312,7 @@ router.put('/:id', verifyAdmin, async (req, res) => {
         `Order #${order._id.toString().slice(-6).toUpperCase()} payment: ${order.paymentStatus || 'N/A'} → ${paymentStatus}`);
     }
 
-    if (status)        order.status        = status;
-    if (paymentStatus) order.paymentStatus = paymentStatus;
-    if (req.body.paymentDetails) {
-      order.paymentDetails = req.body.paymentDetails;
-      order.markModified('paymentDetails');
-    }
-
-    const updatedOrder = await order.save();
-
-    // #6 Order status email notification
+    // #6 Order status email notification (outside transaction)
     if (status && updatedOrder.customerEmail) {
       try {
         await resend.emails.send({
@@ -222,7 +333,10 @@ router.put('/:id', verifyAdmin, async (req, res) => {
 
     res.json(updatedOrder);
   } catch (err) {
+    await session.abortTransaction();
     res.status(400).json({ message: err.message });
+  } finally {
+    session.endSession();
   }
 });
 

@@ -101,6 +101,28 @@ router.get('/slug/:slug', async (req, res) => {
   }
 });
 
+// ✅ FEATURE #2: GET variant availability by product ID (for frontend stock display)
+router.get('/variants/:id', async (req, res) => {
+  try {
+    const perfume = await Perfume.findById(req.params.id);
+    if (!perfume) return res.status(404).json({ success: false, message: 'Product not found' });
+    
+    const response = {
+      baseStock: perfume.stock,
+      variants: (perfume.variants || []).map(v => ({
+        label: v.label,
+        price: v.price,
+        stock: v.stock || 0,
+        available: (v.stock || 0) > 0
+      }))
+    };
+    
+    res.json(response);
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // GET best sellers — top products by units sold
 router.get('/best-sellers', async (req, res) => {
   try {
