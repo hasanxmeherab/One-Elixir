@@ -26,6 +26,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ScrollToTop from './components/ScrollToTop';
 import FloatingWhatsapp from './components/FloatingWhatsapp';
 import Footer from './components/Footer';
+import CartRecovery from './components/CartRecovery';
 
 // --- #18 LAZY-LOADED ADMIN PAGES ---
 const Admin = lazy(() => import('./pages/admin/Admin'));
@@ -53,9 +54,15 @@ import { ComparisonProvider } from './context/ComparisonContext';
 // --- MODALS ---
 import ComparisonModal from './components/ComparisonModal';
 
+// --- HOOKS ---
+import { useCartAbandonment } from './hooks/useCartAbandonment';
+
 const AppContent = () => {
   const location = useLocation();
   const [showComparison, setShowComparison] = React.useState(false);
+  
+  // ✅ FEATURE #5: Track cart abandonment
+  useCartAbandonment();
 
   // Scroll to top on route change
   useEffect(() => { window.scrollTo(0, 0); }, [location.pathname]);
@@ -73,6 +80,7 @@ const AppContent = () => {
           <Route path="/" element={<Home />} />
           <Route path="/product/:slug" element={<ProductDetails />} />
           <Route path="/cart" element={<Cart />} />
+          <Route path="/recover" element={<CartRecovery />} />
           <Route path="/thank-you" element={<ThankYou />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />

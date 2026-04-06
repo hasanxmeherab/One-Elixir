@@ -4,6 +4,7 @@ import { useUser } from '../context/UserContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import { ShoppingBag } from 'lucide-react';
+import RecommendedProducts from '../components/RecommendedProducts';
 
 const Cart = () => {
   const toast = useToast();
@@ -135,6 +136,19 @@ const Cart = () => {
               </Link>
             </div>
 
+          </div>
+        )}
+
+        {/* ✅ FEATURE #6: Recommended Products in Cart */}
+        {cart.length > 0 && (
+          <div className="mt-16 py-10 border-t border-[#eee]">
+            <RecommendedProducts 
+              perfumeId={cart[0]?._id} 
+              title="Customers Also Bought"
+              type="collaborative"
+              limit={5}
+              showReason={true}
+            />
           </div>
         )}
       </div>

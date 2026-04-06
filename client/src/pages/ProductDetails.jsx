@@ -7,6 +7,7 @@ import { useWishlist } from '../context/WishlistContext';
 import { Heart, Star, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { optimizeImage } from '../utils/optimizeImage';
 import FrequentlyBoughtTogether from '../components/FrequentlyBoughtTogether';
+import RecommendedProducts from '../components/RecommendedProducts';
 
 // ── Flash Sale Countdown Hook ─────────────────────────────────
 const useCountdown = (endsAt) => {
@@ -549,6 +550,9 @@ const ProductDetails = ({ openCart }) => {
 
         {/* ✅ FEATURE #4: Frequently Bought Together */}
         {product._id && <FrequentlyBoughtTogether productId={product._id} />}
+
+        {/* ✅ FEATURE #6: Product Recommendations */}
+        {product._id && <RecommendedProducts perfumeId={product._id} title="You May Also Like" type="hybrid" limit={5} />}
 
         {/* ========== REVIEWS SECTION ========== */}
         <div className="w-full px-[8%] pb-20">

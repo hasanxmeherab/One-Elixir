@@ -8,6 +8,8 @@ const path       = require('path');
 const rateLimit  = require('express-rate-limit');
 const helmet     = require('helmet');
 const costRoutes = require('./routes/costRoutes');
+const CartAbandonmentScheduler = require('./utils/CartAbandonmentScheduler');
+const RecommendationScheduler = require('./utils/recommendationScheduler');
 
 require('dotenv').config();
 
@@ -80,6 +82,12 @@ app.use('/api/addresses',   require('./routes/addressRoutes'));
 app.use('/api/costs',       costRoutes);
 app.use('/api/bundles',     require('./routes/bundleRoutes'));
 
+// ✅ FEATURE #5: Cart Abandonment System
+app.use('/api/cart-abandonment', require('./routes/cartAbandonmentRoutes'));
+
+// ✅ FEATURE #6: Product Recommendations Engine
+app.use('/api/recommendations', require('./routes/recommendationRoutes'));
+
 // ── Simple In-Memory Cache ───────────────────────────────
 const cache = new Map();
 const CACHE_TTL = 60 * 1000; // 60 seconds
@@ -114,6 +122,13 @@ app.use((err, req, res, next) => {
 mongoose.connect(process.env.MONGO_URI)
   .then(async () => {
     console.log("OneElixir Database Connected");
+    
+    // ✅ FEATURE #5: Start cart abandonment scheduler
+    CartAbandonmentScheduler.startScheduler();
+    
+    // ✅ FEATURE #6: Start recommendation scheduler
+    RecommendationScheduler.startScheduler();
+    
     const generateSitemap = require('./utils/generateSitemap');
     const Perfume = require('./models/Perfume');
     await generateSitemap(Perfume);
