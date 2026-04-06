@@ -6,6 +6,7 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { Heart, Star, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { optimizeImage } from '../utils/optimizeImage';
+import FrequentlyBoughtTogether from '../components/FrequentlyBoughtTogether';
 
 // ── Flash Sale Countdown Hook ─────────────────────────────────
 const useCountdown = (endsAt) => {
@@ -545,6 +546,9 @@ const ProductDetails = ({ openCart }) => {
             </div>
           </div>
         )}
+
+        {/* ✅ FEATURE #4: Frequently Bought Together */}
+        {product._id && <FrequentlyBoughtTogether productId={product._id} />}
 
         {/* ========== REVIEWS SECTION ========== */}
         <div className="w-full px-[8%] pb-20">

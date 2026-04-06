@@ -123,6 +123,63 @@ router.get('/variants/:id', async (req, res) => {
   }
 });
 
+// ✅ FEATURE #4: GET frequently bought together products
+router.get('/frequently-bought/:perfumeId', async (req, res) => {
+  try {
+    const { perfumeId } = req.params;
+    const perfume = await Perfume.findById(perfumeId);
+    if (!perfume) return res.status(404).json({ message: 'Product not found' });
+
+    // Find all orders containing this product
+    const orders = await Order.find({
+      'items.perfumeId': perfumeId,
+      status: 'Delivered',
+      paymentStatus: 'Paid'
+    });
+
+    if (orders.length === 0) {
+      return res.json([]);  // No purchase history yet
+    }
+
+    // Analyze co-purchases: count how often other products bought with this one
+    const coProductMap = {};
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        // Skip the product itself
+        if (item.perfumeId && item.perfumeId.toString() !== perfumeId) {
+          if (!coProductMap[item.perfumeId]) {
+            coProductMap[item.perfumeId] = { id: item.perfumeId, count: 0, name: item.name };
+          }
+          coProductMap[item.perfumeId].count += 1;
+        }
+      });
+    });
+
+    // Sort by purchase frequency and get top 4
+    const topCoProducts = Object.values(coProductMap)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4);
+
+    if (topCoProducts.length === 0) return res.json([]);
+
+    // Fetch product details for top co-products
+    const productDetails = await Perfume.find({
+      _id: { $in: topCoProducts.map(p => p.id) },
+      isDeleted: { $ne: true }
+    });
+
+    // Enrich with purchase count
+    const enriched = productDetails.map(p => ({
+      ...p.toObject(),
+      frequencyScore: topCoProducts.find(tp => tp.id === p._id.toString())?.count || 0
+    }));
+
+    res.json(enriched);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // GET best sellers — top products by units sold
 router.get('/best-sellers', async (req, res) => {
   try {
