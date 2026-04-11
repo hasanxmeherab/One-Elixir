@@ -72,10 +72,10 @@ const Admin = () => {
             <span className={`block w-5 h-0.5 bg-white transition-all duration-200 ${sidebarOpen ? 'opacity-0' : ''}`} />
             <span className={`block w-5 h-0.5 bg-white transition-all duration-200 ${sidebarOpen ? '-rotate-45 -translate-y-2' : ''}`} />
           </button>
-          <div className="font-bold tracking-[3px] text-xs md:text-sm">
-            ONEELIXIR
-            <span className="text-[9px] bg-white text-black px-1.5 py-0.5 ml-2 rounded-sm hidden md:inline">ADMIN</span>
-          </div>
+          <Link to="/admin" className="flex items-center gap-2 no-underline">
+            <img src="/logos/OneElixir Name(Sg).png" alt="OneElixir" className="h-8 md:h-10 w-auto" />
+            <span className="text-[9px] bg-white text-black px-1.5 py-0.5 rounded-sm hidden md:inline">ADMIN</span>
+          </Link>
           {/* Current page — mobile only */}
           <span className="md:hidden text-[10px] text-gray-400 tracking-wider">/ {currentPage}</span>
         </div>
