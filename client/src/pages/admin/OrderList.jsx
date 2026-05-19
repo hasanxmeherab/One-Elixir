@@ -110,24 +110,35 @@ const OrderList = () => {
     finally { setEditUploading(false); }
   };
 
-  const downloadReceipt = (order) => {
+  const downloadReceipt = async (order) => {
     try {
       const doc = new jsPDF();
-      doc.setFontSize(22); doc.setFont('helvetica', 'bold');
-      doc.text('OneElixir Fragrances', 105, 20, { align: 'center' });
+      
+      // Fetch and embed logo image
+      const logoResponse = await fetch('/logos/OneElixir Name(Sg).png');
+      const logoBlob = await logoResponse.blob();
+      const logoDataUrl = await new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(logoBlob);
+      });
+      
+      // Add logo image to PDF (centered at top)
+      doc.addImage(logoDataUrl, 'PNG', 65, 10, 80, 20);
+      
       doc.setFontSize(9); doc.setTextColor(100);
-      doc.text('Ashulia, Dhaka, Bangladesh', 105, 33, { align: 'center' });
-      doc.text('Phone: +880 1690-272870', 105, 38, { align: 'center' });
-      doc.line(20, 43, 190, 43);
+      doc.text('Ashulia, Dhaka, Bangladesh', 105, 37, { align: 'center' });
+      doc.text('Phone: +880 1690-272870', 105, 42, { align: 'center' });
+      doc.line(20, 48, 190, 48);
       doc.setTextColor(0); doc.setFontSize(11); doc.setFont('helvetica', 'bold');
-      doc.text('BILL TO:', 20, 53); doc.setFont('helvetica', 'normal');
-      doc.text(`${order.customerName}`, 20, 59);
-      doc.text(`Phone: ${order.phone}`, 20, 65);
-      if (order.address) doc.text(`Address: ${order.address}`, 20, 71);
-      doc.text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`, 140, 59);
-      doc.text(`Order ID: #${order._id.slice(-6).toUpperCase()}`, 140, 65);
-      doc.text(`Payment Method: ${order.paymentMethod}`, 20, 77);
-      if (order.createdBy) doc.text(`Processed By: ${order.createdBy}`, 20, 83);
+      doc.text('BILL TO:', 20, 58); doc.setFont('helvetica', 'normal');
+      doc.text(`${order.customerName}`, 20, 64);
+      doc.text(`Phone: ${order.phone}`, 20, 70);
+      if (order.address) doc.text(`Address: ${order.address}`, 20, 76);
+      doc.text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`, 140, 64);
+      doc.text(`Order ID: #${order._id.slice(-6).toUpperCase()}`, 140, 70);
+      doc.text(`Payment Method: ${order.paymentMethod}`, 20, 82);
+      if (order.createdBy) doc.text(`Processed By: ${order.createdBy}`, 20, 88);
       const tableRows = order.items.map(item => {
         const itemPrice = item.price || 0; const qty = item.quantity || 1;
         let discLabel = '0 TK';
@@ -136,7 +147,7 @@ const OrderList = () => {
         const finalPrice = item.finalItemPrice || (item.discountType === 'percentage' ? itemPrice - (itemPrice * item.discountValue / 100) : itemPrice - (item.discountValue || 0));
         return [item.name, qty, `${itemPrice.toLocaleString()} TK`, discLabel, `${(finalPrice * qty).toLocaleString()} TK`];
       });
-      autoTable(doc, { startY: order.createdBy ? 90 : 85, head: [['Item', 'Qty', 'Price', 'Discount', 'Total']], body: tableRows, theme: 'striped', headStyles: { fillColor: [0, 0, 0] }, styles: { fontSize: 10, cellPadding: 5 } });
+      autoTable(doc, { startY: order.createdBy ? 95 : 90, head: [['Item', 'Qty', 'Price', 'Discount', 'Total']], body: tableRows, theme: 'striped', headStyles: { fillColor: [0, 0, 0] }, styles: { fontSize: 10, cellPadding: 5 } });
       const finalY = doc.lastAutoTable.finalY + 15;
       doc.setFontSize(11);
       const subtotal = order.items.reduce((acc, item) => acc + (item.price * item.quantity), 0);

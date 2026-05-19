@@ -8,12 +8,22 @@ const { validate, createBannerSchema } = require('../middleware/validate');
 router.get('/', async (req, res) => {
   try {
     const cached = req.app.cacheGet?.('banners:active');
-    if (cached) return res.json(cached);
+    if (cached) {
+      console.log(`[${req.id}] Banners served from cache`);
+      return res.json(cached);
+    }
+    
     const banners = await Banner.find({ isActive: true });
     req.app.cacheSet?.('banners:active', banners);
+    console.log(`[${req.id}] Fetched ${banners.length} active banners from DB`);
     res.json(banners);
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Failed to fetch banners' });
+    console.error(`[${req.id}] Banner fetch error:`, {
+      message: err.message,
+      stack: err.stack,
+      mongoState: require('mongoose').connection.readyState
+    });
+    res.status(500).json({ success: false, message: 'Failed to fetch banners', error: err.message });
   }
 });
 

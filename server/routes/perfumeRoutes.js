@@ -43,7 +43,10 @@ router.get('/', async (req, res) => {
       const skip = (pageNum - 1) * limit;
       const cacheKey = `perfumes:${search || ''}:${pageNum}:${limit}`;
       const cached = req.app.cacheGet?.(cacheKey);
-      if (cached) return res.json(cached);
+      if (cached) {
+        console.log(`[${req.id}] Perfumes (page ${pageNum}) served from cache`);
+        return res.json(cached);
+      }
 
       const [perfumes, total] = await Promise.all([
         Perfume.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
@@ -51,19 +54,29 @@ router.get('/', async (req, res) => {
       ]);
       const result = { perfumes, total, page: pageNum, pages: Math.ceil(total / limit) };
       req.app.cacheSet?.(cacheKey, result);
+      console.log(`[${req.id}] Fetched ${perfumes.length}/${total} perfumes from DB (page ${pageNum})`);
       return res.json(result);
     }
 
     // Flat array (backward-compatible)
     const cacheKey = `perfumes:all:${search || ''}`;
     const cached = req.app.cacheGet?.(cacheKey);
-    if (cached) return res.json(cached);
+    if (cached) {
+      console.log(`[${req.id}] All perfumes${search ? ' (search: ' + search + ')' : ''} served from cache`);
+      return res.json(cached);
+    }
 
     const perfumes = await Perfume.find(query).sort({ createdAt: -1 });
     req.app.cacheSet?.(cacheKey, perfumes);
+    console.log(`[${req.id}] Fetched ${perfumes.length} perfumes from DB${search ? ' (search: ' + search + ')' : ''}`);
     res.json(perfumes);
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Failed to fetch products' });
+    console.error(`[${req.id}] Perfumes fetch error:`, {
+      message: err.message,
+      stack: err.stack,
+      mongoState: require('mongoose').connection.readyState
+    });
+    res.status(500).json({ success: false, message: 'Failed to fetch products', error: err.message });
   }
 });
 
@@ -105,7 +118,10 @@ router.get('/slug/:slug', async (req, res) => {
 router.get('/best-sellers', async (req, res) => {
   try {
     const cached = req.app.cacheGet?.('perfumes:best-sellers');
-    if (cached) return res.json(cached);
+    if (cached) {
+      console.log(`[${req.id}] Best-sellers served from cache`);
+      return res.json(cached);
+    }
 
     const delivered = await Order.find({ status: 'Delivered', paymentStatus: 'Paid' });
     const map = {};
@@ -117,13 +133,24 @@ router.get('/best-sellers', async (req, res) => {
       .sort((a, b) => b.units - a.units)
       .slice(0, 4)
       .map(x => x.name);
-    if (topNames.length === 0) return res.json([]);
+    
+    if (topNames.length === 0) {
+      console.log(`[${req.id}] No best-sellers found`);
+      return res.json([]);
+    }
+    
     const perfumes = await Perfume.find({ name: { $in: topNames }, isDeleted: { $ne: true } });
     const sorted = topNames.map(name => perfumes.find(p => p.name === name)).filter(Boolean);
     req.app.cacheSet?.('perfumes:best-sellers', sorted);
+    console.log(`[${req.id}] Fetched ${sorted.length} best-sellers from DB`);
     res.json(sorted);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error(`[${req.id}] Best-sellers fetch error:`, {
+      message: err.message,
+      stack: err.stack,
+      mongoState: require('mongoose').connection.readyState
+    });
+    res.status(500).json({ message: err.message, error: err.message });
   }
 });
 
@@ -196,16 +223,26 @@ router.get('/low-stock', verifyAdmin, async (req, res) => {
 router.get('/ratings', async (req, res) => {
   try {
     const cached = req.app.cacheGet?.('perfumes:ratings');
-    if (cached) return res.json(cached);
+    if (cached) {
+      console.log(`[${req.id}] Ratings served from cache`);
+      return res.json(cached);
+    }
+    
     const ratings = await Review.aggregate([
       { $group: { _id: '$perfumeId', avgRating: { $avg: '$rating' }, count: { $sum: 1 } } }
     ]);
     const map = {};
     ratings.forEach(r => { map[r._id] = { avgRating: Math.round(r.avgRating * 10) / 10, count: r.count }; });
     req.app.cacheSet?.('perfumes:ratings', map);
+    console.log(`[${req.id}] Fetched ratings for ${ratings.length} products from DB`);
     res.json(map);
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Failed to fetch ratings' });
+    console.error(`[${req.id}] Ratings fetch error:`, {
+      message: err.message,
+      stack: err.stack,
+      mongoState: require('mongoose').connection.readyState
+    });
+    res.status(500).json({ success: false, message: 'Failed to fetch ratings', error: err.message });
   }
 });
 
