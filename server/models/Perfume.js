@@ -37,30 +37,42 @@ perfumeSchema.index({ name: 'text' });
 perfumeSchema.index({ featured: 1 });
 perfumeSchema.index({ 'flashSale.active': 1 });
 
-// ✅ No "next" parameter
-perfumeSchema.pre('save', async function () {
-  if (!this.isModified('name') && this.slug) return;
-  let base = toSlug(this.name);
-  let slug = base;
-  let count = 1;
-  while (await mongoose.model('Perfume').findOne({ slug, _id: { $ne: this._id } })) {
-    slug = `${base}-${count++}`;
-  }
-  this.slug = slug;
-});
-
-// ✅ No "next" parameter
-perfumeSchema.pre('findOneAndUpdate', async function () {
-  const update = this.getUpdate();
-  if (update.name) {
-    let base = toSlug(update.name);
+// Pre-save hook for slug generation
+perfumeSchema.pre('save', async function (next) {
+  try {
+    if (!this.isModified('name') && this.slug) return next();
+    let base = toSlug(this.name);
     let slug = base;
     let count = 1;
-    const docId = this.getQuery()._id;
-    while (await mongoose.model('Perfume').findOne({ slug, _id: { $ne: docId } })) {
+    const PerfumeModel = mongoose.model('Perfume');
+    while (await PerfumeModel.findOne({ slug, _id: { $ne: this._id } })) {
       slug = `${base}-${count++}`;
     }
-    this.setUpdate({ ...update, slug });
+    this.slug = slug;
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Pre-findOneAndUpdate hook for slug generation
+perfumeSchema.pre('findOneAndUpdate', async function (next) {
+  try {
+    const update = this.getUpdate();
+    if (update.name) {
+      let base = toSlug(update.name);
+      let slug = base;
+      let count = 1;
+      const docId = this.getQuery()._id;
+      const PerfumeModel = mongoose.model('Perfume');
+      while (await PerfumeModel.findOne({ slug, _id: { $ne: docId } })) {
+        slug = `${base}-${count++}`;
+      }
+      this.setUpdate({ ...update, slug });
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
 });
 
