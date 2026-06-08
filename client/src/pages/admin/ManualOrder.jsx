@@ -193,7 +193,12 @@ const ManualOrder = () => {
       console.error('=== Order Submission Error ===');
       console.error('Full error object:', err);
       console.error('Response status:', err.response?.status);
-      console.error('Response data:', err.response?.data);
+      console.log('🔍 Response data details:');
+      console.log('  - data:', err.response?.data);
+      console.log('  - message:', err.response?.data?.message);
+      console.log('  - errors:', err.response?.data?.errors);
+      console.log('  - full response:', JSON.stringify(err.response?.data, null, 2));
+      
       if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
         console.table(err.response.data.errors);
       }

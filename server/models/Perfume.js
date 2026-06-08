@@ -37,42 +37,54 @@ perfumeSchema.index({ name: 'text' });
 perfumeSchema.index({ featured: 1 });
 perfumeSchema.index({ 'flashSale.active': 1 });
 
-// Pre-save hook for slug generation
+// Pre-save hook for slug generation (only if name changed)
 perfumeSchema.pre('save', async function (next) {
+  // Skip if name wasn't modified
+  if (!this.isModified('name')) return;
+  
+  let base = toSlug(this.name);
+  let slug = base;
+  let count = 1;
+  const PerfumeModel = mongoose.model('Perfume');
+  
   try {
-    if (!this.isModified('name') && this.slug) return next();
-    let base = toSlug(this.name);
-    let slug = base;
-    let count = 1;
-    const PerfumeModel = mongoose.model('Perfume');
     while (await PerfumeModel.findOne({ slug, _id: { $ne: this._id } })) {
       slug = `${base}-${count++}`;
     }
     this.slug = slug;
-    next();
   } catch (error) {
-    next(error);
+    throw error;
   }
 });
 
-// Pre-findOneAndUpdate hook for slug generation
+// Pre-findOneAndUpdate hook for slug generation (only if name is being updated)
 perfumeSchema.pre('findOneAndUpdate', async function (next) {
+  const update = this.getUpdate();
+  
+  // Only process slug if name is being updated
+  if (!update.$set?.name && !update.name) return;
+  
+  const nameToUse = update.$set?.name || update.name;
+  let base = toSlug(nameToUse);
+  let slug = base;
+  let count = 1;
+  const docId = this.getQuery()._id;
+  const PerfumeModel = mongoose.model('Perfume');
+  
   try {
-    const update = this.getUpdate();
-    if (update.name) {
-      let base = toSlug(update.name);
-      let slug = base;
-      let count = 1;
-      const docId = this.getQuery()._id;
-      const PerfumeModel = mongoose.model('Perfume');
-      while (await PerfumeModel.findOne({ slug, _id: { $ne: docId } })) {
-        slug = `${base}-${count++}`;
-      }
-      this.setUpdate({ ...update, slug });
+    while (await PerfumeModel.findOne({ slug, _id: { $ne: docId } })) {
+      slug = `${base}-${count++}`;
     }
-    next();
+    
+    // Update the update object properly
+    if (update.$set) {
+      update.$set.slug = slug;
+    } else {
+      update.slug = slug;
+    }
+    this.setUpdate(update);
   } catch (error) {
-    next(error);
+    throw error;
   }
 });
 
