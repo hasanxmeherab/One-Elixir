@@ -13,7 +13,17 @@ router.get('/', verifyAdmin, async (req, res) => {
     const records = await CostRecord.find(query).sort({ createdAt: -1 });
     res.json(records);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('Cost GET error:', {
+      message: err.message,
+      mongoose: require('mongoose').connection.readyState
+    });
+    res.status(500).json({ 
+      message: err.message,
+      debug: {
+        mongoState: require('mongoose').connection.readyState,
+        mongoConnected: require('mongoose').connection.readyState === 1
+      }
+    });
   }
 });
 

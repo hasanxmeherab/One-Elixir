@@ -118,7 +118,37 @@ app.use('/api/bundles',     require('./routes/bundleRoutes'));
 
 // ── Health Check Endpoint ────────────────────────────────
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', mongoConnected });
+  res.json({ 
+    status: 'ok', 
+    mongoConnected,
+    environment: {
+      nodeEnv: process.env.NODE_ENV,
+      mongoUri: process.env.MONGO_URI ? '***configured***' : '***NOT SET***',
+      jwtSecret: process.env.JWT_SECRET ? '***configured***' : '***NOT SET***'
+    }
+  });
+});
+
+// ── Diagnostic Endpoint ────────────────────────────────
+app.get('/api/diagnostic', (req, res) => {
+  res.json({ 
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    mongoConnected,
+    mongoState: {
+      0: 'disconnected',
+      1: 'connected',
+      2: 'connecting',
+      3: 'disconnecting'
+    }[mongoose.connection.readyState],
+    environment: {
+      nodeEnv: process.env.NODE_ENV,
+      mongoUri: process.env.MONGO_URI ? '***configured***' : '***NOT SET***',
+      jwtSecret: process.env.JWT_SECRET ? '***configured***' : '***NOT SET***',
+      jwtRefreshSecret: process.env.JWT_REFRESH_SECRET ? '***configured***' : '***NOT SET***',
+      resendKey: process.env.RESEND_API_KEY ? '***configured***' : '***NOT SET***'
+    }
+  });
 });
 
 // ── 404 Handler ──────────────────────────────────────────

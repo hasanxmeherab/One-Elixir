@@ -74,9 +74,18 @@ router.get('/', async (req, res) => {
     console.error(`[${req.id}] Perfumes fetch error:`, {
       message: err.message,
       stack: err.stack,
-      mongoState: require('mongoose').connection.readyState
+      mongoState: require('mongoose').connection.readyState,
+      mongoConnected: require('mongoose').connection.readyState === 1
     });
-    res.status(500).json({ success: false, message: 'Failed to fetch products', error: err.message });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch products', 
+      error: err.message,
+      debug: {
+        mongoState: require('mongoose').connection.readyState,
+        mongoConnected: require('mongoose').connection.readyState === 1
+      }
+    });
   }
 });
 

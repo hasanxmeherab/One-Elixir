@@ -18,7 +18,17 @@ router.get('/', verifyAdmin, async (req, res) => {
         const expenses = await Expense.find().sort({ date: -1 });
         res.json(expenses);
     } catch (err) {
-        res.status(500).json({ message: err.message });
+        console.error('Expense GET error:', {
+            message: err.message,
+            mongoose: require('mongoose').connection.readyState
+        });
+        res.status(500).json({ 
+            message: err.message,
+            debug: {
+                mongoState: require('mongoose').connection.readyState,
+                mongoConnected: require('mongoose').connection.readyState === 1
+            }
+        });
     }
 });
 

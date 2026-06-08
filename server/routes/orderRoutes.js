@@ -71,7 +71,17 @@ router.get('/', verifyAdmin, async (req, res) => {
     const orders = await Order.find().sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('Order GET error:', {
+      message: err.message,
+      mongoState: mongoose.connection.readyState
+    });
+    res.status(500).json({ 
+      message: err.message,
+      debug: {
+        mongoState: mongoose.connection.readyState,
+        mongoConnected: mongoose.connection.readyState === 1
+      }
+    });
   }
 });
 
