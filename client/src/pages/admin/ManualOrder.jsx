@@ -194,7 +194,7 @@ const ManualOrder = () => {
       console.error('Full error object:', err);
       console.error('Response status:', err.response?.status);
       console.error('Response data:', err.response?.data);
-      if (err.response?.data?.errors) {
+      if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
         console.table(err.response.data.errors);
       }
       

@@ -86,94 +86,104 @@ router.get('/', verifyAdmin, async (req, res) => {
 });
 
 // 3. POST standard website order (✅ ATOMIC STOCK DECREMENT)
-router.post('/', validate(createOrderSchema), async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  
+router.post('/', validate(createOrderSchema), async (req, res, next) => {
   try {
-    const order = new Order(req.body);
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    
+    try {
+      const order = new Order(req.body);
 
-    // Validate and reserve stock (base products only)
-    for (const item of order.items) {
-      if (!item.perfumeId) continue;
-      const perfume = await Perfume.findById(item.perfumeId).session(session);
-      if (!perfume) {
-        await session.abortTransaction();
-        return res.status(400).json({ message: `Product "${item.name}" not found` });
+      // Validate and reserve stock (base products only)
+      for (const item of order.items) {
+        if (!item.perfumeId) continue;
+        const perfume = await Perfume.findById(item.perfumeId).session(session);
+        if (!perfume) {
+          await session.abortTransaction();
+          return res.status(400).json({ message: `Product "${item.name}" not found` });
+        }
+        
+        // Check base product stock
+        if (perfume.stock < item.quantity) {
+          await session.abortTransaction();
+          return res.status(400).json({ 
+            message: `"${item.name}" only has ${perfume.stock} units available (you requested ${item.quantity})` 
+          });
+        }
       }
-      
-      // Check base product stock
-      if (perfume.stock < item.quantity) {
-        await session.abortTransaction();
-        return res.status(400).json({ 
-          message: `"${item.name}" only has ${perfume.stock} units available (you requested ${item.quantity})` 
-        });
+
+      // ✅ Create order and decrement stock atomically
+      const newOrder = await order.save({ session });
+      await decrementStockAtomic(newOrder.items, session);
+
+      // Commit transaction
+      await session.commitTransaction();
+
+      // Send confirmation email (outside transaction)
+      if (newOrder.customerEmail) {
+        try {
+          await resend.emails.send({
+            from: process.env.EMAIL_FROM || 'OneElixir <onboarding@resend.dev>',
+            to: newOrder.customerEmail,
+            subject: `Order Confirmed - #${newOrder._id.toString().slice(-6).toUpperCase()}`,
+            html: `
+              <div style="font-family:sans-serif;max-width:600px;margin:auto;border:1px solid #eee;padding:20px;">
+                <h2 style="text-align:center;letter-spacing:2px;">ONEELIXIR</h2>
+                <p>Hi ${newOrder.customerName},</p>
+                <p>Your order has been placed successfully!</p>
+                <hr/>
+                <p><strong>Order ID:</strong> #${newOrder._id}</p>
+                <ul>${newOrder.items.map(i => `<li>${i.quantity}x ${i.name} - ${i.price} TK</li>`).join('')}</ul>
+                <p><strong>Total:</strong> ${newOrder.totalAmount} TK</p>
+                <p><strong>Address:</strong> ${newOrder.address}</p>
+              </div>`
+          });
+        } catch (emailErr) {
+          console.error('Email failed:', emailErr);
+        }
       }
+
+      res.status(201).json(newOrder);
+    } catch (err) {
+      await session.abortTransaction();
+      res.status(400).json({ message: err.message });
+    } finally {
+      session.endSession();
     }
-
-    // ✅ Create order and decrement stock atomically
-    const newOrder = await order.save({ session });
-    await decrementStockAtomic(newOrder.items, session);
-
-    // Commit transaction
-    await session.commitTransaction();
-
-    // Send confirmation email (outside transaction)
-    if (newOrder.customerEmail) {
-      try {
-        await resend.emails.send({
-          from: process.env.EMAIL_FROM || 'OneElixir <onboarding@resend.dev>',
-          to: newOrder.customerEmail,
-          subject: `Order Confirmed - #${newOrder._id.toString().slice(-6).toUpperCase()}`,
-          html: `
-            <div style="font-family:sans-serif;max-width:600px;margin:auto;border:1px solid #eee;padding:20px;">
-              <h2 style="text-align:center;letter-spacing:2px;">ONEELIXIR</h2>
-              <p>Hi ${newOrder.customerName},</p>
-              <p>Your order has been placed successfully!</p>
-              <hr/>
-              <p><strong>Order ID:</strong> #${newOrder._id}</p>
-              <ul>${newOrder.items.map(i => `<li>${i.quantity}x ${i.name} - ${i.price} TK</li>`).join('')}</ul>
-              <p><strong>Total:</strong> ${newOrder.totalAmount} TK</p>
-              <p><strong>Address:</strong> ${newOrder.address}</p>
-            </div>`
-        });
-      } catch (emailErr) {
-        console.error('Email failed:', emailErr);
-      }
-    }
-
-    res.status(201).json(newOrder);
   } catch (err) {
-    await session.abortTransaction();
-    res.status(400).json({ message: err.message });
-  } finally {
-    session.endSession();
+    console.error('Order route error:', err);
+    res.status(500).json({ message: 'Internal server error', error: err.message });
   }
 });
 
 // 4. POST manual admin order (✅ ATOMIC STOCK DECREMENT)
-router.post('/manual', verifyAdmin, validate(createOrderSchema), async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  
+router.post('/manual', verifyAdmin, validate(createOrderSchema), async (req, res, next) => {
   try {
-    const order = new Order({ ...req.body, isManual: true, createdBy: req.admin.name });
-    const newOrder = await order.save({ session });
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    
+    try {
+      const order = new Order({ ...req.body, isManual: true, createdBy: req.admin.name });
+      const newOrder = await order.save({ session });
 
-    // ✅ Decrement stock atomically within transaction
-    await decrementStockAtomic(newOrder.items, session);
+      // ✅ Decrement stock atomically within transaction
+      await decrementStockAtomic(newOrder.items, session);
 
-    // Commit transaction
-    await session.commitTransaction();
+      // Commit transaction
+      await session.commitTransaction();
 
-    await writeLog(req, 'CREATE_ORDER', 'Order',
-      `Manual order created for ${newOrder.customerName} — ${newOrder.totalAmount} TK`);
-    res.status(201).json(newOrder);
+      await writeLog(req, 'CREATE_ORDER', 'Order',
+        `Manual order created for ${newOrder.customerName} — ${newOrder.totalAmount} TK`);
+      res.status(201).json(newOrder);
+    } catch (err) {
+      await session.abortTransaction();
+      res.status(400).json({ message: err.message });
+    } finally {
+      session.endSession();
+    }
   } catch (err) {
-    await session.abortTransaction();
-    res.status(400).json({ message: err.message });
-  } finally {
-    session.endSession();
+    console.error('Manual order route error:', err);
+    res.status(500).json({ message: 'Internal server error', error: err.message });
   }
 });
 
