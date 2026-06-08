@@ -161,7 +161,7 @@ const ManualOrder = () => {
         catch { console.warn('Screenshot upload failed, continuing without it.'); }
       }
       const authHeader = { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } };
-      await adminAxios.post(`${API_URL}/api/orders/manual`, {
+      const orderPayload = {
         ...orderData,
         address: `${orderData.address}, ${district.label}, ${division.label}`,
         items: itemsToOrder, totalAmount: grandTotal, shippingCost, freeDelivery,
@@ -169,7 +169,9 @@ const ManualOrder = () => {
         isManual: true, createdBy: adminName,
         createdAt: orderData.orderDate ? new Date(orderData.orderDate).toISOString() : new Date().toISOString(),
         ...(isOnlinePayment && { paymentDetails: { platform: paymentMethod, senderNumber: onlinePayment.senderNumber, transactionId: onlinePayment.transactionId, screenshot: screenshotUrl } })
-      }, authHeader);
+      };
+      console.log('Order payload being sent:', orderPayload);
+      await adminAxios.post(`${API_URL}/api/orders/manual`, orderPayload, authHeader);
 
       setOrderData({ customerName: '', phone: '', address: '', orderDate: getLocalDate() });
       setDivision(null); setDistrict(null);
@@ -181,7 +183,11 @@ const ManualOrder = () => {
       setOnlinePayment({ senderNumber: '', transactionId: '', screenshot: null, screenshotUrl: '' });
       fetchData();
       alert('Manual Order Recorded Successfully!');
-    } catch { alert('Failed to record order.'); }
+    } catch (err) { 
+      console.error('Order submission error:', err);
+      const errorMessage = err.response?.data?.message || err.response?.data?.errors?.join(', ') || err.message || 'Failed to record order.';
+      alert(`Error: ${errorMessage}`);
+    }
     finally { setUploading(false); }
   };
 
