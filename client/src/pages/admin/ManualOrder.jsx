@@ -170,7 +170,13 @@ const ManualOrder = () => {
         createdAt: orderData.orderDate ? new Date(orderData.orderDate).toISOString() : new Date().toISOString(),
         ...(isOnlinePayment && { paymentDetails: { platform: paymentMethod, senderNumber: onlinePayment.senderNumber, transactionId: onlinePayment.transactionId, screenshot: screenshotUrl } })
       };
-      console.log('Order payload being sent:', orderPayload);
+      console.log('=== Order Submission Debug ===');
+      console.log('Full payload:', JSON.stringify(orderPayload, null, 2));
+      console.log('Items array:', itemsToOrder);
+      console.log('Items count:', itemsToOrder.length);
+      if (itemsToOrder.length > 0) {
+        console.log('First item:', itemsToOrder[0]);
+      }
       await adminAxios.post(`${API_URL}/api/orders/manual`, orderPayload, authHeader);
 
       setOrderData({ customerName: '', phone: '', address: '', orderDate: getLocalDate() });
@@ -184,8 +190,22 @@ const ManualOrder = () => {
       fetchData();
       alert('Manual Order Recorded Successfully!');
     } catch (err) { 
-      console.error('Order submission error:', err);
-      const errorMessage = err.response?.data?.message || err.response?.data?.errors?.join(', ') || err.message || 'Failed to record order.';
+      console.error('=== Order Submission Error ===');
+      console.error('Full error object:', err);
+      console.error('Response status:', err.response?.status);
+      console.error('Response data:', err.response?.data);
+      if (err.response?.data?.errors) {
+        console.table(err.response.data.errors);
+      }
+      
+      let errorMessage = 'Failed to record order.';
+      if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
+        errorMessage = err.response.data.errors.join('\n');
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
       alert(`Error: ${errorMessage}`);
     }
     finally { setUploading(false); }
