@@ -116,6 +116,7 @@ const updateOrderSchema = z.object({
     adminName: z.string().min(1),
     createdAt: z.string().or(z.date()).optional(),
   })).optional(),
+  createdAt: z.string().or(z.date()).optional(),
 });
 
 // ── Review ────────────────────────────────────────────────────

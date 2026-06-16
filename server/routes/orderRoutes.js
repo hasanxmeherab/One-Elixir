@@ -235,7 +235,7 @@ router.put('/:id', verifyAdmin, asyncHandler(async (req, res) => {
   
   const { status, paymentStatus, items, customerName, phone, address,
           customerEmail, totalAmount, shippingCost, discountApplied,
-          paymentMethod, paymentDetails, adminNotes } = req.body;
+          paymentMethod, paymentDetails, adminNotes, createdAt } = req.body;
   try {
     const order = await Order.findById(req.params.id).session(session);
     if (!order) {
@@ -291,6 +291,7 @@ router.put('/:id', verifyAdmin, asyncHandler(async (req, res) => {
     if (shippingCost !== undefined)  order.shippingCost  = shippingCost;
     if (discountApplied !== undefined) order.discountApplied = discountApplied;
     if (paymentMethod)    order.paymentMethod    = paymentMethod;
+    if (createdAt)        order.createdAt        = new Date(createdAt);
     if (paymentDetails) {
       order.paymentDetails = paymentDetails;
       order.markModified('paymentDetails');
