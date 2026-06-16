@@ -197,6 +197,7 @@ const AdminDashboard = () => {
           { label: 'TOTAL CAPITAL', value: `${totalInvestment.toLocaleString()} TK`, accent: 'border-l-black' },
           { label: 'AVAILABLE MONEY', value: `${availableMoney.toLocaleString()} TK`, accent: 'border-l-black' },
           { label: 'TOTAL UNITS', value: totalStock, accent: 'border-l-black' },
+          { label: 'INVENTORY VALUE', value: `${totalValuation.toLocaleString()} TK`, accent: 'border-l-[#8b5cf6]' },
         ].map(c => (
           <div key={c.label} className={`flex-1 min-w-[150px] p-6 bg-white border border-[#eee] border-l-4 ${c.accent}`}>
             <span className="block text-[10px] text-[#888] font-bold tracking-[2px] mb-2.5">{c.label}</span>

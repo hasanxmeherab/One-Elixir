@@ -228,12 +228,14 @@ router.put('/:id/cancel', verifyUser, asyncHandler(async (req, res) => {
   }
 }));
 
-// 6. PUT update status & payment status (Admin) (✅ ATOMIC STOCK MANAGEMENT)
+// 6. PUT update order (Admin — full edit with stock recalculation) (✅ ATOMIC)
 router.put('/:id', verifyAdmin, asyncHandler(async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   
-  const { status, paymentStatus } = req.body;
+  const { status, paymentStatus, items, customerName, phone, address,
+          customerEmail, totalAmount, shippingCost, discountApplied,
+          paymentMethod, paymentDetails, adminNotes } = req.body;
   try {
     const order = await Order.findById(req.params.id).session(session);
     if (!order) {
@@ -244,39 +246,75 @@ router.put('/:id', verifyAdmin, asyncHandler(async (req, res) => {
     const oldStatus = order.status?.toLowerCase();
     const newStatus = status?.toLowerCase();
 
-    // ✅ Restore stock only if order is being CANCELLED (refund stock)
-    if ((newStatus === 'canceled' || newStatus === 'cancelled') &&
-        oldStatus !== 'canceled' && oldStatus !== 'cancelled') {
-      await restoreStockAtomic(order.items, session);
-    }
-    // ✅ If restoring a cancelled order back to active — deduct stock again atomically
-    else if ((oldStatus === 'canceled' || oldStatus === 'cancelled') &&
-             newStatus && newStatus !== 'canceled' && newStatus !== 'cancelled') {
-      await decrementStockAtomic(order.items, session);
+    // ── Handle item changes (stock recalculation) ──────────────
+    if (items && JSON.stringify(items) !== JSON.stringify(order.items)) {
+      const wasCancelled = oldStatus === 'canceled' || oldStatus === 'cancelled';
+      
+      // Restore stock for OLD items (unless order was already cancelled)
+      if (!wasCancelled) {
+        await restoreStockAtomic(order.items, session);
+      }
+      
+      // Decrement stock for NEW items (unless we're keeping it cancelled)
+      const keepingCancelled = (newStatus === 'canceled' || newStatus === 'cancelled') ||
+                               (!status && wasCancelled);
+      if (!keepingCancelled) {
+        await decrementStockAtomic(items, session);
+      }
+
+      order.items = items;
+      order.markModified('items');
     }
 
-    // Update order fields
-    if (status)        order.status        = status;
-    if (paymentStatus) order.paymentStatus = paymentStatus;
-    if (req.body.paymentDetails) {
-      order.paymentDetails = req.body.paymentDetails;
+    // ── Handle status change (stock restore/decrement) ─────────
+    if (status && !items) {
+      // Cancel → restore stock
+      if ((newStatus === 'canceled' || newStatus === 'cancelled') &&
+          oldStatus !== 'canceled' && oldStatus !== 'cancelled') {
+        await restoreStockAtomic(order.items, session);
+      }
+      // Un-cancel → decrement stock
+      else if ((oldStatus === 'canceled' || oldStatus === 'cancelled') &&
+               newStatus && newStatus !== 'canceled' && newStatus !== 'cancelled') {
+        await decrementStockAtomic(order.items, session);
+      }
+    }
+
+    // ── Update all provided fields ─────────────────────────────
+    if (status)           order.status           = status;
+    if (paymentStatus)    order.paymentStatus    = paymentStatus;
+    if (customerName)     order.customerName     = customerName;
+    if (phone)            order.phone            = phone;
+    if (address !== undefined) order.address     = address;
+    if (customerEmail !== undefined) order.customerEmail = customerEmail;
+    if (totalAmount !== undefined)   order.totalAmount   = totalAmount;
+    if (shippingCost !== undefined)  order.shippingCost  = shippingCost;
+    if (discountApplied !== undefined) order.discountApplied = discountApplied;
+    if (paymentMethod)    order.paymentMethod    = paymentMethod;
+    if (paymentDetails) {
+      order.paymentDetails = paymentDetails;
       order.markModified('paymentDetails');
+    }
+    if (adminNotes) {
+      order.adminNotes = adminNotes;
+      order.markModified('adminNotes');
     }
 
     const updatedOrder = await order.save({ session });
     await session.commitTransaction();
 
     // Log what changed (outside transaction)
-    if (status && status !== order.status) {
+    const changes = [];
+    if (status) changes.push(`status→${status}`);
+    if (paymentStatus) changes.push(`payment→${paymentStatus}`);
+    if (items) changes.push('items edited');
+    if (customerName) changes.push(`customer→${customerName}`);
+    if (changes.length > 0) {
       await writeLog(req, 'UPDATE_ORDER', 'Order',
-        `Order #${order._id.toString().slice(-6).toUpperCase()} status: ${order.status} → ${status}`);
-    }
-    if (paymentStatus && paymentStatus !== order.paymentStatus) {
-      await writeLog(req, 'UPDATE_ORDER', 'Order',
-        `Order #${order._id.toString().slice(-6).toUpperCase()} payment: ${order.paymentStatus || 'N/A'} → ${paymentStatus}`);
+        `Order #${order._id.toString().slice(-6).toUpperCase()} updated: ${changes.join(', ')}`);
     }
 
-    // #6 Order status email notification (outside transaction)
+    // Order status email notification (outside transaction)
     if (status && updatedOrder.customerEmail) {
       try {
         await resend.emails.send({

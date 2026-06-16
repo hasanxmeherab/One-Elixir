@@ -690,38 +690,139 @@ const ProductDetails = ({ openCart }) => {
         </div>
       </div>
 
-      {/* ── Fullscreen Lightbox ── */}
-      {lightboxOpen && (
-        <div className="fixed inset-0 z-[3000] bg-black/90 flex items-center justify-center" onClick={() => setLightboxOpen(false)}>
-          <button onClick={() => setLightboxOpen(false)} className="absolute top-6 right-6 text-white bg-transparent border-none cursor-pointer z-10" aria-label="Close lightbox">
-            <X size={28} />
-          </button>
-          {images.length > 1 && (
-            <>
-              <button onClick={(e) => { e.stopPropagation(); goToImage(-1); }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-white bg-white/10 hover:bg-white/20 border-none rounded-full w-10 h-10 flex items-center justify-center cursor-pointer transition-colors" aria-label="Previous image">
-                <ChevronLeft size={22} />
+      {/* ── Fullscreen Lightbox with Zoom ── */}
+      {lightboxOpen && (() => {
+        const LightboxContent = () => {
+          const [zoom, setZoom] = React.useState(100);
+          const [pan, setPan] = React.useState({ x: 0, y: 0 });
+          const [isPanning, setIsPanning] = React.useState(false);
+          const panStart = React.useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+
+          const handleZoom = (delta) => {
+            setZoom(prev => {
+              const next = Math.min(300, Math.max(100, prev + delta));
+              if (next === 100) setPan({ x: 0, y: 0 });
+              return next;
+            });
+          };
+
+          // Keyboard shortcuts
+          React.useEffect(() => {
+            const handler = (e) => {
+              if (e.key === 'Escape') setLightboxOpen(false);
+              if (e.key === 'ArrowLeft') goToImage(-1);
+              if (e.key === 'ArrowRight') goToImage(1);
+              if (e.key === '+' || e.key === '=') handleZoom(25);
+              if (e.key === '-') handleZoom(-25);
+            };
+            window.addEventListener('keydown', handler);
+            return () => window.removeEventListener('keydown', handler);
+          }, []);
+
+          // Mouse wheel zoom
+          const handleWheel = (e) => {
+            e.preventDefault();
+            handleZoom(e.deltaY < 0 ? 25 : -25);
+          };
+
+          // Pan when zoomed
+          const handleMouseDown = (e) => {
+            if (zoom <= 100) return;
+            setIsPanning(true);
+            panStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+          };
+          const handleMouseMove = (e) => {
+            if (!isPanning) return;
+            setPan({
+              x: panStart.current.panX + (e.clientX - panStart.current.x),
+              y: panStart.current.panY + (e.clientY - panStart.current.y),
+            });
+          };
+          const handleMouseUp = () => setIsPanning(false);
+
+          // Reset zoom on image change
+          React.useEffect(() => {
+            setZoom(100);
+            setPan({ x: 0, y: 0 });
+          }, [selectedImage]);
+
+          return (
+            <div className="fixed inset-0 z-[3000] bg-black/95 flex items-center justify-center select-none"
+              onClick={() => setLightboxOpen(false)}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            >
+              {/* Close button */}
+              <button onClick={() => setLightboxOpen(false)}
+                className="absolute top-5 right-5 text-white bg-white/10 hover:bg-white/20 border-none cursor-pointer z-10 w-10 h-10 rounded-full flex items-center justify-center transition-colors" aria-label="Close">
+                <X size={22} />
               </button>
-              <button onClick={(e) => { e.stopPropagation(); goToImage(1); }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-white bg-white/10 hover:bg-white/20 border-none rounded-full w-10 h-10 flex items-center justify-center cursor-pointer transition-colors" aria-label="Next image">
-                <ChevronRight size={22} />
-              </button>
-            </>
-          )}
-          <img
-            src={optimizeImage(selectedImage || getProductImage(product), 1200)}
-            alt={product.name}
-            onClick={(e) => e.stopPropagation()}
-            className="max-h-[85vh] max-w-[90vw] object-contain select-none"
-            draggable={false}
-          />
-          {images.length > 1 && (
-            <span className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/70 text-xs tracking-[2px] font-bold">
-              {(currentIndex >= 0 ? currentIndex : 0) + 1} / {images.length}
-            </span>
-          )}
-        </div>
-      )}
+
+              {/* Navigation arrows */}
+              {images.length > 1 && (
+                <>
+                  <button onClick={(e) => { e.stopPropagation(); goToImage(-1); }}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-white bg-white/10 hover:bg-white/20 border-none rounded-full w-10 h-10 flex items-center justify-center cursor-pointer transition-colors" aria-label="Previous image">
+                    <ChevronLeft size={22} />
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); goToImage(1); }}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white bg-white/10 hover:bg-white/20 border-none rounded-full w-10 h-10 flex items-center justify-center cursor-pointer transition-colors" aria-label="Next image">
+                    <ChevronRight size={22} />
+                  </button>
+                </>
+              )}
+
+              {/* Image with zoom */}
+              <div className="overflow-hidden max-h-[80vh] max-w-[85vw]"
+                onClick={(e) => e.stopPropagation()}
+                onWheel={handleWheel}
+                onMouseDown={handleMouseDown}
+                style={{ cursor: zoom > 100 ? (isPanning ? 'grabbing' : 'grab') : 'zoom-in' }}
+              >
+                <img
+                  src={optimizeImage(selectedImage || getProductImage(product), 1600)}
+                  alt={product.name}
+                  draggable={false}
+                  onClick={(e) => { e.stopPropagation(); if (zoom === 100) handleZoom(50); }}
+                  className="transition-transform duration-200"
+                  style={{
+                    transform: `scale(${zoom / 100}) translate(${pan.x / (zoom / 100)}px, ${pan.y / (zoom / 100)}px)`,
+                    maxHeight: '80vh',
+                    maxWidth: '85vw',
+                    objectFit: 'contain',
+                  }}
+                />
+              </div>
+
+              {/* Zoom controls bar */}
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/60 backdrop-blur-sm px-4 py-2.5 rounded-full"
+                onClick={(e) => e.stopPropagation()}>
+                <button onClick={() => handleZoom(-25)} disabled={zoom <= 100}
+                  className="text-white bg-transparent border-none cursor-pointer text-lg font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors disabled:opacity-30">−</button>
+                <span className="text-white text-xs font-bold tracking-wider min-w-[40px] text-center">{zoom}%</span>
+                <button onClick={() => handleZoom(25)} disabled={zoom >= 300}
+                  className="text-white bg-transparent border-none cursor-pointer text-lg font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors disabled:opacity-30">+</button>
+                {zoom > 100 && (
+                  <button onClick={() => { setZoom(100); setPan({ x: 0, y: 0 }); }}
+                    className="text-white/60 bg-transparent border-none cursor-pointer text-[10px] font-bold tracking-wider hover:text-white transition-colors ml-1">RESET</button>
+                )}
+                {images.length > 1 && (
+                  <span className="text-white/50 text-[10px] tracking-wider ml-2 border-l border-white/20 pl-3">
+                    {(currentIndex >= 0 ? currentIndex : 0) + 1}/{images.length}
+                  </span>
+                )}
+              </div>
+
+              {/* Keyboard hint */}
+              <div className="absolute top-5 left-5 text-white/30 text-[9px] tracking-wider hidden md:block">
+                ESC close · ← → navigate · +/− zoom
+              </div>
+            </div>
+          );
+        };
+        return <LightboxContent />;
+      })()}
     </>
   );
 };

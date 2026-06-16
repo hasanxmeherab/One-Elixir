@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import adminAxios from '../../utils/adminAxios';
-import { UserPlus, ShieldCheck, Trash2, BadgeCheck } from 'lucide-react';
+import { UserPlus, ShieldCheck, Trash2, BadgeCheck, KeyRound } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 
 const AdminManagement = () => {
@@ -13,6 +13,11 @@ const AdminManagement = () => {
   const loggedInId = adminData?.id || adminData?._id || '';
 
   const isSuperadmin = adminRole === 'superadmin';
+
+  // ── Self-service password change ──
+  const [showPassChange, setShowPassChange] = useState(false);
+  const [passForm, setPassForm] = useState({ current: '', new: '', confirm: '' });
+  const [passLoading, setPassLoading] = useState(false);
 
   const fetchAdmins = async () => {
     try {
@@ -47,6 +52,27 @@ const AdminManagement = () => {
     }
   };
 
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    if (passForm.new.length < 6) return toast.warning('Password must be at least 6 characters.');
+    if (passForm.new !== passForm.confirm) return toast.warning('Passwords do not match.');
+    if (passForm.new === passForm.current) return toast.warning('New password must differ from current.');
+    setPassLoading(true);
+    try {
+      await adminAxios.post(`${API_URL}/api/admins/change-password`, {
+        currentPassword: passForm.current,
+        newPassword: passForm.new,
+      });
+      toast.success('Password changed successfully!');
+      setPassForm({ current: '', new: '', confirm: '' });
+      setShowPassChange(false);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to change password.');
+    } finally {
+      setPassLoading(false);
+    }
+  };
+
   return (
     <div className="p-5">
       {/* Header */}
@@ -55,12 +81,57 @@ const AdminManagement = () => {
           <h2 className="tracking-[3px] font-bold">ADMINISTRATOR MANAGEMENT</h2>
           <p className="text-xs text-[#666] mt-1">Manage access and roles for OneElixir staff.</p>
         </div>
-        {/* Logged-in badge */}
-        <div className="flex items-center gap-2 bg-black text-white px-4 py-2 text-[10px] font-bold tracking-wider">
-          <BadgeCheck size={13} />
-          {adminData?.name?.toUpperCase()} — {adminRole.toUpperCase()}
+        <div className="flex items-center gap-3">
+          <button onClick={() => setShowPassChange(p => !p)}
+            className="flex items-center gap-1.5 bg-white border border-[#ddd] px-3 py-2 text-[10px] font-bold tracking-wider cursor-pointer hover:border-black transition-colors">
+            <KeyRound size={13} /> CHANGE MY PASSWORD
+          </button>
+          {/* Logged-in badge */}
+          <div className="flex items-center gap-2 bg-black text-white px-4 py-2 text-[10px] font-bold tracking-wider">
+            <BadgeCheck size={13} />
+            {adminData?.name?.toUpperCase()} — {adminRole.toUpperCase()}
+          </div>
         </div>
       </div>
+
+      {/* ── Self-Service Password Change ── */}
+      {showPassChange && (
+        <div className="mb-8 bg-white border border-[#eee] rounded p-6 max-w-[400px]">
+          <h3 className="text-sm tracking-wider mb-4 flex items-center gap-2.5">
+            <KeyRound size={18} /> CHANGE YOUR PASSWORD
+          </h3>
+          <form onSubmit={handlePasswordChange} className="flex flex-col gap-3">
+            <input
+              type="password" placeholder="Current Password" required
+              value={passForm.current} onChange={e => setPassForm({...passForm, current: e.target.value})}
+              className="p-3 border border-[#ddd] text-sm outline-none"
+            />
+            <input
+              type="password" placeholder="New Password (min. 6 chars)" required minLength={6}
+              value={passForm.new} onChange={e => setPassForm({...passForm, new: e.target.value})}
+              className="p-3 border border-[#ddd] text-sm outline-none"
+            />
+            <input
+              type="password" placeholder="Confirm New Password" required
+              value={passForm.confirm} onChange={e => setPassForm({...passForm, confirm: e.target.value})}
+              className="p-3 border border-[#ddd] text-sm outline-none"
+            />
+            {passForm.new && passForm.confirm && passForm.new !== passForm.confirm && (
+              <p className="text-[11px] text-red-500">⚠ Passwords do not match</p>
+            )}
+            <div className="flex gap-2">
+              <button type="submit" disabled={passLoading}
+                className="flex-1 p-3 bg-black text-white border-none cursor-pointer font-bold tracking-wider hover:bg-gray-800 transition-colors disabled:opacity-60">
+                {passLoading ? 'UPDATING...' : 'UPDATE PASSWORD'}
+              </button>
+              <button type="button" onClick={() => { setShowPassChange(false); setPassForm({ current: '', new: '', confirm: '' }); }}
+                className="px-4 p-3 bg-[#f0f0f0] border border-[#ddd] cursor-pointer font-bold tracking-wider text-xs">
+                CANCEL
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[350px_1fr] gap-8">
 
@@ -70,6 +141,9 @@ const AdminManagement = () => {
             <h3 className="text-sm tracking-wider mb-5 flex items-center gap-2.5">
               <UserPlus size={18} /> CREATE NEW ADMIN
             </h3>
+            <p className="text-[11px] text-[#999] mb-4 leading-relaxed">
+              New admin will be required to set their own password on first login.
+            </p>
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <input
                 type="text" placeholder="Full Name" required
@@ -82,7 +156,7 @@ const AdminManagement = () => {
                 className="p-3 border border-[#ddd] text-sm outline-none"
               />
               <input
-                type="password" placeholder="Password" required
+                type="password" placeholder="Temporary Password" required
                 value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}
                 className="p-3 border border-[#ddd] text-sm outline-none"
               />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import adminAxios from '../../utils/adminAxios';
 import * as XLSX from 'xlsx';
@@ -34,7 +34,7 @@ const Pagination = ({ page, totalPages, onPageChange }) => {
 };
 
 const OrderList = () => {
-  const { orders = [], fetchData } = useOutletContext();
+  const { orders = [], perfumes = [], fetchData } = useOutletContext();
   const toast = useToast();
   const [showArchived, setShowArchived] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,19 +47,42 @@ const OrderList = () => {
   const [editUploading, setEditUploading] = useState(false);
   const [page, setPage] = useState(1);
 
+  // ── NEW: Date range filter ──
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  // ── NEW: Bulk selection ──
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkAction, setBulkAction] = useState('');
+  const [bulkLoading, setBulkLoading] = useState(false);
+
+  // ── NEW: Edit Order modal ──
+  const [editOrder, setEditOrder] = useState(null);
+  const [editForm, setEditForm] = useState(null);
+  const [editSaving, setEditSaving] = useState(false);
+
+  // ── NEW: Order notes ──
+  const [notesOrder, setNotesOrder] = useState(null);
+  const [noteText, setNoteText] = useState('');
+
+  // ── NEW: Customer history ──
+  const [customerHistory, setCustomerHistory] = useState(null);
+
   const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
   const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const adminData = JSON.parse(localStorage.getItem('adminData') || '{}');
 
   useEffect(() => {
     const interval = setInterval(() => fetchData(), 30000);
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => { setPage(1); }, [searchTerm, paymentStatusFilter, paymentMethodFilter, orderStatusFilter, showArchived]);
+  useEffect(() => { setPage(1); }, [searchTerm, paymentStatusFilter, paymentMethodFilter, orderStatusFilter, showArchived, dateFrom, dateTo]);
 
   if (!orders) return <div className="p-10 text-center">Loading Order Data...</div>;
 
+  // ── Existing handlers (unchanged) ──
   const updatePaymentStatus = async (id, paymentStatus) => {
     try { await adminAxios.put(`${API_URL}/api/orders/${id}`, { paymentStatus }); fetchData(); }
     catch { toast.error('Failed to update payment status'); }
@@ -109,11 +132,165 @@ const OrderList = () => {
     finally { setEditUploading(false); }
   };
 
+  // ── NEW: Full order edit ──
+  const openEditOrder = (order) => {
+    setEditForm({
+      customerName: order.customerName,
+      phone: order.phone,
+      address: order.address || '',
+      customerEmail: order.customerEmail || '',
+      paymentMethod: order.paymentMethod,
+      shippingCost: order.shippingCost || 0,
+      items: order.items.map(item => ({
+        perfumeId: item.perfumeId || '',
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        discountType: item.discountType || 'none',
+        discountValue: item.discountValue || 0,
+        finalItemPrice: item.finalItemPrice || item.price,
+      })),
+    });
+    setEditOrder(order);
+  };
+
+  const calcEditTotal = (form) => {
+    if (!form) return 0;
+    const itemsTotal = form.items.reduce((sum, item) => {
+      let price = item.price;
+      if (item.discountType === 'percentage') price = price - (price * item.discountValue / 100);
+      else if (item.discountType === 'fixed') price = price - (item.discountValue || 0);
+      return sum + Math.max(0, price) * item.quantity;
+    }, 0);
+    return itemsTotal + (Number(form.shippingCost) || 0);
+  };
+
+  const saveEditOrder = async () => {
+    if (!editForm.customerName || !editForm.phone) return toast.warning('Customer name and phone required.');
+    if (editForm.items.length === 0) return toast.warning('At least one item required.');
+    setEditSaving(true);
+    try {
+      const totalAmount = calcEditTotal(editForm);
+      const items = editForm.items.map(item => {
+        let finalPrice = item.price;
+        if (item.discountType === 'percentage') finalPrice = item.price - (item.price * item.discountValue / 100);
+        else if (item.discountType === 'fixed') finalPrice = item.price - (item.discountValue || 0);
+        return { ...item, finalItemPrice: Math.max(0, finalPrice) };
+      });
+      await adminAxios.put(`${API_URL}/api/orders/${editOrder._id}`, {
+        customerName: editForm.customerName,
+        phone: editForm.phone,
+        address: editForm.address,
+        customerEmail: editForm.customerEmail,
+        paymentMethod: editForm.paymentMethod,
+        shippingCost: Number(editForm.shippingCost) || 0,
+        totalAmount,
+        items,
+      });
+      toast.success('Order updated successfully.');
+      setEditOrder(null);
+      setEditForm(null);
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update order.');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const addEditItem = () => {
+    setEditForm(f => ({
+      ...f,
+      items: [...f.items, { perfumeId: '', name: '', price: 0, quantity: 1, discountType: 'none', discountValue: 0 }]
+    }));
+  };
+
+  const removeEditItem = (idx) => {
+    setEditForm(f => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
+  };
+
+  const updateEditItem = (idx, field, value) => {
+    setEditForm(f => {
+      const items = [...f.items];
+      items[idx] = { ...items[idx], [field]: value };
+      // If selecting a perfume from dropdown, auto-fill name/price
+      if (field === 'perfumeId' && value) {
+        const p = perfumes.find(p => p._id === value);
+        if (p) {
+          items[idx].name = p.name;
+          items[idx].price = p.price;
+        }
+      }
+      return { ...f, items };
+    });
+  };
+
+  // ── NEW: Bulk actions ──
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === displayedOrders.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(displayedOrders.map(o => o._id)));
+    }
+  };
+
+  const executeBulkAction = async () => {
+    if (!bulkAction || selectedIds.size === 0) return;
+    setBulkLoading(true);
+    try {
+      const [type, value] = bulkAction.split(':');
+      const body = { orderIds: [...selectedIds] };
+      if (type === 'status') body.status = value;
+      if (type === 'payment') body.paymentStatus = value;
+      await adminAxios.put(`${API_URL}/api/orders/bulk-update`, body);
+      toast.success(`${selectedIds.size} orders updated.`);
+      setSelectedIds(new Set());
+      setBulkAction('');
+      fetchData();
+    } catch { toast.error('Bulk update failed.'); }
+    finally { setBulkLoading(false); }
+  };
+
+  // ── NEW: Notes ──
+  const addNote = async () => {
+    if (!noteText.trim()) return;
+    try {
+      const existingNotes = notesOrder.adminNotes || [];
+      await adminAxios.put(`${API_URL}/api/orders/${notesOrder._id}`, {
+        adminNotes: [...existingNotes, { text: noteText.trim(), adminName: adminData?.name || 'Admin' }]
+      });
+      toast.success('Note added.');
+      setNoteText('');
+      fetchData();
+      // Refresh the notes order
+      setNotesOrder(prev => ({
+        ...prev,
+        adminNotes: [...(prev.adminNotes || []), { text: noteText.trim(), adminName: adminData?.name || 'Admin', createdAt: new Date().toISOString() }]
+      }));
+    } catch { toast.error('Failed to add note.'); }
+  };
+
+  // ── NEW: Customer history ──
+  const showCustomerHistory = (customerName, phone) => {
+    const history = orders.filter(o => o.customerName === customerName || o.phone === phone);
+    const totalSpent = history.filter(o => o.status?.toLowerCase() === 'delivered' && o.paymentStatus?.toLowerCase() === 'paid')
+      .reduce((a, o) => a + (Number(o.totalAmount) || 0), 0);
+    setCustomerHistory({ name: customerName, phone, orders: history, totalSpent });
+  };
+
+  // ── Receipt download (unchanged) ──
   const downloadReceipt = async (order) => {
     try {
       const doc = new jsPDF();
 
-      // Fetch and embed logo image
       const logoResponse = await fetch('/logos/OneElixir Name(Sg).png');
       const logoBlob = await logoResponse.blob();
       const logoDataUrl = await new Promise(resolve => {
@@ -122,7 +299,6 @@ const OrderList = () => {
         reader.readAsDataURL(logoBlob);
       });
 
-      // Add logo image to PDF (centered at top)
       doc.addImage(logoDataUrl, 'PNG', 65, 10, 80, 20);
 
       doc.setFontSize(9); doc.setTextColor(100);
@@ -189,13 +365,25 @@ const OrderList = () => {
     toast.success(`Exported ${rows.length} orders to Excel`);
   };
 
+  // ── Filtering (UPDATED: search by Order ID + date range) ──
   const baseFiltered = orders.filter(o => showArchived ? o.status === 'Canceled' : o.status !== 'Canceled');
   const allFiltered = baseFiltered.filter(order => {
     const s = searchTerm.toLowerCase();
-    return (order.customerName.toLowerCase().includes(s) || order.phone.includes(s))
-      && (paymentStatusFilter === 'ALL' || order.paymentStatus === paymentStatusFilter)
-      && (paymentMethodFilter === 'ALL' || order.paymentMethod === paymentMethodFilter)
-      && (orderStatusFilter === 'ALL' || order.status === orderStatusFilter);
+    const matchesSearch = !s ||
+      order.customerName.toLowerCase().includes(s) ||
+      order.phone.includes(s) ||
+      order._id.slice(-6).toUpperCase().includes(s.toUpperCase());
+    const matchesPaymentStatus = paymentStatusFilter === 'ALL' || order.paymentStatus === paymentStatusFilter;
+    const matchesPaymentMethod = paymentMethodFilter === 'ALL' || order.paymentMethod === paymentMethodFilter;
+    const matchesOrderStatus = orderStatusFilter === 'ALL' || order.status === orderStatusFilter;
+    // Date range filter
+    let matchesDate = true;
+    if (dateFrom) matchesDate = new Date(order.createdAt) >= new Date(dateFrom);
+    if (dateTo && matchesDate) {
+      const to = new Date(dateTo); to.setHours(23, 59, 59, 999);
+      matchesDate = new Date(order.createdAt) <= to;
+    }
+    return matchesSearch && matchesPaymentStatus && matchesPaymentMethod && matchesOrderStatus && matchesDate;
   });
   const totalPages = Math.ceil(allFiltered.length / PAGE_SIZE);
   const displayedOrders = allFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -208,19 +396,18 @@ const OrderList = () => {
     return 'bg-amber-100 text-amber-800';
   };
 
-  // ✅ Check if order has payment details (works for COD + Full Payment)
   const hasPaymentDetails = (order) =>
     !!(order.paymentDetails?.senderNumber || order.paymentDetails?.transactionId);
 
   return (
     <div className="w-full">
       {/* ── Header ── */}
-      <div className="flex justify-between items-center mb-8 flex-wrap gap-3">
+      <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
         <h3 className="tracking-[2px] font-bold m-0">{showArchived ? 'ARCHIVED ORDERS' : 'ACTIVE ORDERS'}</h3>
         <div className="flex gap-2.5 flex-wrap items-center">
-          <input type="text" placeholder="Search customer..." value={searchTerm}
+          <input type="text" placeholder="Search name / phone / ID..." value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="px-3 py-2 border border-[#ddd] text-xs outline-none w-36" />
+            className="px-3 py-2 border border-[#ddd] text-xs outline-none w-48" />
           <select value={orderStatusFilter} onChange={e => setOrderStatusFilter(e.target.value)}
             className="px-2 py-2 border border-[#ddd] text-[11px] outline-none cursor-pointer font-bold">
             <option value="ALL">ALL STATUS</option>
@@ -253,22 +440,70 @@ const OrderList = () => {
         </div>
       </div>
 
+      {/* ── NEW: Date Range Filter ── */}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <span className="text-[10px] font-bold text-[#888] tracking-wider">DATE RANGE:</span>
+        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+          className="px-2 py-1.5 border border-[#ddd] text-[11px] outline-none" />
+        <span className="text-[#aaa] text-xs">to</span>
+        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+          className="px-2 py-1.5 border border-[#ddd] text-[11px] outline-none" />
+        {(dateFrom || dateTo) && (
+          <button onClick={() => { setDateFrom(''); setDateTo(''); }}
+            className="text-[10px] text-[#888] underline cursor-pointer bg-transparent border-none">CLEAR</button>
+        )}
+      </div>
+
+      {/* ── NEW: Bulk Actions Bar ── */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 mb-4 p-3 bg-[#f5f5f5] border border-[#ddd]">
+          <span className="text-[11px] font-bold">{selectedIds.size} selected</span>
+          <select value={bulkAction} onChange={e => setBulkAction(e.target.value)}
+            className="px-2 py-1.5 border border-[#ddd] text-[11px] outline-none cursor-pointer font-bold">
+            <option value="">— BULK ACTION —</option>
+            <option value="status:Pending">Set Pending</option>
+            <option value="status:Processing">Set Processing</option>
+            <option value="status:Shipped">Set Shipped</option>
+            <option value="status:Delivered">Set Delivered</option>
+            <option value="status:Canceled">Cancel All</option>
+            <option value="payment:Paid">Mark Paid</option>
+            <option value="payment:Unpaid">Mark Unpaid</option>
+          </select>
+          <button onClick={executeBulkAction} disabled={!bulkAction || bulkLoading}
+            className="px-3 py-1.5 text-[10px] font-bold bg-black text-white border-none cursor-pointer disabled:opacity-50">
+            {bulkLoading ? 'APPLYING...' : 'APPLY'}
+          </button>
+          <button onClick={() => setSelectedIds(new Set())}
+            className="text-[10px] text-[#888] underline cursor-pointer bg-transparent border-none ml-auto">DESELECT ALL</button>
+        </div>
+      )}
+
       {/* ── Table ── */}
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-left text-xs">
           <thead>
             <tr className="border-b-2 border-black">
-              {['DATE', 'CUSTOMER', 'ADDRESS', 'ITEMS', 'SHIPPING', 'TOTAL', 'PAYMENT', 'INFO', 'CREATED BY', 'STATUS', 'ACTIONS', 'PDF'].map(h => (
+              <th className="py-2.5 px-2 w-8">
+                <input type="checkbox" checked={selectedIds.size === displayedOrders.length && displayedOrders.length > 0}
+                  onChange={toggleSelectAll} className="cursor-pointer" />
+              </th>
+              {['DATE', 'ID', 'CUSTOMER', 'ADDRESS', 'ITEMS', 'SHIPPING', 'TOTAL', 'PAYMENT', 'INFO', 'NOTES', 'CREATED BY', 'STATUS', 'ACTIONS', 'EDIT', 'PDF'].map(h => (
                 <th key={h} className="py-2.5 px-2 font-bold tracking-wider text-[10px]">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {displayedOrders.length > 0 ? displayedOrders.map(order => (
-              <tr key={order._id} className="border-b border-[#eee]">
-                <td className="py-2.5 px-2">{new Date(order.createdAt).toLocaleDateString()}</td>
+              <tr key={order._id} className={`border-b border-[#eee] ${selectedIds.has(order._id) ? 'bg-blue-50' : ''}`}>
                 <td className="py-2.5 px-2">
-                  <div className="font-bold">{order.customerName}</div>
+                  <input type="checkbox" checked={selectedIds.has(order._id)} onChange={() => toggleSelect(order._id)} className="cursor-pointer" />
+                </td>
+                <td className="py-2.5 px-2 whitespace-nowrap">{new Date(order.createdAt).toLocaleDateString()}</td>
+                <td className="py-2.5 px-2 font-mono text-[10px] text-[#888]">#{order._id.slice(-6).toUpperCase()}</td>
+                <td className="py-2.5 px-2">
+                  <div className="font-bold cursor-pointer hover:underline" onClick={() => showCustomerHistory(order.customerName, order.phone)}>
+                    {order.customerName}
+                  </div>
                   <div className="text-[11px] text-gray-500">{order.phone}</div>
                 </td>
                 <td className="py-2.5 px-2 max-w-[180px]">
@@ -290,24 +525,20 @@ const OrderList = () => {
                     <option value="Paid">Paid</option>
                   </select>
                 </td>
-
-                {/* ✅ INFO column — shows for ANY order with payment details, including COD */}
                 <td className="py-2.5 px-2 text-center align-middle">
                   {hasPaymentDetails(order) ? (
                     <div className="flex flex-col gap-1 items-center justify-center">
-                      <button
-                        onClick={() => setSelectedPayment({
-                          platform: order.paymentDetails?.platform || order.paymentMethod,
-                          senderNumber: order.paymentDetails?.senderNumber || '—',
-                          transactionId: order.paymentDetails?.transactionId || '—',
-                          amountPaid: order.paymentDetails?.amountPaid || null,
-                          screenshot: order.paymentDetails?.screenshot || null,
-                        })}
+                      <button onClick={() => setSelectedPayment({
+                        platform: order.paymentDetails?.platform || order.paymentMethod,
+                        senderNumber: order.paymentDetails?.senderNumber || '—',
+                        transactionId: order.paymentDetails?.transactionId || '—',
+                        amountPaid: order.paymentDetails?.amountPaid || null,
+                        screenshot: order.paymentDetails?.screenshot || null,
+                      })}
                         className="bg-black text-white border-none px-2 py-1 text-[9px] cursor-pointer font-bold">
                         VIEW
                       </button>
-                      <button
-                        onClick={() => openEditPayment(order)}
+                      <button onClick={() => openEditPayment(order)}
                         className="bg-[#555] text-white border-none px-2 py-1 text-[9px] cursor-pointer font-bold">
                         EDIT
                       </button>
@@ -316,7 +547,17 @@ const OrderList = () => {
                     <span className="text-[11px] text-gray-300 block text-center">—</span>
                   )}
                 </td>
-
+                {/* NOTES column */}
+                <td className="py-2.5 px-2 text-center">
+                  <button onClick={() => setNotesOrder(order)}
+                    className="bg-transparent border border-[#ddd] px-2 py-1 text-[9px] cursor-pointer font-bold hover:border-black transition-colors relative">
+                    📝 {(order.adminNotes?.length || 0) > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-black text-white rounded-full text-[8px] flex items-center justify-center">
+                        {order.adminNotes.length}
+                      </span>
+                    )}
+                  </button>
+                </td>
                 <td className="py-2.5 px-2 text-[11px] text-gray-500">{order.createdBy || (order.isManual ? 'Admin' : 'Customer')}</td>
                 <td className="py-2.5 px-2">
                   <span className={`px-2 py-0.5 rounded-sm text-[10px] font-bold ${getStatusClass(order.status)}`}>
@@ -338,13 +579,20 @@ const OrderList = () => {
                       className="bg-[#222] text-white border-none px-3 py-1 cursor-pointer text-[10px]">RESTORE</button>
                   )}
                 </td>
+                {/* EDIT button */}
+                <td className="py-2.5 px-2">
+                  <button onClick={() => openEditOrder(order)}
+                    className="bg-blue-50 border border-blue-300 text-blue-700 px-2 py-1 cursor-pointer text-[10px] font-bold hover:bg-blue-100 transition-colors">
+                    ✏️ EDIT
+                  </button>
+                </td>
                 <td className="py-2.5 px-2">
                   <button onClick={() => downloadReceipt(order)}
                     className="bg-white border border-black px-2 py-1 cursor-pointer text-[11px] font-bold">📄</button>
                 </td>
               </tr>
             )) : (
-              <tr><td colSpan="12" className="text-center py-12 text-gray-300">No orders found.</td></tr>
+              <tr><td colSpan="16" className="text-center py-12 text-gray-300">No orders found.</td></tr>
             )}
           </tbody>
         </table>
@@ -429,6 +677,232 @@ const OrderList = () => {
               className={`bg-black text-white border-none p-2.5 cursor-pointer font-bold mt-4 tracking-wider transition-opacity ${editUploading ? 'opacity-60' : ''}`}>
               {editUploading ? 'SAVING...' : 'SAVE PAYMENT INFO'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── NEW: Full Edit Order Modal ── */}
+      {editOrder && editForm && (
+        <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-[3000] overflow-y-auto py-10" onClick={() => { setEditOrder(null); setEditForm(null); }}>
+          <div className="bg-white p-6 w-[650px] max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-[13px] tracking-[2px] m-0 font-bold">EDIT ORDER #{editOrder._id.slice(-6).toUpperCase()}</h3>
+              <button onClick={() => { setEditOrder(null); setEditForm(null); }} className="bg-transparent border-none text-lg cursor-pointer text-gray-400">×</button>
+            </div>
+
+            {/* Customer Info */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <label className="block text-[10px] font-bold tracking-wider text-[#888] mb-1">CUSTOMER NAME *</label>
+                <input value={editForm.customerName} onChange={e => setEditForm({ ...editForm, customerName: e.target.value })}
+                  className="w-full p-2.5 border border-[#ddd] text-[13px] outline-none" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold tracking-wider text-[#888] mb-1">PHONE *</label>
+                <input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
+                  className="w-full p-2.5 border border-[#ddd] text-[13px] outline-none" />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-[10px] font-bold tracking-wider text-[#888] mb-1">ADDRESS</label>
+                <input value={editForm.address} onChange={e => setEditForm({ ...editForm, address: e.target.value })}
+                  className="w-full p-2.5 border border-[#ddd] text-[13px] outline-none" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold tracking-wider text-[#888] mb-1">EMAIL</label>
+                <input value={editForm.customerEmail} onChange={e => setEditForm({ ...editForm, customerEmail: e.target.value })}
+                  className="w-full p-2.5 border border-[#ddd] text-[13px] outline-none" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold tracking-wider text-[#888] mb-1">PAYMENT METHOD</label>
+                <select value={editForm.paymentMethod} onChange={e => setEditForm({ ...editForm, paymentMethod: e.target.value })}
+                  className="w-full p-2.5 border border-[#ddd] text-[13px] outline-none cursor-pointer">
+                  <option value="Cash on Delivery">Cash on Delivery</option>
+                  <option value="Full Payment">Full Payment</option>
+                  <option value="Bkash">Bkash</option>
+                  <option value="Nagad">Nagad</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Items */}
+            <div className="mb-4">
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-[10px] font-bold tracking-wider text-[#888]">ORDER ITEMS</label>
+                <button onClick={addEditItem}
+                  className="text-[10px] font-bold border border-[#ddd] px-2 py-1 cursor-pointer hover:border-black transition-colors bg-white">
+                  + ADD ITEM
+                </button>
+              </div>
+              {editForm.items.map((item, idx) => (
+                <div key={idx} className="grid grid-cols-[1fr_80px_60px_100px_80px_30px] gap-2 mb-2 items-end">
+                  <div>
+                    <label className="text-[9px] text-[#aaa]">Product</label>
+                    <select value={item.perfumeId || ''} onChange={e => updateEditItem(idx, 'perfumeId', e.target.value)}
+                      className="w-full p-1.5 border border-[#ddd] text-[11px] outline-none">
+                      <option value="">— Custom —</option>
+                      {perfumes.map(p => <option key={p._id} value={p._id}>{p.name} ({p.price} TK)</option>)}
+                    </select>
+                    {!item.perfumeId && (
+                      <input value={item.name} onChange={e => updateEditItem(idx, 'name', e.target.value)}
+                        placeholder="Item name" className="w-full p-1.5 border border-[#ddd] text-[11px] outline-none mt-1" />
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-[#aaa]">Price</label>
+                    <input type="number" value={item.price} onChange={e => updateEditItem(idx, 'price', Number(e.target.value))}
+                      className="w-full p-1.5 border border-[#ddd] text-[11px] outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-[#aaa]">Qty</label>
+                    <input type="number" min="1" value={item.quantity} onChange={e => updateEditItem(idx, 'quantity', Number(e.target.value) || 1)}
+                      className="w-full p-1.5 border border-[#ddd] text-[11px] outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-[#aaa]">Discount</label>
+                    <div className="flex gap-1">
+                      <select value={item.discountType} onChange={e => updateEditItem(idx, 'discountType', e.target.value)}
+                        className="p-1.5 border border-[#ddd] text-[10px] outline-none w-16">
+                        <option value="none">None</option>
+                        <option value="fixed">Fixed</option>
+                        <option value="percentage">%</option>
+                      </select>
+                      {item.discountType !== 'none' && (
+                        <input type="number" value={item.discountValue} onChange={e => updateEditItem(idx, 'discountValue', Number(e.target.value))}
+                          className="p-1.5 border border-[#ddd] text-[10px] outline-none w-14" />
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-[#aaa]">Subtotal</label>
+                    <p className="text-[11px] font-bold mt-1">
+                      {(() => {
+                        let p = item.price;
+                        if (item.discountType === 'percentage') p = p - (p * item.discountValue / 100);
+                        else if (item.discountType === 'fixed') p = p - (item.discountValue || 0);
+                        return (Math.max(0, p) * item.quantity).toLocaleString();
+                      })()} TK
+                    </p>
+                  </div>
+                  <div>
+                    {editForm.items.length > 1 && (
+                      <button onClick={() => removeEditItem(idx)}
+                        className="text-red-500 cursor-pointer bg-transparent border-none text-lg">×</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Shipping + Total */}
+            <div className="flex items-center gap-4 border-t border-[#eee] pt-4">
+              <div>
+                <label className="text-[10px] font-bold text-[#888]">SHIPPING</label>
+                <input type="number" value={editForm.shippingCost} onChange={e => setEditForm({ ...editForm, shippingCost: Number(e.target.value) })}
+                  className="w-24 p-2 border border-[#ddd] text-sm outline-none ml-2" />
+              </div>
+              <div className="ml-auto text-right">
+                <span className="text-[10px] text-[#888] font-bold">GRAND TOTAL</span>
+                <p className="text-xl font-bold">{calcEditTotal(editForm).toLocaleString()} TK</p>
+              </div>
+            </div>
+
+            <button onClick={saveEditOrder} disabled={editSaving}
+              className="w-full bg-black text-white border-none p-3 cursor-pointer font-bold tracking-wider mt-5 hover:bg-gray-800 transition-colors disabled:opacity-60">
+              {editSaving ? 'SAVING ORDER...' : 'SAVE CHANGES'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── NEW: Notes Modal ── */}
+      {notesOrder && (
+        <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-[3000]" onClick={() => setNotesOrder(null)}>
+          <div className="bg-white p-6 w-[420px] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-[13px] tracking-[2px] m-0 font-bold">ORDER NOTES</h3>
+              <button onClick={() => setNotesOrder(null)} className="bg-transparent border-none text-lg cursor-pointer text-gray-400">×</button>
+            </div>
+            <p className="text-[11px] text-[#888] mb-3">#{notesOrder._id.slice(-6).toUpperCase()} — {notesOrder.customerName}</p>
+
+            {/* Existing notes */}
+            <div className="flex-1 overflow-y-auto mb-4 max-h-[300px]">
+              {(!notesOrder.adminNotes || notesOrder.adminNotes.length === 0) ? (
+                <p className="text-xs text-[#ccc] text-center py-6">No notes yet.</p>
+              ) : (
+                notesOrder.adminNotes.map((note, i) => (
+                  <div key={i} className="border-b border-[#f0f0f0] py-3">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[10px] font-bold text-[#555]">{note.adminName}</span>
+                      <span className="text-[9px] text-[#aaa]">{new Date(note.createdAt).toLocaleString()}</span>
+                    </div>
+                    <p className="text-[12px] text-[#333] leading-relaxed">{note.text}</p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Add note */}
+            <div className="flex gap-2 border-t border-[#eee] pt-3">
+              <input value={noteText} onChange={e => setNoteText(e.target.value)}
+                placeholder="Add a note..." onKeyDown={e => e.key === 'Enter' && addNote()}
+                className="flex-1 p-2.5 border border-[#ddd] text-[13px] outline-none" />
+              <button onClick={addNote} disabled={!noteText.trim()}
+                className="bg-black text-white border-none px-4 cursor-pointer font-bold text-[11px] disabled:opacity-40">
+                ADD
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── NEW: Customer History Side Panel ── */}
+      {customerHistory && (
+        <div className="fixed inset-0 bg-black/80 flex justify-end z-[3000]" onClick={() => setCustomerHistory(null)}>
+          <div className="bg-white w-[450px] h-full overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-[13px] tracking-[2px] m-0 font-bold">CUSTOMER HISTORY</h3>
+              <button onClick={() => setCustomerHistory(null)} className="bg-transparent border-none text-lg cursor-pointer text-gray-400">×</button>
+            </div>
+
+            <div className="mb-6">
+              <h4 className="text-lg font-bold mb-1">{customerHistory.name}</h4>
+              <p className="text-sm text-[#666]">{customerHistory.phone}</p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              <div className="p-3 bg-[#f9f9f9] border border-[#eee] text-center">
+                <p className="text-[10px] font-bold text-[#888] tracking-wider">TOTAL ORDERS</p>
+                <p className="text-xl font-bold">{customerHistory.orders.length}</p>
+              </div>
+              <div className="p-3 bg-[#f9f9f9] border border-[#eee] text-center">
+                <p className="text-[10px] font-bold text-[#888] tracking-wider">TOTAL SPENT</p>
+                <p className="text-xl font-bold">{customerHistory.totalSpent.toLocaleString()}</p>
+              </div>
+              <div className="p-3 bg-[#f9f9f9] border border-[#eee] text-center">
+                <p className="text-[10px] font-bold text-[#888] tracking-wider">AVG ORDER</p>
+                <p className="text-xl font-bold">
+                  {customerHistory.orders.length ? Math.round(customerHistory.totalSpent / customerHistory.orders.filter(o => o.status?.toLowerCase() === 'delivered').length || 1).toLocaleString() : 0}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-[10px] font-bold text-[#888] tracking-wider mb-3">ORDER HISTORY</p>
+            {customerHistory.orders.map(o => (
+              <div key={o._id} className="border-b border-[#f0f0f0] py-3">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[11px] font-mono text-[#888]">#{o._id.slice(-6).toUpperCase()}</span>
+                  <span className={`px-2 py-0.5 rounded-sm text-[9px] font-bold ${getStatusClass(o.status)}`}>{o.status}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] text-[#666]">{new Date(o.createdAt).toLocaleDateString()}</span>
+                  <span className="text-[12px] font-bold">{o.totalAmount.toLocaleString()} TK</span>
+                </div>
+                <div className="text-[10px] text-[#999] mt-1">
+                  {o.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

@@ -83,7 +83,26 @@ const createOrderSchema = z.object({
 });
 
 const updateOrderSchema = z.object({
+  customerName: z.string().min(1).max(200).optional(),
+  customerEmail: z.string().email().optional().nullable(),
+  phone: z.string().min(1).max(30).optional(),
+  address: z.string().max(500).optional(),
+  items: z.array(z.object({
+    perfumeId: z.string().optional(),
+    name: z.string().min(1),
+    price: z.number().min(0),
+    quantity: z.number().int().positive().default(1),
+    variantLabel: z.string().optional().nullable(),
+    variantPrice: z.number().optional().nullable(),
+    discountType: z.enum(['fixed', 'percentage', 'none']).optional(),
+    discountValue: z.number().min(0).optional(),
+    finalItemPrice: z.number().min(0).optional(),
+  })).min(1).optional(),
+  totalAmount: z.number().min(0).optional(),
+  shippingCost: z.number().min(0).optional(),
+  discountApplied: z.number().min(0).optional(),
   status: z.string().max(30).optional(),
+  paymentMethod: z.string().max(50).optional(),
   paymentStatus: z.string().max(30).optional(),
   paymentDetails: z.object({
     senderNumber: z.string().optional(),
@@ -92,6 +111,11 @@ const updateOrderSchema = z.object({
     screenshot: z.string().optional(),
     amountPaid: z.number().optional(),
   }).optional(),
+  adminNotes: z.array(z.object({
+    text: z.string().min(1),
+    adminName: z.string().min(1),
+    createdAt: z.string().or(z.date()).optional(),
+  })).optional(),
 });
 
 // ── Review ────────────────────────────────────────────────────

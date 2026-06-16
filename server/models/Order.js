@@ -32,6 +32,12 @@ const orderSchema = new mongoose.Schema({
     screenshot: String,
     amountPaid: Number // To track if they paid delivery charge or full amount
   },
+  // --- ADMIN NOTES ---
+  adminNotes: [{
+    text:      { type: String, required: true },
+    adminName: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now }
+  }],
   isManual: { type: Boolean, default: false },
   createdBy: { type: String }, 
   createdAt: { type: Date, default: Date.now }

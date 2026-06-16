@@ -59,7 +59,8 @@ router.post('/login', validate(adminLoginSchema), async (req, res) => {
     res.json({
       accessToken,
       refreshToken,
-      admin: { id: admin._id, name: admin.name, email: admin.email, role: admin.role }
+      admin: { id: admin._id, name: admin.name, email: admin.email, role: admin.role },
+      mustChangePassword: !!admin.mustChangePassword
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -91,6 +92,32 @@ router.post('/logout', verifyAdmin, async (req, res) => {
   try {
     await Admin.findByIdAndUpdate(req.admin.id, { refreshToken: null });
     res.json({ message: 'Logged out' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ── 4b. CHANGE PASSWORD (first-login forced change)
+router.post('/change-password', verifyAdmin, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword || newPassword.length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters.' });
+    }
+
+    const admin = await Admin.findById(req.admin.id);
+    if (!admin) return res.status(404).json({ message: 'Admin not found' });
+
+    const isMatch = await bcrypt.compare(currentPassword, admin.password);
+    if (!isMatch) return res.status(400).json({ message: 'Current password is incorrect.' });
+
+    const salt = await bcrypt.genSalt(10);
+    admin.password = await bcrypt.hash(newPassword, salt);
+    admin.mustChangePassword = false;
+    await admin.save();
+
+    await writeLog(req, 'CHANGE_PASSWORD', 'Admin', `${admin.name} changed their password`);
+    res.json({ message: 'Password changed successfully.' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
