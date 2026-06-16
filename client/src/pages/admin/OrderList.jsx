@@ -20,9 +20,8 @@ const Pagination = ({ page, totalPages, onPageChange }) => {
       </button>
       {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
         <button key={n} onClick={() => onPageChange(n)}
-          className={`w-9 h-9 text-xs font-bold border transition-colors cursor-pointer ${
-            n === page ? 'bg-black text-white border-black' : 'bg-white border-[#ddd] hover:border-black'
-          }`}>
+          className={`w-9 h-9 text-xs font-bold border transition-colors cursor-pointer ${n === page ? 'bg-black text-white border-black' : 'bg-white border-[#ddd] hover:border-black'
+            }`}>
           {n}
         </button>
       ))}
@@ -37,20 +36,20 @@ const Pagination = ({ page, totalPages, onPageChange }) => {
 const OrderList = () => {
   const { orders = [], fetchData } = useOutletContext();
   const toast = useToast();
-  const [showArchived, setShowArchived]           = useState(false);
-  const [searchTerm, setSearchTerm]               = useState('');
+  const [showArchived, setShowArchived] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('ALL');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('ALL');
-  const [selectedPayment, setSelectedPayment]     = useState(null);
+  const [selectedPayment, setSelectedPayment] = useState(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
-  const [editPaymentOrder, setEditPaymentOrder]   = useState(null);
-  const [editPaymentForm, setEditPaymentForm]     = useState({ senderNumber: '', transactionId: '', screenshot: null, screenshotUrl: '' });
-  const [editUploading, setEditUploading]         = useState(false);
-  const [page, setPage]                           = useState(1);
+  const [editPaymentOrder, setEditPaymentOrder] = useState(null);
+  const [editPaymentForm, setEditPaymentForm] = useState({ senderNumber: '', transactionId: '', screenshot: null, screenshotUrl: '' });
+  const [editUploading, setEditUploading] = useState(false);
+  const [page, setPage] = useState(1);
 
-  const CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+  const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
   const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-  const API_URL       = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   useEffect(() => {
     const interval = setInterval(() => fetchData(), 30000);
@@ -113,7 +112,7 @@ const OrderList = () => {
   const downloadReceipt = async (order) => {
     try {
       const doc = new jsPDF();
-      
+
       // Fetch and embed logo image
       const logoResponse = await fetch('/logos/OneElixir Name(Sg).png');
       const logoBlob = await logoResponse.blob();
@@ -122,10 +121,10 @@ const OrderList = () => {
         reader.onload = () => resolve(reader.result);
         reader.readAsDataURL(logoBlob);
       });
-      
+
       // Add logo image to PDF (centered at top)
       doc.addImage(logoDataUrl, 'PNG', 65, 10, 80, 20);
-      
+
       doc.setFontSize(9); doc.setTextColor(100);
       doc.text('Ashulia, Dhaka, Bangladesh', 105, 37, { align: 'center' });
       doc.text('Phone: +880 1690-272870', 105, 42, { align: 'center' });
@@ -164,18 +163,18 @@ const OrderList = () => {
 
   const exportToExcel = () => {
     const rows = allFiltered.map(order => ({
-      'Date':           new Date(order.createdAt).toLocaleDateString('en-GB'),
-      'Order ID':       order._id.slice(-6).toUpperCase(),
-      'Customer':       order.customerName,
-      'Phone':          order.phone,
-      'Address':        order.address || '',
-      'Items':          order.items.map(i => `${i.quantity}x ${i.name}`).join(', '),
-      'Shipping (TK)':  order.shippingCost || 0,
-      'Total (TK)':     order.totalAmount,
+      'Date': new Date(order.createdAt).toLocaleDateString('en-GB'),
+      'Order ID': order._id.slice(-6).toUpperCase(),
+      'Customer': order.customerName,
+      'Phone': order.phone,
+      'Address': order.address || '',
+      'Items': order.items.map(i => `${i.quantity}x ${i.name}`).join(', '),
+      'Shipping (TK)': order.shippingCost || 0,
+      'Total (TK)': order.totalAmount,
       'Payment Method': order.paymentMethod,
       'Payment Status': order.paymentStatus || 'Unpaid',
-      'Order Status':   order.status,
-      'Created By':     order.createdBy || (order.isManual ? 'Admin' : 'Customer'),
+      'Order Status': order.status,
+      'Created By': order.createdBy || (order.isManual ? 'Admin' : 'Customer'),
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     ws['!cols'] = [
@@ -190,22 +189,22 @@ const OrderList = () => {
     toast.success(`Exported ${rows.length} orders to Excel`);
   };
 
-  const baseFiltered    = orders.filter(o => showArchived ? o.status === 'Canceled' : o.status !== 'Canceled');
+  const baseFiltered = orders.filter(o => showArchived ? o.status === 'Canceled' : o.status !== 'Canceled');
   const allFiltered = baseFiltered.filter(order => {
     const s = searchTerm.toLowerCase();
     return (order.customerName.toLowerCase().includes(s) || order.phone.includes(s))
       && (paymentStatusFilter === 'ALL' || order.paymentStatus === paymentStatusFilter)
       && (paymentMethodFilter === 'ALL' || order.paymentMethod === paymentMethodFilter)
-      && (orderStatusFilter   === 'ALL' || order.status       === orderStatusFilter);
+      && (orderStatusFilter === 'ALL' || order.status === orderStatusFilter);
   });
-  const totalPages      = Math.ceil(allFiltered.length / PAGE_SIZE);
+  const totalPages = Math.ceil(allFiltered.length / PAGE_SIZE);
   const displayedOrders = allFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const getStatusClass = (status) => {
-    if (status === 'Delivered')  return 'bg-emerald-100 text-emerald-800';
-    if (status === 'Canceled')   return 'bg-red-100 text-red-800';
+    if (status === 'Delivered') return 'bg-emerald-100 text-emerald-800';
+    if (status === 'Canceled') return 'bg-red-100 text-red-800';
     if (status === 'Processing') return 'bg-blue-100 text-blue-800';
-    if (status === 'Shipped')    return 'bg-violet-100 text-violet-800';
+    if (status === 'Shipped') return 'bg-violet-100 text-violet-800';
     return 'bg-amber-100 text-amber-800';
   };
 
@@ -259,7 +258,7 @@ const OrderList = () => {
         <table className="w-full border-collapse text-left text-xs">
           <thead>
             <tr className="border-b-2 border-black">
-              {['DATE','CUSTOMER','ADDRESS','ITEMS','SHIPPING','TOTAL','PAYMENT','INFO','CREATED BY','STATUS','ACTIONS','PDF'].map(h => (
+              {['DATE', 'CUSTOMER', 'ADDRESS', 'ITEMS', 'SHIPPING', 'TOTAL', 'PAYMENT', 'INFO', 'CREATED BY', 'STATUS', 'ACTIONS', 'PDF'].map(h => (
                 <th key={h} className="py-2.5 px-2 font-bold tracking-wider text-[10px]">{h}</th>
               ))}
             </tr>

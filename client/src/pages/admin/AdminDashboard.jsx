@@ -26,7 +26,7 @@ const CustomTooltip = ({ active, payload, label, suffix = '' }) => {
 const AdminDashboard = () => {
   const { perfumes = [], orders = [], investments = [] } = useOutletContext();
   const navigate = useNavigate();
-  const [filterType, setFilterType]    = useState(null);
+  const [filterType, setFilterType] = useState(null);
   const [revenueRange, setRevenueRange] = useState('30');
   const [now, setNow] = useState(new Date());
 
@@ -34,8 +34,8 @@ const AdminDashboard = () => {
   const [costRecords, setCostRecords] = useState([]);
   const [expenses, setExpenses] = useState([]);
   useEffect(() => {
-    adminAxios.get(`${API_URL}/api/costs`).then(r => setCostRecords(r.data)).catch(() => {});
-    adminAxios.get(`${API_URL}/api/expenses`).then(r => setExpenses(r.data)).catch(() => {});
+    adminAxios.get(`${API_URL}/api/costs`).then(r => setCostRecords(r.data)).catch(() => { });
+    adminAxios.get(`${API_URL}/api/expenses`).then(r => setExpenses(r.data)).catch(() => { });
   }, []);
 
   // ── Live clock for flash sale countdowns ────────────────
@@ -64,17 +64,17 @@ const AdminDashboard = () => {
   }
 
   // ── KPIs ────────────────────────────────────────────────────
-  const lowStockItems   = perfumes.filter(p => p.stock > 0 && p.stock <= 5);
+  const lowStockItems = perfumes.filter(p => p.stock > 0 && p.stock <= 5);
   const outOfStockItems = perfumes.filter(p => p.stock === 0);
-  const totalStock      = perfumes.reduce((a, p) => a + (Number(p.stock) || 0), 0);
-  const totalValuation  = perfumes.reduce((a, p) => a + (p.price * (Number(p.stock) || 0)), 0);
-  const totalRevenue    = orders
+  const totalStock = perfumes.reduce((a, p) => a + (Number(p.stock) || 0), 0);
+  const totalValuation = perfumes.reduce((a, p) => a + (p.price * (Number(p.stock) || 0)), 0);
+  const totalRevenue = orders
     .filter(o => o.status?.toLowerCase() === 'delivered' && o.paymentStatus?.toLowerCase() === 'paid')
     .reduce((a, o) => a + (Number(o.totalAmount) || 0), 0);
   const totalInvestment = investments.reduce((a, inv) => {
     const v = parseFloat(inv.totalAmount); return a + (isNaN(v) ? 0 : v);
   }, 0);
-  const totalExpenses  = expenses.reduce((a, e) => a + (Number(e.amount) || 0), 0);
+  const totalExpenses = expenses.reduce((a, e) => a + (Number(e.amount) || 0), 0);
   const availableMoney = (totalRevenue + totalInvestment) - totalExpenses;
   const totalOrders = orders.length;
 
@@ -102,15 +102,15 @@ const AdminDashboard = () => {
   // ── Revenue + Volume data ────────────────────────────────────
   const chartData = useMemo(() => {
     const days = parseInt(revenueRange);
-    const now  = new Date();
-    const map  = {};
+    const now = new Date();
+    const map = {};
     for (let i = days - 1; i >= 0; i--) {
-      const d   = new Date(now); d.setDate(d.getDate() - i);
+      const d = new Date(now); d.setDate(d.getDate() - i);
       const key = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-      map[key]  = { date: key, revenue: 0, orders: 0 };
+      map[key] = { date: key, revenue: 0, orders: 0 };
     }
     orders.forEach(o => {
-      const d    = new Date(o.createdAt);
+      const d = new Date(o.createdAt);
       const diff = Math.floor((now - d) / 86400000);
       if (diff < days) {
         const key = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
@@ -143,7 +143,7 @@ const AdminDashboard = () => {
       .filter(o => o.status?.toLowerCase() === 'delivered' && o.paymentStatus?.toLowerCase() === 'paid')
       .forEach(o => o.items?.forEach(item => {
         if (!map[item.name]) map[item.name] = { name: item.name, revenue: 0, units: 0 };
-        map[item.name].units   += item.quantity;
+        map[item.name].units += item.quantity;
         map[item.name].revenue += (Number(item.price) || 0) * item.quantity;
       }));
 
@@ -151,7 +151,7 @@ const AdminDashboard = () => {
     const latestMargin = {};
     costRecords.forEach(r => {
       if (!latestMargin[r.perfumeName] ||
-          new Date(r.createdAt) > new Date(latestMargin[r.perfumeName].createdAt)) {
+        new Date(r.createdAt) > new Date(latestMargin[r.perfumeName].createdAt)) {
         latestMargin[r.perfumeName] = r;
       }
     });
@@ -179,9 +179,9 @@ const AdminDashboard = () => {
     Cancelled: '#e74c3c', Canceled: '#e74c3c',
   };
 
-  const BAR_COLORS = ['#111','#333','#555','#777','#999','#bbb'];
+  const BAR_COLORS = ['#111', '#333', '#555', '#777', '#999', '#bbb'];
 
-  const axisStyle  = { fontSize: 10, fill: '#bbb' };
+  const axisStyle = { fontSize: 10, fill: '#bbb' };
 
   // margin bar color
   const marginBarColor = (val) => val >= 60 ? '#16a34a' : val >= 30 ? '#d97706' : '#dc2626';
@@ -193,10 +193,10 @@ const AdminDashboard = () => {
       {/* ── KPI Cards ── */}
       <div className="flex gap-5 flex-wrap mb-5">
         {[
-          { label: 'TOTAL REVENUE',   value: `${totalRevenue.toLocaleString()} TK`,   accent: 'border-l-black' },
-          { label: 'TOTAL CAPITAL',   value: `${totalInvestment.toLocaleString()} TK`, accent: 'border-l-black' },
-          { label: 'AVAILABLE MONEY', value: `${availableMoney.toLocaleString()} TK`,  accent: 'border-l-black' },
-          { label: 'TOTAL UNITS',     value: totalStock,                                accent: 'border-l-black' },
+          { label: 'TOTAL REVENUE', value: `${totalRevenue.toLocaleString()} TK`, accent: 'border-l-black' },
+          { label: 'TOTAL CAPITAL', value: `${totalInvestment.toLocaleString()} TK`, accent: 'border-l-black' },
+          { label: 'AVAILABLE MONEY', value: `${availableMoney.toLocaleString()} TK`, accent: 'border-l-black' },
+          { label: 'TOTAL UNITS', value: totalStock, accent: 'border-l-black' },
         ].map(c => (
           <div key={c.label} className={`flex-1 min-w-[150px] p-6 bg-white border border-[#eee] border-l-4 ${c.accent}`}>
             <span className="block text-[10px] text-[#888] font-bold tracking-[2px] mb-2.5">{c.label}</span>
@@ -307,7 +307,7 @@ const AdminDashboard = () => {
             <p className="text-xs text-[#aaa] mt-0.5">Delivered orders only</p>
           </div>
           <div className="flex gap-2">
-            {[['7','7D'],['30','30D'],['90','90D']].map(([val, label]) => (
+            {[['7', '7D'], ['30', '30D'], ['90', '90D']].map(([val, label]) => (
               <button key={val} onClick={() => setRevenueRange(val)}
                 className={`px-3 py-1.5 text-[10px] font-bold tracking-wider border transition-colors ${revenueRange === val ? 'bg-black text-white border-black' : 'bg-white text-[#888] border-[#ddd] hover:border-black'}`}>
                 {label}
@@ -319,13 +319,13 @@ const AdminDashboard = () => {
           <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <defs>
               <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="#000" stopOpacity={0.12} />
+                <stop offset="5%" stopColor="#000" stopOpacity={0.12} />
                 <stop offset="95%" stopColor="#000" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="date" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-            <YAxis tick={axisStyle} tickLine={false} axisLine={false} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
+            <YAxis tick={axisStyle} tickLine={false} axisLine={false} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
             <Tooltip content={<CustomTooltip suffix=" TK" />} />
             <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#000" strokeWidth={2} fill="url(#revenueGrad)" />
           </AreaChart>
@@ -381,8 +381,8 @@ const AdminDashboard = () => {
           <div className="flex gap-2">
             {[
               ['revenue', 'REVENUE'],
-              ['units',   'UNITS SOLD'],
-              ['margin',  'MARGIN %'],
+              ['units', 'UNITS SOLD'],
+              ['margin', 'MARGIN %'],
             ].map(([key, label]) => (
               <button key={key} onClick={() => setProductTab(key)}
                 className={`px-3 py-1.5 text-[10px] font-bold tracking-wider border transition-colors cursor-pointer ${productTab === key ? 'bg-black text-white border-black' : 'bg-white text-[#888] border-[#ddd] hover:border-black'}`}>
@@ -421,9 +421,9 @@ const AdminDashboard = () => {
                   tickLine={false}
                   axisLine={false}
                   tickFormatter={v =>
-                    productTab === 'revenue' && v >= 1000 ? `${(v/1000).toFixed(0)}k`
-                    : productTab === 'margin' ? `${v}%`
-                    : v
+                    productTab === 'revenue' && v >= 1000 ? `${(v / 1000).toFixed(0)}k`
+                      : productTab === 'margin' ? `${v}%`
+                        : v
                   }
                 />
                 <Tooltip
@@ -490,7 +490,7 @@ const AdminDashboard = () => {
                     <p className="text-[10px] text-[#aaa]">{totalOrders ? Math.round((value / totalOrders) * 100) : 0}%</p>
                     <div className="mt-2 h-1 bg-[#f0f0f0] rounded-full overflow-hidden">
                       <div className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${totalOrders ? (value/totalOrders)*100 : 0}%`, background: STATUS_COLORS[name] || '#999' }} />
+                        style={{ width: `${totalOrders ? (value / totalOrders) * 100 : 0}%`, background: STATUS_COLORS[name] || '#999' }} />
                     </div>
                   </div>
                 ))}

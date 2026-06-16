@@ -1,26 +1,31 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet" />
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/favicon2.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="OneElixir Fragrances — Premium handcrafted perfumes and bespoke fragrances. Shop exclusive scents crafted in small batches." />
-    <meta name="theme-color" content="#000000" />
-    <link rel="canonical" href="https://www.oneelixir.live/" />
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="OneElixir" />
-    <meta property="og:title" content="OneElixir — Premium Handcrafted Fragrances" />
-    <meta property="og:description" content="Shop exclusive scents crafted in small batches. Bespoke perfumes for the discerning." />
-    <meta property="og:url" content="https://www.oneelixir.live/" />
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-    <meta name="apple-mobile-web-app-title" content="OneElixir" />
-    <link rel="apple-touch-icon" href="/oneelixir.png" />
-    <title>OneElixir — Premium Handcrafted Fragrances</title>
-    <script type="application/ld+json">
+
+<head>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap"
+    rel="stylesheet" />
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="/favicon2.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description"
+    content="OneElixir Fragrances — Premium handcrafted perfumes and bespoke fragrances. Shop exclusive scents crafted in small batches." />
+  <meta name="theme-color" content="#000000" />
+  <link rel="canonical" href="https://www.oneelixir.live/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="OneElixir" />
+  <meta property="og:title" content="OneElixir — Premium Handcrafted Fragrances" />
+  <meta property="og:description"
+    content="Shop exclusive scents crafted in small batches. Bespoke perfumes for the discerning." />
+  <meta property="og:url" content="https://www.oneelixir.live/" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <meta name="apple-mobile-web-app-title" content="OneElixir" />
+  <link rel="apple-touch-icon" href="/oneelixir.png" />
+  <title>OneElixir — Premium Handcrafted Fragrances</title>
+  <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "Organization",
@@ -35,7 +40,7 @@
       }
     }
     </script>
-    <script type="application/ld+json">
+  <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
@@ -48,33 +53,35 @@
       }
     }
     </script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+</head>
 
-    <script>
-      // Disable old service worker caches to avoid stale app/data on normal refresh.
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', async () => {
-          try {
-            const regs = await navigator.serviceWorker.getRegistrations();
-            await Promise.all(regs.map((reg) => reg.unregister()));
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
 
-            if ('caches' in window) {
-              const keys = await caches.keys();
-              await Promise.all(
-                keys
-                  .filter((key) => key.startsWith('oneelixir-'))
-                  .map((key) => caches.delete(key))
-              );
-            }
-          } catch (_) {
-            // No-op: best-effort cleanup only.
+  <script>
+    // Disable old service worker caches to avoid stale app/data on normal refresh.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', async () => {
+        try {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((reg) => reg.unregister()));
+
+          if ('caches' in window) {
+            const keys = await caches.keys();
+            await Promise.all(
+              keys
+                .filter((key) => key.startsWith('oneelixir-'))
+                .map((key) => caches.delete(key))
+            );
           }
-        });
-      }
-    </script>
+        } catch (_) {
+          // No-op: best-effort cleanup only.
+        }
+      });
+    }
+  </script>
 
-  </body>
+</body>
+
 </html>

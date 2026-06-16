@@ -3,30 +3,30 @@ import adminAxios from '../../utils/adminAxios';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 const LINKS = [
-  { to: '/admin',              label: 'DASHBOARD',       icon: '▦' },
-  { to: '/admin/inventory',    label: 'INVENTORY',       icon: '📦' },
-  { to: '/admin/manual-order', label: 'MANUAL ORDER',    icon: '✏️' },
-  { to: '/admin/order-list',   label: 'ORDER LIST',      icon: '🧾' },
-  { to: '/admin/customers',    label: 'CUSTOMERS',       icon: '👥' },
-  { to: '/admin/expenses',     label: 'EXPENSES',        icon: '💸' },
-  { to: '/admin/investment',   label: 'INVESTMENT',      icon: '📈' },
-  { to: '/admin/coupons',      label: 'COUPONS',         icon: '🏷️' },
-  { to: '/admin/banners',      label: 'BANNERS',         icon: '🖼️' },
-  { to: '/admin/bundles',      label: 'BUNDLES',         icon: '🎁' },
-  { to: '/admin/logs',         label: 'ACTIVITY LOGS',   icon: '📋' },
-  { to: '/admin/costs',        label: 'COST CALCULATION',icon: '🧮' },
-  { to: '/admin/admins',       label: 'ADMIN MANAGEMENT',icon: '🔐' },
+  { to: '/admin', label: 'DASHBOARD', icon: '▦' },
+  { to: '/admin/inventory', label: 'INVENTORY', icon: '📦' },
+  { to: '/admin/manual-order', label: 'MANUAL ORDER', icon: '✏️' },
+  { to: '/admin/order-list', label: 'ORDER LIST', icon: '🧾' },
+  { to: '/admin/customers', label: 'CUSTOMERS', icon: '👥' },
+  { to: '/admin/expenses', label: 'EXPENSES', icon: '💸' },
+  { to: '/admin/investment', label: 'INVESTMENT', icon: '📈' },
+  { to: '/admin/coupons', label: 'COUPONS', icon: '🏷️' },
+  { to: '/admin/banners', label: 'BANNERS', icon: '🖼️' },
+  { to: '/admin/bundles', label: 'BUNDLES', icon: '🎁' },
+  { to: '/admin/logs', label: 'ACTIVITY LOGS', icon: '📋' },
+  { to: '/admin/costs', label: 'COST CALCULATION', icon: '🧮' },
+  { to: '/admin/admins', label: 'ADMIN MANAGEMENT', icon: '🔐' },
 ];
 
 const Admin = () => {
-  const [perfumes, setPerfumes]       = useState([]);
-  const [orders, setOrders]           = useState([]);
+  const [perfumes, setPerfumes] = useState([]);
+  const [orders, setOrders] = useState([]);
   const [investments, setInvestments] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const location = useLocation();
   const navigate = useNavigate();
-  const API_URL  = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   const fetchData = async () => {
     try {
@@ -105,9 +105,8 @@ const Admin = () => {
           <nav className="flex-1 overflow-y-auto px-3">
             {LINKS.map(({ to, label, icon }) => (
               <Link key={to} to={to}
-                className={`flex items-center gap-3 text-xs font-bold tracking-wider px-3 py-3 no-underline transition-colors rounded mb-0.5 ${
-                  isActive(to) ? 'bg-black text-white' : 'text-[#555] hover:text-black hover:bg-[#eee]'
-                }`}>
+                className={`flex items-center gap-3 text-xs font-bold tracking-wider px-3 py-3 no-underline transition-colors rounded mb-0.5 ${isActive(to) ? 'bg-black text-white' : 'text-[#555] hover:text-black hover:bg-[#eee]'
+                  }`}>
                 <span className="text-base w-5 text-center">{icon}</span>
                 <span>{label}</span>
               </Link>
@@ -133,16 +132,15 @@ const Admin = () => {
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-black text-white z-[999] border-t border-[#333]">
         <div className="grid grid-cols-5 h-14">
           {[
-            { to: '/admin',            icon: '▦',  label: 'Home'    },
-            { to: '/admin/order-list', icon: '🧾', label: 'Orders'  },
-            { to: '/admin/inventory',  icon: '📦', label: 'Stock'   },
-            { to: '/admin/customers',  icon: '👥', label: 'Clients' },
-            { to: '/admin/costs',      icon: '🧮', label: 'Costs'   },
+            { to: '/admin', icon: '▦', label: 'Home' },
+            { to: '/admin/order-list', icon: '🧾', label: 'Orders' },
+            { to: '/admin/inventory', icon: '📦', label: 'Stock' },
+            { to: '/admin/customers', icon: '👥', label: 'Clients' },
+            { to: '/admin/costs', icon: '🧮', label: 'Costs' },
           ].map(({ to, icon, label }) => (
             <Link key={to} to={to}
-              className={`flex flex-col items-center justify-center gap-0.5 no-underline transition-colors ${
-                isActive(to) ? 'text-white bg-white/10' : 'text-gray-400 hover:text-white'
-              }`}>
+              className={`flex flex-col items-center justify-center gap-0.5 no-underline transition-colors ${isActive(to) ? 'text-white bg-white/10' : 'text-gray-400 hover:text-white'
+                }`}>
               <span className="text-lg leading-none">{icon}</span>
               <span className="text-[8px] tracking-wider font-bold">{label}</span>
             </Link>

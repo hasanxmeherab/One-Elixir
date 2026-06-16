@@ -31,10 +31,14 @@
   --color-info: #3498db;
 
   /* Typography — font size scale */
-  --font-size-3xs: 0.5rem;       /* 8px  — tiny badges */
-  --font-size-2xs: 0.5625rem;    /* 9px  — small labels, tags */
-  --font-size-label: 0.625rem;   /* 10px — form labels, controls */
-  --font-size-caption: 0.6875rem; /* 11px — captions, nav links */
+  --font-size-3xs: 0.5rem;
+  /* 8px  — tiny badges */
+  --font-size-2xs: 0.5625rem;
+  /* 9px  — small labels, tags */
+  --font-size-label: 0.625rem;
+  /* 10px — form labels, controls */
+  --font-size-caption: 0.6875rem;
+  /* 11px — captions, nav links */
 
   /* Typography — letter spacing scale */
   --letter-spacing-xs: 1px;
@@ -51,7 +55,12 @@ body {
   color: var(--color-primary);
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: 'Playfair Display', serif;
 }
 
@@ -74,6 +83,7 @@ h1, h2, h3, h4, h5, h6 {
 .product-card {
   transition: box-shadow 0.3s ease;
 }
+
 .product-card:hover {
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
 }
@@ -95,48 +105,86 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Shared keyframes */
 @keyframes shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
 }
+
 .animate-shimmer {
   animation: shimmer 1.6s ease-in-out infinite;
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateX(40px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
+
 .animate-slide-in {
   animation: slideIn 0.25s ease-out;
 }
 
 @keyframes pageFadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
+
 .page-transition {
   animation: pageFadeIn 0.25s ease-out;
 }
 
 /* Micro-interactions */
 @keyframes heartPop {
-  0%   { transform: scale(1); }
-  30%  { transform: scale(1.25); }
-  60%  { transform: scale(0.95); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+
+  30% {
+    transform: scale(1.25);
+  }
+
+  60% {
+    transform: scale(0.95);
+  }
+
+  100% {
+    transform: scale(1);
+  }
 }
+
 .heart-pop {
   animation: heartPop 0.35s ease-out;
 }
+
 .btn-press {
   transition: transform 0.1s ease;
 }
+
 .btn-press:active {
   transform: scale(0.97);
 }
+
 .stepper-btn {
   transition: transform 0.1s ease, background-color 0.15s;
 }
+
 .stepper-btn:active {
   transform: scale(0.88);
 }
