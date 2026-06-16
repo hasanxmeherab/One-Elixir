@@ -67,7 +67,11 @@ const AdminDashboard = () => {
   const lowStockItems = perfumes.filter(p => p.stock > 0 && p.stock <= 5);
   const outOfStockItems = perfumes.filter(p => p.stock === 0);
   const totalStock = perfumes.reduce((a, p) => a + (Number(p.stock) || 0), 0);
-  const totalValuation = perfumes.reduce((a, p) => a + (p.price * (Number(p.stock) || 0)), 0);
+  const totalValuation = perfumes.reduce((a, p) => {
+    const flashActive = p.flashSale?.active && p.flashSale?.salePrice && new Date(p.flashSale.endsAt) > new Date();
+    const price = flashActive ? p.flashSale.salePrice : p.price;
+    return a + (price * (Number(p.stock) || 0));
+  }, 0);
   const totalRevenue = orders
     .filter(o => o.status?.toLowerCase() === 'delivered' && o.paymentStatus?.toLowerCase() === 'paid')
     .reduce((a, o) => a + (Number(o.totalAmount) || 0), 0);
