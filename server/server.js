@@ -67,6 +67,78 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ── MongoDB Connection Status ────────────────────────────
 let mongoConnected = false;
 
+// ── Cached MongoDB Connection (Vercel Serverless Pattern) ─
+// Cache the connection promise so it survives across warm invocations
+// and is awaited before any request touches the database.
+let cachedConnection = null;
+
+async function connectToDatabase() {
+  // If already connected, return immediately
+  if (mongoose.connection.readyState === 1) {
+    mongoConnected = true;
+    return;
+  }
+
+  // If we have a cached promise, await it (don't create a duplicate)
+  if (cachedConnection) {
+    await cachedConnection;
+    return;
+  }
+
+  // Create and cache the connection promise
+  cachedConnection = mongoose.connect(process.env.MONGO_URI, {
+    serverSelectionTimeoutMS: 15000,
+    connectTimeoutMS: 15000,
+    socketTimeoutMS: 45000,
+    maxPoolSize: 10,
+    minPoolSize: 1,
+    maxIdleTimeMS: 30000,
+    retryWrites: true,
+    retryReads: true,
+  }).then(async () => {
+    mongoConnected = true;
+    console.log("✅ OneElixir Database Connected");
+
+    try {
+      const generateSitemap = require('./utils/generateSitemap');
+      const Perfume = require('./models/Perfume');
+      await generateSitemap(Perfume);
+      console.log("✅ Sitemap generated successfully");
+    } catch (sitemapErr) {
+      console.error("❌ Sitemap generation failed:", sitemapErr.message);
+    }
+  }).catch(err => {
+    mongoConnected = false;
+    cachedConnection = null; // Reset so next request retries
+    console.error("❌ MongoDB Connection Error:", {
+      message: err.message,
+      code: err.code,
+      uri: process.env.MONGO_URI ? '***configured***' : '***NOT SET***'
+    });
+    throw err; // Re-throw so the middleware can handle it
+  });
+
+  await cachedConnection;
+}
+
+// ── Listen for connection events ────────────────────────
+mongoose.connection.on('disconnected', () => {
+  mongoConnected = false;
+  cachedConnection = null; // Reset cache so next request reconnects
+  console.warn("⚠️  MongoDB disconnected");
+});
+
+mongoose.connection.on('reconnected', () => {
+  mongoConnected = true;
+  console.log("✅ MongoDB reconnected");
+});
+
+mongoose.connection.on('error', (err) => {
+  mongoConnected = false;
+  cachedConnection = null; // Reset cache so next request reconnects
+  console.error("❌ MongoDB connection error event:", err.message);
+});
+
 // ── Simple In-Memory Cache ───────────────────────────────
 const cache = new Map();
 const CACHE_TTL = 60 * 1000; // 60 seconds
@@ -89,15 +161,24 @@ app.use((req, res, next) => {
   next();
 });
 
-// ── Database Status Middleware ──────────────────────────
-app.use('/api/', (req, res, next) => {
-  if (!mongoConnected && req.method !== 'OPTIONS') {
-    // Allow health check endpoints, but warn about others
-    if (req.path !== '/health') {
-      console.warn(`[${req.id}] MongoDB not connected yet, request queued`);
-    }
+// ── Database Connection Middleware (CRITICAL FIX) ───────
+// This middleware AWAITS the MongoDB connection before allowing
+// any API request to proceed. This prevents the cold-start race
+// condition where requests arrive before MongoDB finishes connecting.
+app.use('/api/', async (req, res, next) => {
+  if (req.method === 'OPTIONS') return next();
+
+  try {
+    await connectToDatabase();
+    next();
+  } catch (err) {
+    console.error(`[${req.id}] Failed to connect to MongoDB:`, err.message);
+    res.status(503).json({
+      success: false,
+      message: 'Database temporarily unavailable. Please try again in a moment.',
+      retryAfter: 5
+    });
   }
-  next();
 });
 
 // ── Routes ───────────────────────────────────────────────
@@ -117,10 +198,21 @@ app.use('/api/costs',       costRoutes);
 app.use('/api/bundles',     require('./routes/bundleRoutes'));
 
 // ── Health Check Endpoint ────────────────────────────────
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+  // Health check also tries to connect so it's a reliable indicator
+  try {
+    await connectToDatabase();
+  } catch (_) { /* report status even on failure */ }
+  
   res.json({ 
     status: 'ok', 
     mongoConnected,
+    mongoState: {
+      0: 'disconnected',
+      1: 'connected',
+      2: 'connecting',
+      3: 'disconnecting'
+    }[mongoose.connection.readyState],
     environment: {
       nodeEnv: process.env.NODE_ENV,
       mongoUri: process.env.MONGO_URI ? '***configured***' : '***NOT SET***',
@@ -176,43 +268,8 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ── Connect to MongoDB & Generate Sitemap ─────────────────
-mongoose.connect(process.env.MONGO_URI, {
-  serverSelectionTimeoutMS: 10000,
-  connectTimeoutMS: 10000
-})
-  .then(async () => {
-    mongoConnected = true;
-    console.log("✅ OneElixir Database Connected");
-    
-    try {
-      const generateSitemap = require('./utils/generateSitemap');
-      const Perfume = require('./models/Perfume');
-      await generateSitemap(Perfume);
-      console.log("✅ Sitemap generated successfully");
-    } catch (sitemapErr) {
-      console.error("❌ Sitemap generation failed:", sitemapErr.message);
-    }
-  })
-  .catch(err => {
-    mongoConnected = false;
-    console.error("❌ MongoDB Connection Error:", {
-      message: err.message,
-      code: err.code,
-      uri: process.env.MONGO_URI ? '***configured***' : '***NOT SET***'
-    });
-  });
-
-// ── Listen for connection events ────────────────────────
-mongoose.connection.on('disconnected', () => {
-  mongoConnected = false;
-  console.warn("⚠️  MongoDB disconnected");
-});
-
-mongoose.connection.on('reconnected', () => {
-  mongoConnected = true;
-  console.log("✅ MongoDB reconnected");
-});
+// ── Eagerly start connecting (don't await — middleware will await) ──
+connectToDatabase().catch(() => {});
 
 // ── Export for Vercel Serverless ──────────────────────────
 module.exports = app;
