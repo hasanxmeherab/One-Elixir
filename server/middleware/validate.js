@@ -168,7 +168,7 @@ const createExpenseSchema = z.object({
 // ── Investment ────────────────────────────────────────────────
 const addInvestmentSchema = z.object({
   investorName: z.string().min(1).max(100),
-  amount: z.number(),
+  amount: z.coerce.number(),
   note: z.string().max(500).optional(),
   date: z.string().or(z.date()).optional(),
 });

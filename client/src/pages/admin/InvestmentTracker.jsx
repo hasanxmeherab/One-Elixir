@@ -46,7 +46,10 @@ const InvestmentTracker = () => {
   const handleAddInvestment = async (e) => {
     e.preventDefault();
     try {
-      await adminAxios.post(`${API_URL}/api/investments/add`, formData);
+      await adminAxios.post(`${API_URL}/api/investments/add`, {
+        ...formData,
+        amount: Number(formData.amount)
+      });
       setFormData({ ...formData, investorName: '', amount: '', note: '' });
       fetchData();
       toast.success("Investment recorded successfully!");
