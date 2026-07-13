@@ -3,6 +3,7 @@ const router = express.Router();
 const Expense = require('../models/Expense');
 const { verifyAdmin } = require('../middleware/authMiddleware');
 const { validate, createExpenseSchema } = require('../middleware/validate');
+const writeLog = require('../utils/writeLog');
 
 // GET all expenses (admin only)
 router.get('/', verifyAdmin, async (req, res) => {
@@ -37,6 +38,8 @@ router.post('/', verifyAdmin, validate(createExpenseSchema), async (req, res) =>
     try {
         const expense = new Expense(req.body);
         const newExpense = await expense.save();
+        const detail = `Added expense: "${newExpense.title}" — ${Number(newExpense.amount).toLocaleString()} TK (${newExpense.category})`;
+        await writeLog(req, 'CREATE_EXPENSE', 'Expense', detail);
         res.status(201).json(newExpense);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -46,7 +49,11 @@ router.post('/', verifyAdmin, validate(createExpenseSchema), async (req, res) =>
 // DELETE expense (admin only)
 router.delete('/:id', verifyAdmin, async (req, res) => {
     try {
+        const expense = await Expense.findById(req.params.id);
+        if (!expense) return res.status(404).json({ message: "Expense not found" });
+        const detail = `Removed expense: "${expense.title}" — ${Number(expense.amount).toLocaleString()} TK (${expense.category})`;
         await Expense.findByIdAndDelete(req.params.id);
+        await writeLog(req, 'DELETE_EXPENSE', 'Expense', detail);
         res.json({ message: "Expense record removed" });
     } catch (err) {
         res.status(500).json({ message: err.message });

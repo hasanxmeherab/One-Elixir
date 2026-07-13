@@ -43,6 +43,7 @@ const CustomerList = lazy(() => import('./pages/admin/CustomerList'));
 const CostCalculator = lazy(() => import('./pages/admin/CostCalculator'));
 const ActivityLogs = lazy(() => import('./pages/admin/ActivityLogs'));
 const AdminBundles = lazy(() => import('./pages/admin/AdminBundles'));
+const SettlementDashboard = lazy(() => import('./pages/admin/SettlementDashboard'));
 
 // --- CONTEXT ---
 import { WishlistProvider } from './context/WishlistContext';
@@ -100,6 +101,7 @@ const AppContent = () => {
             <Route path="customers" element={<CustomerList />} />
             <Route path="/admin/costs" element={<CostCalculator />} />
             <Route path="bundles" element={<AdminBundles />} />
+            <Route path="settlements" element={<SettlementDashboard />} />
           </Route>
           
           <Route path="/admin-login" element={<AdminLogin />} />

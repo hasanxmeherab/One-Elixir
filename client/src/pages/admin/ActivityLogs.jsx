@@ -12,6 +12,8 @@ const ACTION_COLORS = {
   CREATE_ADMIN:   'bg-purple-100 text-purple-800',
   DELETE_ADMIN:   'bg-red-100 text-red-800',
   LOGIN:          'bg-gray-100 text-gray-600',
+  CREATE_EXPENSE: 'bg-orange-100 text-orange-800',
+  DELETE_EXPENSE: 'bg-rose-100 text-rose-800',
 };
 
 const ActivityLogs = () => {

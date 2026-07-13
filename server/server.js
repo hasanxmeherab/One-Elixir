@@ -196,6 +196,7 @@ app.use('/api/logs',        require('./routes/logRoutes'));
 app.use('/api/addresses',   require('./routes/addressRoutes'));
 app.use('/api/costs',       costRoutes);
 app.use('/api/bundles',     require('./routes/bundleRoutes'));
+app.use('/api/settlements', require('./routes/settlementRoutes'));
 
 // ── Health Check Endpoint ────────────────────────────────
 app.get('/health', async (req, res) => {

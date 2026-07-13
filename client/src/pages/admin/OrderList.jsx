@@ -68,6 +68,11 @@ const OrderList = () => {
   // ── NEW: Customer history ──
   const [customerHistory, setCustomerHistory] = useState(null);
 
+  // ── NEW: Payment Receiver Modal ──
+  const [receiverModal, setReceiverModal] = useState(null); // { orderId, currentStatus } or { bulk: true }
+  const [adminList, setAdminList] = useState([]);
+  const [selectedReceiver, setSelectedReceiver] = useState(null);
+
   const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
   const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -80,12 +85,48 @@ const OrderList = () => {
 
   useEffect(() => { setPage(1); }, [searchTerm, paymentStatusFilter, paymentMethodFilter, orderStatusFilter, showArchived, dateFrom, dateTo]);
 
+  // Fetch admin list for payment receiver selection
+  useEffect(() => {
+    adminAxios.get(`${API_URL}/api/admins/list`)
+      .then(res => setAdminList(res.data))
+      .catch(() => {});
+  }, [API_URL]);
+
   if (!orders) return <div className="p-10 text-center">Loading Order Data...</div>;
 
-  // ── Existing handlers (unchanged) ──
-  const updatePaymentStatus = async (id, paymentStatus) => {
-    try { await adminAxios.put(`${API_URL}/api/orders/${id}`, { paymentStatus }); fetchData(); }
+  // ── Existing handlers (updated for payment receiver) ──
+  const updatePaymentStatus = async (id, paymentStatus, receiverInfo) => {
+    // If marking as Paid and no receiver yet, show the modal
+    if (paymentStatus === 'Paid' && !receiverInfo) {
+      setReceiverModal({ orderId: id });
+      setSelectedReceiver(adminData?.id || null);
+      return;
+    }
+    try {
+      const body = { paymentStatus };
+      if (paymentStatus === 'Paid' && receiverInfo) {
+        body.paymentReceivedBy = receiverInfo;
+      }
+      await adminAxios.put(`${API_URL}/api/orders/${id}`, body);
+      fetchData();
+    }
     catch { toast.error('Failed to update payment status'); }
+  };
+
+  const confirmPaymentReceiver = () => {
+    if (!selectedReceiver) return toast.warning('Please select who received the payment.');
+    const admin = adminList.find(a => a._id === selectedReceiver);
+    if (!admin) return toast.error('Admin not found.');
+    const receiverInfo = { adminId: admin._id, adminName: admin.name };
+
+    if (receiverModal.bulk) {
+      // Bulk mark as paid
+      executeBulkPaid(receiverInfo);
+    } else {
+      updatePaymentStatus(receiverModal.orderId, 'Paid', receiverInfo);
+    }
+    setReceiverModal(null);
+    setSelectedReceiver(null);
   };
 
   const updateStatus = async (id, status) => {
@@ -249,6 +290,12 @@ const OrderList = () => {
     setBulkLoading(true);
     try {
       const [type, value] = bulkAction.split(':');
+      // If marking as Paid, intercept and show receiver modal
+      if (type === 'payment' && value === 'Paid') {
+        setReceiverModal({ bulk: true });
+        setSelectedReceiver(adminData?.id || null);
+        return;
+      }
       const body = { orderIds: [...selectedIds] };
       if (type === 'status') body.status = value;
       if (type === 'payment') body.paymentStatus = value;
@@ -258,6 +305,24 @@ const OrderList = () => {
       setBulkAction('');
       fetchData();
     } catch { toast.error('Bulk update failed.'); }
+    finally { setBulkLoading(false); }
+  };
+
+  // Bulk paid with receiver info (called from modal)
+  const executeBulkPaid = async (receiverInfo) => {
+    setBulkLoading(true);
+    try {
+      const body = {
+        orderIds: [...selectedIds],
+        paymentStatus: 'Paid',
+        paymentReceivedBy: receiverInfo
+      };
+      await adminAxios.put(`${API_URL}/api/orders/bulk-update`, body);
+      toast.success(`${selectedIds.size} orders marked as Paid.`);
+      setSelectedIds(new Set());
+      setBulkAction('');
+      fetchData();
+    } catch { toast.error('Bulk paid update failed.'); }
     finally { setBulkLoading(false); }
   };
 
@@ -335,6 +400,20 @@ const OrderList = () => {
       if (totalSavings > 0) { doc.setTextColor(200, 0, 0); doc.text('Total Discount:', 135, currentY); doc.text(`-${totalSavings.toLocaleString()} TK`, 190, currentY, { align: 'right' }); currentY += 8; }
       doc.setTextColor(0); doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
       doc.text('GRAND TOTAL:', 120, currentY + 5); doc.text(`${order.totalAmount.toLocaleString()} TK`, 190, currentY + 5, { align: 'right' });
+
+      // ── Logo watermark slightly below center of page ──
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const wmWidth = 120;
+      const wmHeight = 30;
+      const wmX = (pageWidth - wmWidth) / 2;
+      const wmY = (pageHeight / 2) + 30; // slightly below center
+      const gState = new doc.GState({ opacity: 0.08 });
+      doc.saveGraphicsState();
+      doc.setGState(gState);
+      doc.addImage(logoDataUrl, 'PNG', wmX, wmY, wmWidth, wmHeight);
+      doc.restoreGraphicsState();
+
       doc.save(`OneElixir_Receipt_${order.customerName.replace(/\s+/g, '_')}.pdf`);
     } catch (error) { console.error('PDF Error:', error); }
   };
@@ -526,6 +605,12 @@ const OrderList = () => {
                     <option value="Pending Verification">Pending Verification</option>
                     <option value="Paid">Paid</option>
                   </select>
+                  {order.paymentReceivedBy?.adminName && (
+                    <div className="mt-1 text-[9px] text-gray-500 flex items-center gap-1">
+                      <span className="inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
+                      {order.paymentReceivedBy.adminName}
+                    </div>
+                  )}
                 </td>
                 <td className="py-2.5 px-2 text-center align-middle">
                   {hasPaymentDetails(order) ? (
@@ -912,6 +997,58 @@ const OrderList = () => {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Payment Receiver Selection Modal ── */}
+      {receiverModal && (
+        <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-[3000]" onClick={() => { setReceiverModal(null); setSelectedReceiver(null); }}>
+          <div className="bg-white p-6 w-[380px] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-[13px] tracking-[2px] m-0 font-bold">WHO RECEIVED PAYMENT?</h3>
+              <button onClick={() => { setReceiverModal(null); setSelectedReceiver(null); }} className="bg-transparent border-none text-lg cursor-pointer text-gray-400">×</button>
+            </div>
+            <p className="text-[11px] text-[#888] mb-4">
+              {receiverModal.bulk
+                ? `Select the admin who received payment for ${selectedIds.size} order(s).`
+                : 'Select the admin who received this payment.'}
+            </p>
+
+            <div className="flex flex-col gap-1.5 mb-5 max-h-[300px] overflow-y-auto">
+              {adminList.map(admin => (
+                <label key={admin._id}
+                  className={`flex items-center gap-3 p-3 border cursor-pointer transition-colors ${
+                    selectedReceiver === admin._id
+                      ? 'border-black bg-gray-50'
+                      : 'border-[#eee] hover:border-gray-300'
+                  }`}>
+                  <input type="radio" name="paymentReceiver" value={admin._id}
+                    checked={selectedReceiver === admin._id}
+                    onChange={() => setSelectedReceiver(admin._id)}
+                    className="cursor-pointer" />
+                  <div className="flex-1">
+                    <div className="text-[12px] font-bold">
+                      {admin.name}
+                      {admin._id === adminData?.id && (
+                        <span className="ml-2 text-[9px] bg-black text-white px-1.5 py-0.5 rounded-sm">YOU</span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-gray-400">
+                      {admin.role === 'superadmin' ? '⭐ Super Admin (Cashier)' : 'Admin'}
+                    </div>
+                  </div>
+                </label>
+              ))}
+              {adminList.length === 0 && (
+                <p className="text-[11px] text-[#ccc] text-center py-6">Loading admins...</p>
+              )}
+            </div>
+
+            <button onClick={confirmPaymentReceiver} disabled={!selectedReceiver}
+              className="w-full bg-black text-white border-none p-3 cursor-pointer font-bold tracking-wider hover:bg-gray-800 transition-colors disabled:opacity-40">
+              CONFIRM PAYMENT RECEIVED
+            </button>
           </div>
         </div>
       )}

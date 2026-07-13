@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import adminAxios from '../../utils/adminAxios';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
@@ -15,8 +15,13 @@ const LINKS = [
   { to: '/admin/bundles', label: 'BUNDLES', icon: '🎁' },
   { to: '/admin/logs', label: 'ACTIVITY LOGS', icon: '📋' },
   { to: '/admin/costs', label: 'COST CALCULATION', icon: '🧮' },
+  { to: '/admin/settlements', label: 'SETTLEMENTS', icon: '💰' },
   { to: '/admin/admins', label: 'ADMIN MANAGEMENT', icon: '🔐' },
 ];
+
+const SEEN_KEY = 'admin_seen_order_ids';
+const getSeen = () => { try { return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || '[]')); } catch { return new Set(); } };
+const saveSeen = (set) => localStorage.setItem(SEEN_KEY, JSON.stringify([...set]));
 
 const Admin = () => {
   const [perfumes, setPerfumes] = useState([]);
@@ -24,11 +29,18 @@ const Admin = () => {
   const [investments, setInvestments] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // ── Notification state ──
+  const [unreadOrders, setUnreadOrders] = useState([]);
+  const [bellOpen, setBellOpen] = useState(false);
+  const [toastNotifs, setToastNotifs] = useState([]);
+  const bellRef = useRef(null);
+  const prevOrderIdsRef = useRef(null);
+
   const location = useLocation();
   const navigate = useNavigate();
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [pRes, oRes, iRes] = await Promise.all([
         adminAxios.get(`${API_URL}/api/perfumes`),
@@ -39,10 +51,73 @@ const Admin = () => {
       setOrders(oRes.data);
       setInvestments(iRes.data);
     } catch (err) { console.error('Fetch failed', err); }
+  }, [API_URL]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
+
+  // ── Compute unread orders whenever orders change ──
+  useEffect(() => {
+    if (!orders.length) return;
+    const seen = getSeen();
+    const currentIds = new Set(orders.map(o => o._id));
+
+    // Detect brand-new orders (not in previous poll) for toast
+    if (prevOrderIdsRef.current !== null) {
+      const brandNew = orders.filter(o =>
+        !prevOrderIdsRef.current.has(o._id) && !seen.has(o._id)
+      );
+      if (brandNew.length > 0) {
+        setToastNotifs(prev => [...prev, ...brandNew.map(o => ({ ...o, _toastId: Date.now() + Math.random() }))]);
+      }
+    }
+    prevOrderIdsRef.current = currentIds;
+
+    // Compute unread list
+    const unread = orders.filter(o => !seen.has(o._id));
+    setUnreadOrders(unread);
+  }, [orders]);
+
+  // ── Poll every 30s ──
+  useEffect(() => {
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  // ── Auto-dismiss toast after 6s ──
+  useEffect(() => {
+    if (toastNotifs.length === 0) return;
+    const timer = setTimeout(() => {
+      setToastNotifs(prev => prev.slice(1));
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [toastNotifs]);
+
+  // ── Close bell dropdown on outside click ──
+  useEffect(() => {
+    const handler = (e) => {
+      if (bellRef.current && !bellRef.current.contains(e.target)) setBellOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // ── Mark one as read ──
+  const dismissOrder = (orderId) => {
+    const seen = getSeen();
+    seen.add(orderId);
+    saveSeen(seen);
+    setUnreadOrders(prev => prev.filter(o => o._id !== orderId));
   };
 
-  useEffect(() => { fetchData(); }, []);
-  useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
+  // ── Mark all as read ──
+  const markAllRead = () => {
+    const seen = getSeen();
+    unreadOrders.forEach(o => seen.add(o._id));
+    saveSeen(seen);
+    setUnreadOrders([]);
+    setBellOpen(false);
+  };
 
   const handleAdminLogout = () => {
     localStorage.removeItem('isAdminAuthenticated');
@@ -52,8 +127,6 @@ const Admin = () => {
   };
 
   const isActive = (path) => location.pathname === path;
-
-  // Current page label for mobile header
   const currentPage = LINKS.find(l => isActive(l.to))?.label || 'ADMIN';
 
   return (
@@ -79,11 +152,132 @@ const Admin = () => {
           {/* Current page — mobile only */}
           <span className="md:hidden text-[10px] text-gray-400 tracking-wider">/ {currentPage}</span>
         </div>
-        <button onClick={handleAdminLogout}
-          className="bg-transparent border border-white text-white px-2 md:px-3 py-1 cursor-pointer text-[10px] md:text-xs tracking-wider hover:bg-white hover:text-black transition-colors">
-          LOGOUT
-        </button>
+
+        <div className="flex items-center gap-3">
+          {/* ── Notification Bell ── */}
+          <div ref={bellRef} className="relative">
+            <button
+              onClick={() => setBellOpen(o => !o)}
+              className="relative bg-transparent border-none cursor-pointer p-1.5 hover:opacity-80 transition-opacity"
+              aria-label="Notifications"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              {unreadOrders.length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 animate-pulse">
+                  {unreadOrders.length > 99 ? '99+' : unreadOrders.length}
+                </span>
+              )}
+            </button>
+
+            {/* ── Dropdown ── */}
+            {bellOpen && (
+              <div className="absolute right-0 top-full mt-2 w-[320px] bg-white text-black border border-[#eee] shadow-2xl z-[2000] max-h-[420px] flex flex-col"
+                style={{ animation: 'fadeSlideIn 0.15s ease-out' }}>
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-[#eee] bg-[#fafafa]">
+                  <span className="text-[10px] font-bold tracking-[2px] text-[#888]">
+                    NOTIFICATIONS ({unreadOrders.length})
+                  </span>
+                  {unreadOrders.length > 0 && (
+                    <button
+                      onClick={markAllRead}
+                      className="text-[10px] font-bold tracking-wider text-emerald-600 bg-transparent border-none cursor-pointer hover:underline"
+                    >
+                      ✓ MARK ALL READ
+                    </button>
+                  )}
+                </div>
+
+                {/* List */}
+                <div className="flex-1 overflow-y-auto">
+                  {unreadOrders.length === 0 ? (
+                    <div className="py-12 text-center">
+                      <p className="text-[32px] mb-2">🔔</p>
+                      <p className="text-[11px] text-[#aaa] tracking-wider">No new notifications</p>
+                    </div>
+                  ) : (
+                    unreadOrders.slice(0, 20).map(order => (
+                      <div key={order._id} className="flex items-start gap-3 px-4 py-3 border-b border-[#f5f5f5] hover:bg-[#f9f9f9] transition-colors group">
+                        <div className="w-9 h-9 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
+                          <span className="text-sm">🛒</span>
+                        </div>
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => { navigate('/admin/order-list'); dismissOrder(order._id); setBellOpen(false); }}>
+                          <div className="flex items-center gap-2">
+                            <p className="text-[11px] font-bold text-emerald-700 tracking-wider m-0">NEW ORDER!</p>
+                            <span className="text-[16px] animate-bounce">🔔</span>
+                          </div>
+                          <p className="text-[12px] font-bold m-0 mt-0.5 truncate">{order.customerName}</p>
+                          <p className="text-[10px] text-[#888] m-0 mt-0.5">
+                            {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''} · {Number(order.totalAmount || 0).toLocaleString()} TK
+                          </p>
+                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); dismissOrder(order._id); }}
+                          className="text-[#ccc] hover:text-[#888] bg-transparent border-none cursor-pointer text-sm p-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                          title="Dismiss"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Footer */}
+                {unreadOrders.length > 0 && (
+                  <div className="px-4 py-2.5 border-t border-[#eee] bg-[#fafafa]">
+                    <button
+                      onClick={() => { navigate('/admin/order-list'); setBellOpen(false); }}
+                      className="w-full text-center text-[10px] font-bold tracking-wider text-black bg-transparent border-none cursor-pointer hover:underline py-1"
+                    >
+                      VIEW ALL ORDERS →
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <button onClick={handleAdminLogout}
+            className="bg-transparent border border-white text-white px-2 md:px-3 py-1 cursor-pointer text-[10px] md:text-xs tracking-wider hover:bg-white hover:text-black transition-colors">
+            LOGOUT
+          </button>
+        </div>
       </nav>
+
+      {/* ── Toast notifications (slide-in for new orders) ── */}
+      <div className="fixed top-16 right-4 z-[9999] flex flex-col gap-3 pointer-events-none" style={{ maxWidth: 320 }}>
+        {toastNotifs.slice(0, 3).map((order) => (
+          <div
+            key={order._toastId}
+            className="flex items-start gap-3 bg-white border border-[#eee] shadow-xl px-4 py-3.5 pointer-events-auto border-l-4 border-l-emerald-500"
+            style={{ animation: 'slideInRight 0.3s ease-out' }}
+          >
+            <div className="w-9 h-9 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+              <span className="text-sm">🛒</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-[11px] font-bold text-emerald-700 tracking-wider m-0">NEW ORDER!</p>
+                <span className="text-[16px] animate-bounce">🔔</span>
+              </div>
+              <p className="text-[12px] font-bold m-0 mt-0.5 truncate">{order.customerName}</p>
+              <p className="text-[10px] text-[#888] m-0 mt-0.5">
+                {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''} · {Number(order.totalAmount || 0).toLocaleString()} TK
+              </p>
+            </div>
+            <button
+              onClick={() => setToastNotifs(prev => prev.filter(t => t._toastId !== order._toastId))}
+              className="text-[#ccc] hover:text-[#888] bg-transparent border-none cursor-pointer text-sm p-0.5 shrink-0"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
 
       <div className="flex flex-1 relative">
         {/* ── Overlay ── */}
@@ -150,6 +344,18 @@ const Admin = () => {
 
       {/* Bottom nav spacer on mobile */}
       <div className="md:hidden h-14" />
+
+      {/* ── Notification animations ── */}
+      <style>{`
+        @keyframes fadeSlideIn {
+          from { opacity: 0; transform: translateY(-8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slideInRight {
+          from { opacity: 0; transform: translateX(100%); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+      `}</style>
     </div>
   );
 };

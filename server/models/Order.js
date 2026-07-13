@@ -32,6 +32,14 @@ const orderSchema = new mongoose.Schema({
     screenshot: String,
     amountPaid: Number // To track if they paid delivery charge or full amount
   },
+  // --- PAYMENT RECEIVER TRACKING ---
+  paymentReceivedBy: {
+    adminId:   { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
+    adminName: { type: String, default: '' }
+  },
+  paymentReceivedAt: { type: Date, default: null },
+  settlementStatus:  { type: String, enum: ['unsettled', 'settled', 'pending', null], default: null },
+  settlementRef:     { type: mongoose.Schema.Types.ObjectId, ref: 'Settlement', default: null },
   // --- ADMIN NOTES ---
   adminNotes: [{
     text:      { type: String, required: true },
@@ -48,5 +56,7 @@ orderSchema.index({ status: 1 });
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ paymentStatus: 1 });
 orderSchema.index({ isManual: 1 });
+orderSchema.index({ 'paymentReceivedBy.adminId': 1 });
+orderSchema.index({ settlementStatus: 1 });
 
 module.exports = mongoose.model('Order', orderSchema);

@@ -1,9 +1,11 @@
 const express    = require('express');
 const router     = express.Router();
 const mongoose   = require('mongoose');
-const Order      = require('../models/Order');
-const Perfume    = require('../models/Perfume');
-const Log        = require('../models/Log');
+const Order          = require('../models/Order');
+const Perfume        = require('../models/Perfume');
+const Log            = require('../models/Log');
+const PaymentLedger  = require('../models/PaymentLedger');
+const Admin          = require('../models/Admin');
 const { Resend } = require('resend');
 
 const { verifyAdmin, verifyUser } = require('../middleware/authMiddleware');
@@ -182,13 +184,44 @@ router.post('/manual', verifyAdmin, validate(createOrderSchema), asyncHandler(as
 
 // #11 Bulk order status update (Admin)
 router.put('/bulk-update', verifyAdmin, asyncHandler(async (req, res) => {
-  const { orderIds, status, paymentStatus } = req.body;
+  const { orderIds, status, paymentStatus, paymentReceivedBy } = req.body;
   if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
     return res.status(400).json({ success: false, message: 'orderIds array required' });
   }
   const update = {};
   if (status) update.status = status;
   if (paymentStatus) update.paymentStatus = paymentStatus;
+
+  // If marking as Paid with a receiver, handle ledger entries per order
+  if (paymentStatus?.toLowerCase() === 'paid' && paymentReceivedBy?.adminId) {
+    const receiverAdmin = await Admin.findById(paymentReceivedBy.adminId);
+    const isSuperadmin = receiverAdmin?.role === 'superadmin';
+
+    update['paymentReceivedBy.adminId'] = paymentReceivedBy.adminId;
+    update['paymentReceivedBy.adminName'] = paymentReceivedBy.adminName || receiverAdmin?.name || '';
+    update.paymentReceivedAt = new Date();
+    update.settlementStatus = isSuperadmin ? 'settled' : 'unsettled';
+
+    // Only create ledger for orders not already paid
+    const unpaidOrders = await Order.find({
+      _id: { $in: orderIds },
+      paymentStatus: { $ne: 'Paid' }
+    });
+
+    if (unpaidOrders.length > 0) {
+      const ledgerEntries = unpaidOrders.map(order => ({
+        orderId: order._id,
+        adminId: paymentReceivedBy.adminId,
+        adminName: paymentReceivedBy.adminName || receiverAdmin?.name || '',
+        amount: order.totalAmount,
+        type: 'collection',
+        paymentMethod: order.paymentMethod || 'Cash',
+        note: `Bulk payment — order #${order._id.toString().slice(-6).toUpperCase()}`
+      }));
+      await PaymentLedger.insertMany(ledgerEntries);
+    }
+  }
+
   const result = await Order.updateMany({ _id: { $in: orderIds } }, { $set: update });
   await writeLog(req, 'BULK_UPDATE_ORDER', 'Order',
     `Bulk updated ${result.modifiedCount} orders — ${JSON.stringify(update)}`);
@@ -299,6 +332,37 @@ router.put('/:id', verifyAdmin, asyncHandler(async (req, res) => {
     if (adminNotes) {
       order.adminNotes = adminNotes;
       order.markModified('adminNotes');
+    }
+
+    // ── Payment receiver tracking ────────────────────────────
+    const paymentReceivedBy = req.body.paymentReceivedBy;
+    const wasAlreadyPaid = order.paymentStatus?.toLowerCase() === 'paid' && !paymentStatus;
+    const isBeingMarkedPaid = paymentStatus?.toLowerCase() === 'paid' &&
+                              order.paymentStatus?.toLowerCase() !== 'paid';
+
+    if (isBeingMarkedPaid && paymentReceivedBy?.adminId) {
+      order.paymentReceivedBy = {
+        adminId: paymentReceivedBy.adminId,
+        adminName: paymentReceivedBy.adminName || ''
+      };
+      order.paymentReceivedAt = new Date();
+      order.markModified('paymentReceivedBy');
+
+      // Check if receiver is superadmin → auto-settle
+      const receiverAdmin = await Admin.findById(paymentReceivedBy.adminId).session(session);
+      const isSuperadmin = receiverAdmin?.role === 'superadmin';
+      order.settlementStatus = isSuperadmin ? 'settled' : 'unsettled';
+
+      // Create ledger entry
+      await PaymentLedger.create([{
+        orderId: order._id,
+        adminId: paymentReceivedBy.adminId,
+        adminName: paymentReceivedBy.adminName || receiverAdmin?.name || '',
+        amount: order.totalAmount,
+        type: 'collection',
+        paymentMethod: order.paymentMethod || 'Cash',
+        note: `Payment collected for order #${order._id.toString().slice(-6).toUpperCase()}`
+      }], { session });
     }
 
     const updatedOrder = await order.save({ session });
