@@ -17,7 +17,7 @@ const getLocalDate = () => {
 };
 
 const ManualOrder = () => {
-  const { perfumes = [], fetchData } = useOutletContext();
+  const { perfumes = [], fetchData, toast = (() => {}) } = useOutletContext();
 
   const today = getLocalDate();
   const [orderData, setOrderData]         = useState({ customerName: '', phone: '', address: '', orderDate: today });
@@ -122,9 +122,9 @@ const ManualOrder = () => {
         ? (subtotal * res.data.discountValue) / 100
         : res.data.discountValue;
       setCouponDiscount(discountAmount);
-      alert(`Coupon applied! ${discountAmount.toLocaleString()} TK off.`);
+      toast.success(`Coupon applied! ৳${discountAmount.toLocaleString()} TK off.`);
     } catch {
-      alert('Invalid or expired coupon.');
+      toast.error('Invalid or expired coupon.');
       setCouponDiscount(0);
     } finally { setCouponLoading(false); }
   };
@@ -146,12 +146,12 @@ const ManualOrder = () => {
 
   const handleOrderSubmit = async (e) => {
     e.preventDefault();
-    if (!division || !district) { alert('Please select Division and District.'); return; }
+    if (!division || !district) { toast.warning('Please select Division and District.'); return; }
     if (isOnlinePayment && (!onlinePayment.senderNumber || !onlinePayment.transactionId)) {
-      alert('Please fill sender number and transaction ID.'); return;
+      toast.warning('Please fill sender number and transaction ID.'); return;
     }
     if (paymentStatus === 'Paid' && !selectedReceiver) {
-      alert('Please select which admin received the payment.'); return;
+      toast.warning('Please select which admin received the payment.'); return;
     }
     const adminName = adminData.name || 'System Admin';
     const itemsToOrder = [];
@@ -159,7 +159,7 @@ const ManualOrder = () => {
     for (const item of selectedItems) {
       if (!item.perfumeId) continue;
       const opt = getSelectedOption(item);
-      if (!opt || opt.stock < item.quantity) { alert(`Insufficient stock for ${opt?.fullName || 'selected item'}`); return; }
+      if (!opt || opt.stock < item.quantity) { toast.error(`Insufficient stock for ${opt?.fullName || 'selected item'}`); return; }
       let finalItemPrice = opt.price;
       if (item.discountType === 'percentage') finalItemPrice -= (opt.price * item.discountValue) / 100;
       else if (item.discountType === 'fixed')  finalItemPrice -= item.discountValue;
@@ -212,7 +212,7 @@ const ManualOrder = () => {
       setOnlinePayment({ senderNumber: '', transactionId: '', screenshot: null, screenshotUrl: '' });
       setSelectedReceiver(null);
       fetchData();
-      alert('Manual Order Recorded Successfully!');
+      toast.success('✓ Manual Order Recorded Successfully!');
     } catch (err) { 
       console.error('=== Order Submission Error ===');
       console.error('Full error object:', err);
@@ -235,7 +235,7 @@ const ManualOrder = () => {
       } else if (err.message) {
         errorMessage = err.message;
       }
-      alert(`Error: ${errorMessage}`);
+      toast.error(`Error: ${errorMessage}`);
     }
     finally { setUploading(false); }
   };

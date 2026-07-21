@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { DashboardSkeleton } from '../../components/Skeleton';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import adminAxios from '../../utils/adminAxios';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, XAxis, YAxis,
@@ -24,7 +25,7 @@ const CustomTooltip = ({ active, payload, label, suffix = '' }) => {
 };
 
 const AdminDashboard = () => {
-  const { perfumes = [], orders = [], investments = [] } = useOutletContext();
+  const { perfumes = [], orders = [], investments = [], toast = () => {} } = useOutletContext();
   const navigate = useNavigate();
   const [filterType, setFilterType] = useState(null);
   const [revenueRange, setRevenueRange] = useState('30');
@@ -34,6 +35,9 @@ const AdminDashboard = () => {
   const [costRecords, setCostRecords] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [adminBalances, setAdminBalances] = useState([]);
+  const [resetting, setResetting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
   const adminData = JSON.parse(localStorage.getItem('adminData') || '{}');
   const isSuperadmin = adminData?.role === 'superadmin';
 
@@ -209,6 +213,27 @@ const AdminDashboard = () => {
   const marginBarColor = (val) => val >= 60 ? '#16a34a' : val >= 30 ? '#d97706' : '#dc2626';
 
   return (
+    <>
+      <ConfirmDialog
+        isOpen={confirmReset}
+        type="danger"
+        title="Reset All Balances to ৳0?"
+        message="This will permanently clear all admin holding balances and start fresh. All unsettled amounts will be lost. This action cannot be undone."
+        confirmText="Yes, Reset"
+        cancelText="Cancel"
+        onCancel={() => setConfirmReset(false)}
+        onConfirm={() => {
+          setConfirmReset(false);
+          setResetting(true);
+          adminAxios.post(`${API_URL}/api/settlements/reset-ledger`)
+            .then(r => {
+              toast.success(r.data.message || 'All balances reset to ৳0.');
+              fetchSettlementDashboard();
+            })
+            .catch(e => toast.error('Reset failed: ' + (e.response?.data?.message || e.message)))
+            .finally(() => setResetting(false));
+        }}
+      />
     <div>
       <h3 className="tracking-[3px] mb-8 font-bold">DASHBOARD OVERVIEW</h3>
 
@@ -237,21 +262,21 @@ const AdminDashboard = () => {
               <p className="text-xs text-[#aaa] mt-0.5">Track current cash/money held by each admin</p>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => {
-                if (!window.confirm('This will reset ALL admin balances to ৳0 and start fresh. This cannot be undone. Are you sure?')) return;
-                adminAxios.post(`${API_URL}/api/settlements/reset-ledger`)
-                  .then(r => {
-                    alert(r.data.message);
-                    fetchSettlementDashboard();
-                  })
-                  .catch(e => alert('Reset failed: ' + (e.response?.data?.message || e.message)));
-              }}
-                className="px-3 py-1.5 text-[10px] font-bold tracking-wider border border-red-400 text-red-600 bg-red-50 hover:bg-red-600 hover:text-white transition-colors cursor-pointer">
-                🗑 RESET TO ZERO
+              <button
+                disabled={resetting}
+                onClick={() => setConfirmReset(true)}
+                className="px-3 py-1.5 text-[10px] font-bold tracking-wider border border-red-400 text-red-600 bg-red-50 hover:bg-red-600 hover:text-white transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5">
+                {resetting ? (
+                  <><span className="btn-spin" /> RESETTING...</>
+                ) : '🗑 RESET TO ZERO'}
               </button>
-              <button onClick={fetchSettlementDashboard}
-                className="px-3 py-1.5 text-[10px] font-bold tracking-wider border border-emerald-600 text-emerald-700 bg-emerald-50 hover:bg-emerald-600 hover:text-white transition-colors cursor-pointer">
-                🔄 REFRESH
+              <button
+                disabled={refreshing}
+                onClick={() => { setRefreshing(true); fetchSettlementDashboard(); setTimeout(() => setRefreshing(false), 800); }}
+                className="px-3 py-1.5 text-[10px] font-bold tracking-wider border border-emerald-600 text-emerald-700 bg-emerald-50 hover:bg-emerald-600 hover:text-white transition-colors cursor-pointer disabled:opacity-60 flex items-center gap-1.5">
+                {refreshing ? (
+                  <><span className="btn-spin" /> SYNCING...</>
+                ) : '🔄 REFRESH'}
               </button>
               <button onClick={() => navigate('/admin/settlements')}
                 className="px-3 py-1.5 text-[10px] font-bold tracking-wider border border-[#ddd] bg-white hover:border-black transition-colors cursor-pointer">
@@ -645,6 +670,7 @@ const AdminDashboard = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

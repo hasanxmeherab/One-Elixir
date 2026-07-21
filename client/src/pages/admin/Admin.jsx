@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import adminAxios from '../../utils/adminAxios';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import useToast from '../../hooks/useToast';
+import ToastContainer from '../../components/ToastContainer';
 
 const LINKS = [
   { to: '/admin', label: 'DASHBOARD', icon: '▦' },
@@ -29,7 +31,10 @@ const Admin = () => {
   const [investments, setInvestments] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // ── Notification state ──
+  // ── Global toast notifications ──
+  const { toasts, toast, dismiss } = useToast();
+
+  // ── Order bell notification state ──
   const [unreadOrders, setUnreadOrders] = useState([]);
   const [bellOpen, setBellOpen] = useState(false);
   const [toastNotifs, setToastNotifs] = useState([]);
@@ -248,36 +253,8 @@ const Admin = () => {
         </div>
       </nav>
 
-      {/* ── Toast notifications (slide-in for new orders) ── */}
-      <div className="fixed top-16 right-4 z-[9999] flex flex-col gap-3 pointer-events-none" style={{ maxWidth: 320 }}>
-        {toastNotifs.slice(0, 3).map((order) => (
-          <div
-            key={order._toastId}
-            className="flex items-start gap-3 bg-white border border-[#eee] shadow-xl px-4 py-3.5 pointer-events-auto border-l-4 border-l-emerald-500"
-            style={{ animation: 'slideInRight 0.3s ease-out' }}
-          >
-            <div className="w-9 h-9 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
-              <span className="text-sm">🛒</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="text-[11px] font-bold text-emerald-700 tracking-wider m-0">NEW ORDER!</p>
-                <span className="text-[16px] animate-bounce">🔔</span>
-              </div>
-              <p className="text-[12px] font-bold m-0 mt-0.5 truncate">{order.customerName}</p>
-              <p className="text-[10px] text-[#888] m-0 mt-0.5">
-                {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''} · {Number(order.totalAmount || 0).toLocaleString()} TK
-              </p>
-            </div>
-            <button
-              onClick={() => setToastNotifs(prev => prev.filter(t => t._toastId !== order._toastId))}
-              className="text-[#ccc] hover:text-[#888] bg-transparent border-none cursor-pointer text-sm p-0.5 shrink-0"
-            >
-              ✕
-            </button>
-          </div>
-        ))}
-      </div>
+      {/* ── Global toast system ── */}
+      <ToastContainer toasts={toasts} onDismiss={dismiss} />
 
       <div className="flex flex-1 relative">
         {/* ── Overlay ── */}
@@ -318,7 +295,7 @@ const Admin = () => {
 
         {/* ── Page Content ── */}
         <main className="flex-1 p-4 md:p-10 bg-white overflow-x-auto min-w-0 w-full">
-          <Outlet context={{ perfumes, orders, investments, fetchData }} />
+          <Outlet context={{ perfumes, orders, investments, fetchData, toast }} />
         </main>
       </div>
 
