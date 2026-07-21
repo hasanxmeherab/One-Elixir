@@ -12,7 +12,8 @@
   
   "districtsByDivision": {
     "Dhaka": [
-      { "value": "Dhaka", "label": "Dhaka" }, { "value": "Ashulia", "label": "Ashulia" },
+      { "value": "Dhaka", "label": "Dhaka" }, { "value": "Ashulia (Daffodil Area)", "label": "Ashulia (Daffodil Area)" },
+      { "value": "Ashulia (Other)", "label": "Ashulia (Other)" },
       { "value": "Gazipur", "label": "Gazipur" },
       { "value": "Narayanganj", "label": "Narayanganj" }, { "value": "Tangail", "label": "Tangail" },
       { "value": "Faridpur", "label": "Faridpur" }, { "value": "Gopalganj", "label": "Gopalganj" },

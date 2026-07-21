@@ -39,7 +39,10 @@ const Checkout = () => {
 
   const shippingCost = useMemo(() => {
     if (!formData.district) return 0;
-    return formData.district.value === 'Dhaka' ? 80 : 120;
+    const district = formData.district.value;
+    if (district === 'Ashulia (Daffodil Area)') return 0;
+    if (district === 'Ashulia (Other)') return 80;
+    return district === 'Dhaka' ? 80 : 120;
   }, [formData.district]);
 
   const finalAmount = cartTotal - discount + shippingCost;
@@ -63,6 +66,38 @@ const Checkout = () => {
     }
   };
 
+  // Build the base order payload (used by both submit paths)
+  const buildOrderData = (paymentDetails = {}) => ({
+    customerName: formData.name,
+    customerEmail: user.email.toLowerCase(),
+    phone: formData.phone,
+    address: `${formData.address}, ${formData.district.label}, ${formData.division.label}`,
+    items: cart.flatMap(item => {
+      if (item.isBundle && item.bundleProducts) {
+        return item.bundleProducts.map(p => ({
+          perfumeId: p._id,
+          name: `${p.name} (${item.name})`,
+          quantity: item.quantity,
+          price: Math.round(item.price / item.bundleProducts.length),
+        }));
+      }
+      return [{
+        perfumeId: item._id,
+        name: item.selectedSize ? `${item.name} (${item.selectedSize})` : item.name,
+        quantity: item.quantity,
+        price: item.price,
+      }];
+    }),
+    totalAmount: finalAmount,
+    shippingCost: shippingCost,
+    discountApplied: discount,
+    status: 'Pending',
+    paymentMethod: paymentMethod,
+    paymentStatus: shippingCost === 0 && paymentMethod === 'Cash on Delivery' ? 'Free Delivery' : 'Pending Verification',
+    paymentDetails,
+    isManual: false
+  });
+
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     if (!cart || cart.length === 0) {
@@ -73,7 +108,26 @@ const Checkout = () => {
     if (!formData.division || !formData.district || !formData.phone || !formData.address) {
       return toast.warning("Please complete the shipping details form first.");
     }
+    // Free delivery + Cash on Delivery → skip payment modal
+    if (shippingCost === 0 && paymentMethod === 'Cash on Delivery') {
+      return handleDirectOrderSubmit();
+    }
     setShowModal(true);
+  };
+
+  // Direct submit: no payment details needed (free COD)
+  const handleDirectOrderSubmit = async () => {
+    setLoading(true);
+    try {
+      const orderData = buildOrderData({ amountPaid: 0 });
+      const res = await axios.post(`${API_URL}/api/orders`, orderData);
+      clearCart();
+      navigate('/thank-you', { state: { order: { ...orderData, _id: res.data._id || res.data.order?._id } } });
+    } catch (err) {
+      toast.error("Order placement failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFinalOrderSubmit = async () => {
@@ -94,44 +148,14 @@ const Checkout = () => {
         return toast.error("Screenshot upload failed. Please try again.");
       }
     }
-    const orderData = {
-      customerName: formData.name,
-      customerEmail: user.email.toLowerCase(),
-      phone: formData.phone,
-      address: `${formData.address}, ${formData.district.label}, ${formData.division.label}`,
-      items: cart.flatMap(item => {
-        if (item.isBundle && item.bundleProducts) {
-          return item.bundleProducts.map(p => ({
-            perfumeId: p._id,
-            name: `${p.name} (${item.name})`,
-            quantity: item.quantity,
-            price: Math.round(item.price / item.bundleProducts.length),
-          }));
-        }
-        return [{
-          perfumeId: item._id,
-          name: item.selectedSize ? `${item.name} (${item.selectedSize})` : item.name,
-          quantity: item.quantity,
-          price: item.price,
-        }];
-      }),
-      totalAmount: finalAmount,
-      shippingCost: shippingCost, 
-      discountApplied: discount,
-      status: 'Pending',
-      paymentMethod: paymentMethod,
-      paymentStatus: 'Pending Verification',
-      paymentDetails: {
-        ...mobilePayment,
-        screenshot: screenshotUrl,
-        amountPaid: amountToVerify
-      },
-      isManual: false 
-    };
+    const orderData = buildOrderData({
+      ...mobilePayment,
+      screenshot: screenshotUrl,
+      amountPaid: amountToVerify
+    });
     try {
       const res = await axios.post(`${API_URL}/api/orders`, orderData);
       clearCart();
-      // ── Pass order data to ThankYou page ──
       navigate('/thank-you', { state: { order: { ...orderData, _id: res.data._id || res.data.order?._id } } });
     } catch (err) {
       toast.error("Order placement failed. Please try again.");
@@ -262,7 +286,11 @@ const Checkout = () => {
               />
               <div className="ml-2.5">
                 <div className="font-bold">Cash on Delivery</div>
-                <div className="text-[11px] text-[#666]">Pay {shippingCost} TK Delivery Charge now, rest on delivery.</div>
+                <div className="text-[11px] text-[#666]">
+                  {shippingCost === 0
+                    ? 'Free delivery — no advance payment needed.'
+                    : `Pay ${shippingCost} TK Delivery Charge now, rest on delivery.`}
+                </div>
               </div>
             </label>
             <label className="p-4 border border-[#ddd] flex items-center text-sm cursor-pointer hover:border-black transition-colors">
