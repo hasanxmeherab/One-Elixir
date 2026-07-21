@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import adminAxios from '../../utils/adminAxios';
-import { useToast } from '../../context/ToastContext';
+import { useOutletContext } from 'react-router-dom';
 
 const CouponManagement = () => {
-  const toast = useToast();
+  const { toast = {} } = useOutletContext();
   const [coupons, setCoupons] = useState([]);
   const [newCoupon, setNewCoupon] = useState({ code: '', discountValue: '', discountType: 'percentage' });
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -19,21 +19,29 @@ const CouponManagement = () => {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    const value = parseFloat(newCoupon.discountValue);
+    if (isNaN(value) || value <= 0) { toast.error?.('Please enter a valid discount value.'); return; }
     try {
-      await adminAxios.post(`${API_URL}/api/coupons`, newCoupon);
+      await adminAxios.post(`${API_URL}/api/coupons`, {
+        ...newCoupon,
+        discountValue: value,   // must be a number, not a string
+      });
       setNewCoupon({ code: '', discountValue: '', discountType: 'percentage' });
       fetchCoupons();
-      toast.success("Coupon created successfully!");
-    } catch (err) { toast.error("Failed to create coupon."); }
+      toast.success?.('Coupon created successfully!');
+    } catch (err) {
+      const msg = err.response?.data?.errors?.join(', ') || err.response?.data?.message || 'Failed to create coupon.';
+      toast.error?.(msg);
+    }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Delete this coupon?")) {
-      try {
-        await adminAxios.delete(`${API_URL}/api/coupons/${id}`);
-        fetchCoupons();
-      } catch (err) { console.error(err); }
-    }
+    if (!window.confirm('Delete this coupon?')) return;
+    try {
+      await adminAxios.delete(`${API_URL}/api/coupons/${id}`);
+      fetchCoupons();
+      toast.success?.('Coupon deleted.');
+    } catch (err) { console.error(err); }
   };
 
   return (
