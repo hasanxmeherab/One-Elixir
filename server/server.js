@@ -39,9 +39,13 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 
 // ── Rate Limiting ─────────────────────────────────────────
+const isDev = process.env.NODE_ENV !== 'production';
+const skipLocal = (req) => isDev || req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
+
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200,                  // 200 requests per window per IP
+  max: 2000,                 // 2000 requests per window per IP in production
+  skip: skipLocal,
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: 'Too many requests, please try again later.' }
@@ -49,7 +53,8 @@ const generalLimiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 15,                   // 15 auth attempts per window
+  max: 30,                   // 30 auth attempts per window
+  skip: skipLocal,
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: 'Too many login attempts, please try again later.' }

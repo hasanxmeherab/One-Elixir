@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { DashboardSkeleton } from '../../components/Skeleton';
 import adminAxios from '../../utils/adminAxios';
@@ -30,13 +30,31 @@ const AdminDashboard = () => {
   const [revenueRange, setRevenueRange] = useState('30');
   const [now, setNow] = useState(new Date());
 
-  // ── Cost records for margin calculation ──────────────────
+  // ── Cost records for margin calculation & Superadmin Money tracking ──
   const [costRecords, setCostRecords] = useState([]);
   const [expenses, setExpenses] = useState([]);
+  const [adminBalances, setAdminBalances] = useState([]);
+  const adminData = JSON.parse(localStorage.getItem('adminData') || '{}');
+  const isSuperadmin = adminData?.role === 'superadmin';
+
+  const fetchSettlementDashboard = useCallback(() => {
+    adminAxios.get(`${API_URL}/api/settlements/dashboard`)
+      .then(r => setAdminBalances(r.data.admins || []))
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     adminAxios.get(`${API_URL}/api/costs`).then(r => setCostRecords(r.data)).catch(() => { });
     adminAxios.get(`${API_URL}/api/expenses`).then(r => setExpenses(r.data)).catch(() => { });
-  }, []);
+    if (isSuperadmin) fetchSettlementDashboard();
+  }, [isSuperadmin, fetchSettlementDashboard]);
+
+  // Auto-refresh admin holding balances when any order's payment status changes
+  // e.g. when an order is marked unpaid, the admin's holding should immediately decrease
+  const orderPaymentFingerprint = orders.map(o => `${o._id}:${o.paymentStatus}`).join('|');
+  useEffect(() => {
+    if (isSuperadmin) fetchSettlementDashboard();
+  }, [orderPaymentFingerprint]);
 
   // ── Live clock for flash sale countdowns ────────────────
   const activeFlashSales = perfumes.filter(p =>
@@ -209,6 +227,98 @@ const AdminDashboard = () => {
           </div>
         ))}
       </div>
+
+      {/* ── SUPER ADMIN: ADMIN MONEY OVERVIEW ── */}
+      {isSuperadmin && (
+        <div className="bg-white border border-[#eee] p-6 mb-6">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <p className="text-[10px] tracking-[3px] text-[#888] font-bold">💰 ADMIN MONEY OVERVIEW (SUPER ADMIN)</p>
+              <p className="text-xs text-[#aaa] mt-0.5">Track current cash/money held by each admin</p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => {
+                if (!window.confirm('This will reset ALL admin balances to ৳0 and start fresh. This cannot be undone. Are you sure?')) return;
+                adminAxios.post(`${API_URL}/api/settlements/reset-ledger`)
+                  .then(r => {
+                    alert(r.data.message);
+                    fetchSettlementDashboard();
+                  })
+                  .catch(e => alert('Reset failed: ' + (e.response?.data?.message || e.message)));
+              }}
+                className="px-3 py-1.5 text-[10px] font-bold tracking-wider border border-red-400 text-red-600 bg-red-50 hover:bg-red-600 hover:text-white transition-colors cursor-pointer">
+                🗑 RESET TO ZERO
+              </button>
+              <button onClick={fetchSettlementDashboard}
+                className="px-3 py-1.5 text-[10px] font-bold tracking-wider border border-emerald-600 text-emerald-700 bg-emerald-50 hover:bg-emerald-600 hover:text-white transition-colors cursor-pointer">
+                🔄 REFRESH
+              </button>
+              <button onClick={() => navigate('/admin/settlements')}
+                className="px-3 py-1.5 text-[10px] font-bold tracking-wider border border-[#ddd] bg-white hover:border-black transition-colors cursor-pointer">
+                SETTLEMENT DASHBOARD →
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {adminBalances.map(a => {
+              const hasMoney = a.outstandingBalance > 0;
+              return (
+                <div key={a.adminId} className={`p-5 border-2 rounded transition-all shadow-sm ${
+                  hasMoney ? 'border-amber-400 bg-amber-50/40' : 'border-emerald-300 bg-emerald-50/30'
+                }`}>
+                  {/* Header */}
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-sm font-bold text-black flex items-center gap-1.5">
+                      👤 {a.adminName}
+                    </span>
+                    <span className={`text-[9px] px-2 py-0.5 font-bold rounded tracking-wider ${
+                      a.role === 'superadmin' ? 'bg-black text-white' : 'bg-gray-800 text-white'
+                    }`}>
+                      {a.role === 'superadmin' ? '⭐ SUPER ADMIN' : 'ADMIN'}
+                    </span>
+                  </div>
+
+                  {/* Primary Metric: Exact Money Currently Held */}
+                  <div className="my-3 py-3 px-3 bg-white border border-[#eee] rounded">
+                    <span className="block text-[9px] font-bold text-gray-500 tracking-[2px] mb-1">
+                      CURRENT CASH HELD IN HAND
+                    </span>
+                    <span className={`text-2xl font-black ${hasMoney ? 'text-amber-700' : 'text-emerald-700'}`}>
+                      ৳{a.outstandingBalance.toLocaleString()} <span className="text-xs font-semibold text-gray-500">TK</span>
+                    </span>
+                    <span className={`block text-[10px] font-semibold mt-1 ${hasMoney ? 'text-amber-600' : 'text-emerald-600'}`}>
+                      {hasMoney ? `⚠️ Holding ৳${a.outstandingBalance.toLocaleString()} to settle` : '✓ Fully Settled (৳0 Held)'}
+                    </span>
+                  </div>
+
+                  {/* Breakdown details */}
+                  <div className="space-y-1.5 text-[11px] pt-1 border-t border-[#eee]">
+                    <div className="flex justify-between text-gray-600">
+                      <span>Total Collected:</span>
+                      <span className="font-bold text-black">৳{a.totalAmountCollected.toLocaleString()} ({a.totalOrdersCollected} orders)</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600">
+                      <span>Settled to Vault:</span>
+                      <span className="font-bold text-emerald-700">৳{a.amountSettled.toLocaleString()}</span>
+                    </div>
+                    {a.pendingAmount > 0 && (
+                      <div className="flex justify-between text-amber-700 font-bold bg-amber-100/60 px-1.5 py-0.5 rounded">
+                        <span>Pending Settlement:</span>
+                        <span>৳{a.pendingAmount.toLocaleString()} ({a.pendingSettlements} request)</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {adminBalances.length === 0 && (
+              <p className="text-xs text-gray-400 py-6 col-span-3 text-center">Loading admin balances...</p>
+            )}
+          </div>
+        </div>
+      )}
+
 
       {/* ── Alert KPI Cards ── */}
       <div className="flex gap-5 flex-wrap mb-5">

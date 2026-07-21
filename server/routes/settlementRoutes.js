@@ -5,6 +5,7 @@ const Settlement    = require('../models/Settlement');
 const PaymentLedger = require('../models/PaymentLedger');
 const Order         = require('../models/Order');
 const Admin         = require('../models/Admin');
+const SystemConfig  = require('../models/SystemConfig');
 const writeLog      = require('../utils/writeLog');
 
 const { verifyAdmin, verifySuperadmin } = require('../middleware/authMiddleware');
@@ -14,11 +15,100 @@ const asyncHandler = (fn) => (req, res, next) => {
   Promise.resolve(fn(req, res, next)).catch(next);
 };
 
+// ── Helper: Fast bulk-sync missing PaymentLedger collection entries ──
+const syncMissingLedgerEntries = async () => {
+  try {
+    // 1. Get all orderIds already present in PaymentLedger
+    const existingLedgerOrderIds = await PaymentLedger.distinct('orderId', { orderId: { $ne: null } });
+    const existingSet = new Set(existingLedgerOrderIds.map(id => id.toString()));
+
+    // 1b. Check if a ledger reset has been done — only sync orders AFTER that date
+    const resetConfig = await SystemConfig.findOne({ key: 'ledgerResetAt' });
+    const resetAt = resetConfig?.value ? new Date(resetConfig.value) : null;
+
+    // 2. Query paid orders that are NOT in PaymentLedger (and paid AFTER reset date if applicable)
+    const orderFilter = {
+      paymentStatus: { $regex: /^paid$/i },
+      _id: { $nin: existingLedgerOrderIds }
+    };
+    if (resetAt) {
+      // Only sync orders that were paid/created after the reset
+      orderFilter.createdAt = { $gt: resetAt };
+    }
+    const unsyncedPaidOrders = await Order.find(orderFilter);
+
+    if (unsyncedPaidOrders.length === 0) return; // Fast exit (0 iterations)!
+
+    const admins = await Admin.find().select('_id name role');
+    const adminNameMap = {};
+    admins.forEach(a => {
+      if (a.name) adminNameMap[a.name.trim().toLowerCase()] = a;
+    });
+
+    const newLedgerEntries = [];
+    const orderSavePromises = [];
+
+    for (const order of unsyncedPaidOrders) {
+      let targetAdminId = order.paymentReceivedBy?.adminId;
+      let targetAdminName = order.paymentReceivedBy?.adminName;
+
+      // If paymentReceivedBy is missing, match createdBy to admin
+      if (!targetAdminId && order.createdBy) {
+        const matchedAdmin = adminNameMap[order.createdBy.trim().toLowerCase()];
+        if (matchedAdmin) {
+          targetAdminId = matchedAdmin._id;
+          targetAdminName = matchedAdmin.name;
+
+          order.paymentReceivedBy = {
+            adminId: matchedAdmin._id,
+            adminName: matchedAdmin.name
+          };
+          order.paymentReceivedAt = order.paymentReceivedAt || order.createdAt;
+          order.settlementStatus = matchedAdmin.role === 'superadmin' ? 'settled' : 'unsettled';
+          orderSavePromises.push(order.save());
+        }
+      }
+
+      if (targetAdminId) {
+        const receiverAdmin = admins.find(a => a._id.toString() === targetAdminId.toString());
+        const isSuperadmin = receiverAdmin?.role === 'superadmin';
+
+        newLedgerEntries.push({
+          orderId: order._id,
+          adminId: targetAdminId,
+          adminName: targetAdminName || receiverAdmin?.name || 'Admin',
+          amount: order.totalAmount,
+          type: 'collection',
+          paymentMethod: order.paymentMethod || 'Cash',
+          note: `Auto-synced ledger entry for paid order #${order._id.toString().slice(-6).toUpperCase()}`,
+          createdAt: order.paymentReceivedAt || order.createdAt
+        });
+
+        if (!order.settlementStatus) {
+          order.settlementStatus = isSuperadmin ? 'settled' : 'unsettled';
+          orderSavePromises.push(order.save());
+        }
+      }
+    }
+
+    if (newLedgerEntries.length > 0) {
+      await PaymentLedger.insertMany(newLedgerEntries);
+    }
+    if (orderSavePromises.length > 0) {
+      await Promise.all(orderSavePromises);
+    }
+  } catch (err) {
+    console.error('Error syncing missing ledger entries:', err.message);
+  }
+};
+
 // ══════════════════════════════════════════════════════════════
 // 1. GET /balances — outstanding balance per admin
 //    Superadmin sees all, normal admin sees only self
 // ══════════════════════════════════════════════════════════════
 router.get('/balances', verifyAdmin, asyncHandler(async (req, res) => {
+  await syncMissingLedgerEntries();
+
   const isSuperadmin = req.admin.role === 'superadmin';
 
   const matchStage = isSuperadmin
@@ -66,6 +156,8 @@ router.get('/balances', verifyAdmin, asyncHandler(async (req, res) => {
 // 2. GET /dashboard — full settlement dashboard (superadmin)
 // ══════════════════════════════════════════════════════════════
 router.get('/dashboard', verifySuperadmin, asyncHandler(async (req, res) => {
+  await syncMissingLedgerEntries();
+
   // Get all admins
   const admins = await Admin.find().select('_id name role');
 
@@ -157,8 +249,50 @@ router.get('/dashboard', verifySuperadmin, asyncHandler(async (req, res) => {
 
   const totalPending = await Settlement.countDocuments({ status: 'pending' });
 
+  // Superadmin's own holding balance (received from admins but not yet vaulted)
+  const superadmin = admins.find(a => a.role === 'superadmin');
+  const superadminHoldingAgg = superadmin ? await PaymentLedger.aggregate([
+    { $match: { adminId: superadmin._id } },
+    {
+      $group: {
+        _id: null,
+        totalIn: { $sum: { $cond: [{ $in: ['$type', ['collection', 'received_from_admin']] }, '$amount', 0] } },
+        totalOut: { $sum: { $cond: [{ $eq: ['$type', 'vault_transfer'] }, '$amount', 0] } }
+      }
+    }
+  ]) : [];
+  const superadminHolding = (superadminHoldingAgg[0]?.totalIn || 0) - (superadminHoldingAgg[0]?.totalOut || 0);
+
+  // Total money confirmed into vault (only explicit vault_transfer entries)
+  const vaultAgg = await PaymentLedger.aggregate([
+    { $match: { type: 'vault_transfer' } },
+    { $group: { _id: null, total: { $sum: '$amount' } } }
+  ]);
+  const vaultBalance = vaultAgg[0]?.total || 0;
+
+  // Frozen revenue: a permanent snapshot of revenue at the time the vault chain was introduced.
+  // Saved once in DB — never changes from order updates. Only vault transfers add to available money after this.
+  let snapshotConfig = await SystemConfig.findOne({ key: 'revenueSnapshot' });
+  if (!snapshotConfig) {
+    // First time: calculate current revenue from ALL existing delivered+paid orders and freeze it
+    const snapshotAgg = await Order.aggregate([
+      { $match: { status: { $regex: /^delivered$/i }, paymentStatus: { $regex: /^paid$/i } } },
+      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+    ]);
+    const snapshot = snapshotAgg[0]?.total || 0;
+    snapshotConfig = await SystemConfig.findOneAndUpdate(
+      { key: 'revenueSnapshot' },
+      { key: 'revenueSnapshot', value: snapshot, updatedAt: new Date() },
+      { upsert: true, new: true }
+    );
+  }
+  const frozenRevenue = snapshotConfig?.value || 0;
+
   res.json({
     admins: dashboard,
+    vaultBalance,
+    frozenRevenue,
+    superadminHolding,
     summary: {
       totalCollectedToday: todayCollected[0]?.total || 0,
       collectionsToday: todayCollected[0]?.count || 0,
@@ -168,6 +302,8 @@ router.get('/dashboard', verifySuperadmin, asyncHandler(async (req, res) => {
     }
   });
 }));
+
+
 
 // ══════════════════════════════════════════════════════════════
 // 3. POST /request — admin submits a settlement request
@@ -280,6 +416,17 @@ router.put('/:id/confirm', verifySuperadmin, asyncHandler(async (req, res) => {
       paymentMethod: settlement.paymentMethod,
       settlementId: settlement._id,
       note: `Settlement confirmed by ${req.admin.name}`
+    }], { session });
+
+    // Add received_from_admin entry for superadmin (money now in superadmin's holding)
+    await PaymentLedger.create([{
+      adminId: req.admin.id,
+      adminName: req.admin.name,
+      amount: settlement.amount,
+      type: 'received_from_admin',
+      paymentMethod: settlement.paymentMethod,
+      settlementId: settlement._id,
+      note: `Received ৳${settlement.amount.toLocaleString()} from ${settlement.adminName} (Settlement #${settlement._id.toString().slice(-6).toUpperCase()})`
     }], { session });
 
     // Update any unsettled orders from this admin to 'settled'
@@ -437,6 +584,103 @@ router.get('/reports', verifySuperadmin, asyncHandler(async (req, res) => {
     collectionByMethod,
     dailyTrend,
     ledgerEntries
+  });
+}));
+
+// ══════════════════════════════════════════════════════════════
+// POST /vault-transfer — superadmin transfers from holding to main vault
+// ══════════════════════════════════════════════════════════════
+router.post('/vault-transfer', verifySuperadmin, asyncHandler(async (req, res) => {
+  const { amount, note } = req.body;
+
+  if (!amount || Number(amount) <= 0) {
+    return res.status(400).json({ message: 'Amount must be greater than 0' });
+  }
+
+  // Calculate superadmin's current holding balance
+  const holdingAgg = await PaymentLedger.aggregate([
+    { $match: { adminId: new mongoose.Types.ObjectId(req.admin.id) } },
+    {
+      $group: {
+        _id: null,
+        totalIn: { $sum: { $cond: [{ $in: ['$type', ['collection', 'received_from_admin']] }, '$amount', 0] } },
+        totalOut: { $sum: { $cond: [{ $eq: ['$type', 'vault_transfer'] }, '$amount', 0] } }
+      }
+    }
+  ]);
+  const currentHolding = (holdingAgg[0]?.totalIn || 0) - (holdingAgg[0]?.totalOut || 0);
+
+  if (Number(amount) > currentHolding) {
+    return res.status(400).json({
+      message: `Insufficient holding balance. You have ৳${currentHolding.toLocaleString()} available.`
+    });
+  }
+
+  // Create vault_transfer ledger entry (deducts from superadmin's holding, adds to vault)
+  const ledgerEntry = await PaymentLedger.create({
+    adminId: req.admin.id,
+    adminName: req.admin.name,
+    amount: Number(amount),
+    type: 'vault_transfer',
+    paymentMethod: 'Internal Transfer',
+    note: note || `Vault transfer by ${req.admin.name}`
+  });
+
+  await writeLog(req, 'VAULT_TRANSFER', 'PaymentLedger',
+    `${req.admin.name} transferred ৳${Number(amount).toLocaleString()} to vault. Remaining holding: ৳${(currentHolding - Number(amount)).toLocaleString()}`);
+
+  res.json({
+    message: `৳${Number(amount).toLocaleString()} transferred to vault successfully.`,
+    newHolding: currentHolding - Number(amount),
+    ledgerEntry
+  });
+}));
+
+// ══════════════════════════════════════════════════════════════
+// POST /reset-ledger — superadmin resets all balances to 0
+//   Clears PaymentLedger + resets order settlement fields
+// ══════════════════════════════════════════════════════════════
+router.post('/reset-ledger', verifySuperadmin, asyncHandler(async (req, res) => {
+  // Snapshot current revenue BEFORE clearing anything (this becomes the new frozen base)
+  const snapshotAgg = await Order.aggregate([
+    { $match: { status: { $regex: /^delivered$/i }, paymentStatus: { $regex: /^paid$/i } } },
+    { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+  ]);
+  const snapshot = snapshotAgg[0]?.total || 0;
+  await SystemConfig.findOneAndUpdate(
+    { key: 'revenueSnapshot' },
+    { key: 'revenueSnapshot', value: snapshot, updatedAt: new Date() },
+    { upsert: true, new: true }
+  );
+
+  // Delete all PaymentLedger entries
+  const deletedLedger = await PaymentLedger.deleteMany({});
+
+  // Save reset timestamp — syncMissingLedgerEntries will skip all orders before this
+  const now = new Date();
+  await SystemConfig.findOneAndUpdate(
+    { key: 'ledgerResetAt' },
+    { key: 'ledgerResetAt', value: now, updatedAt: now },
+    { upsert: true, new: true }
+  );
+
+  // Reset all orders settlement status (optional UX cleanup)
+  await Order.updateMany(
+    {},
+    {
+      $set: { settlementStatus: null, paymentReceivedAt: null },
+      $unset: { 'paymentReceivedBy.adminId': '', 'paymentReceivedBy.adminName': '' }
+    }
+  );
+
+  await writeLog(req, 'RESET_LEDGER', 'PaymentLedger',
+    `${req.admin.name} reset all admin balances to 0. ${deletedLedger.deletedCount} ledger entries cleared. Revenue snapshot saved: ৳${snapshot.toLocaleString()}`);
+
+  res.json({
+    message: `Ledger reset successful. ${deletedLedger.deletedCount} entries cleared. Revenue snapshot: ৳${snapshot.toLocaleString()}. Only new vault transfers will update available money.`,
+    deletedCount: deletedLedger.deletedCount,
+    frozenRevenue: snapshot,
+    resetAt: now
   });
 }));
 

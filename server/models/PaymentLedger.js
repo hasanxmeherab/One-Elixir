@@ -7,7 +7,7 @@ const paymentLedgerSchema = new mongoose.Schema({
   amount: { type: Number, required: true },
   type: {
     type: String,
-    enum: ['collection', 'settlement', 'adjustment'],
+    enum: ['collection', 'settlement', 'adjustment', 'received_from_admin', 'vault_transfer'],
     required: true
   },
   paymentMethod: { type: String, default: '' },

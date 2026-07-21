@@ -78,10 +78,7 @@ const OrderList = () => {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const adminData = JSON.parse(localStorage.getItem('adminData') || '{}');
 
-  useEffect(() => {
-    const interval = setInterval(() => fetchData(), 30000);
-    return () => clearInterval(interval);
-  }, []);
+
 
   useEffect(() => { setPage(1); }, [searchTerm, paymentStatusFilter, paymentMethodFilter, orderStatusFilter, showArchived, dateFrom, dateTo]);
 
@@ -605,11 +602,22 @@ const OrderList = () => {
                     <option value="Pending Verification">Pending Verification</option>
                     <option value="Paid">Paid</option>
                   </select>
-                  {order.paymentReceivedBy?.adminName && (
-                    <div className="mt-1 text-[9px] text-gray-500 flex items-center gap-1">
-                      <span className="inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
-                      {order.paymentReceivedBy.adminName}
-                    </div>
+                  {order.paymentStatus === 'Paid' && (
+                    order.paymentReceivedBy?.adminName ? (
+                      <div className="mt-1 text-[9px] text-gray-600 flex items-center gap-1">
+                        <span className="inline-block w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                        <span className="font-semibold">{order.paymentReceivedBy.adminName}</span>
+                        <button onClick={() => { setReceiverModal({ orderId: order._id }); setSelectedReceiver(order.paymentReceivedBy?.adminId || adminData?.id || null); }}
+                          className="text-[8px] text-gray-400 hover:text-black border-none bg-transparent cursor-pointer p-0 underline ml-0.5">
+                          edit
+                        </button>
+                      </div>
+                    ) : (
+                      <button onClick={() => { setReceiverModal({ orderId: order._id }); setSelectedReceiver(adminData?.id || null); }}
+                        className="mt-1 block text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-300 px-1.5 py-0.5 rounded cursor-pointer hover:bg-amber-100 transition-colors">
+                        + Assign Admin
+                      </button>
+                    )
                   )}
                 </td>
                 <td className="py-2.5 px-2 text-center align-middle">

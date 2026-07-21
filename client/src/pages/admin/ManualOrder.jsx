@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import axios from 'axios';
 import adminAxios from '../../utils/adminAxios';
 import { useOutletContext } from 'react-router-dom';
@@ -31,6 +31,10 @@ const ManualOrder = () => {
   const [onlinePayment, setOnlinePayment] = useState({ senderNumber: '', transactionId: '', screenshot: null, screenshotUrl: '' });
   const [selectedItems, setSelectedItems] = useState([{ perfumeId: '', variantIdx: null, quantity: 1, discountType: 'none', discountValue: 0 }]);
   const [couponCode, setCouponCode]       = useState('');
+
+  // ── Payment Receiver (required when Paid) ──
+  const [adminList, setAdminList] = useState([]);
+  const [selectedReceiver, setSelectedReceiver] = useState(null);
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponLoading, setCouponLoading] = useState(false);
   const [totalDiscountType, setTotalDiscountType] = useState('none');
@@ -38,6 +42,14 @@ const ManualOrder = () => {
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const isOnlinePayment = ['Bkash', 'Nagad', 'Bank Transfer'].includes(paymentMethod);
+  const adminData = JSON.parse(localStorage.getItem('adminData') || '{}');
+
+  // Fetch admin list for payment receiver selection
+  useEffect(() => {
+    adminAxios.get(`${API_URL}/api/admins/list`)
+      .then(res => setAdminList(res.data))
+      .catch(() => {});
+  }, [API_URL]);
 
   const shippingCost = useMemo(() => {
     if (freeDelivery) return 0;
@@ -138,8 +150,9 @@ const ManualOrder = () => {
     if (isOnlinePayment && (!onlinePayment.senderNumber || !onlinePayment.transactionId)) {
       alert('Please fill sender number and transaction ID.'); return;
     }
-
-    const adminData = JSON.parse(localStorage.getItem('adminData') || '{}');
+    if (paymentStatus === 'Paid' && !selectedReceiver) {
+      alert('Please select which admin received the payment.'); return;
+    }
     const adminName = adminData.name || 'System Admin';
     const itemsToOrder = [];
 
@@ -161,6 +174,15 @@ const ManualOrder = () => {
         catch { console.warn('Screenshot upload failed, continuing without it.'); }
       }
       const authHeader = { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } };
+      // Build payment receiver info if Paid
+      let paymentReceiverPayload = undefined;
+      if (paymentStatus === 'Paid' && selectedReceiver) {
+        const receiverAdmin = adminList.find(a => a._id === selectedReceiver);
+        if (receiverAdmin) {
+          paymentReceiverPayload = { adminId: receiverAdmin._id, adminName: receiverAdmin.name };
+        }
+      }
+
       const orderPayload = {
         ...orderData,
         address: `${orderData.address}, ${district.label}, ${division.label}`,
@@ -168,7 +190,8 @@ const ManualOrder = () => {
         discountApplied: couponDiscount + totalDiscountAmount, paymentMethod, paymentStatus,
         isManual: true, createdBy: adminName,
         createdAt: orderData.orderDate ? new Date(orderData.orderDate).toISOString() : new Date().toISOString(),
-        ...(isOnlinePayment && { paymentDetails: { platform: paymentMethod, senderNumber: onlinePayment.senderNumber, transactionId: onlinePayment.transactionId, screenshot: screenshotUrl } })
+        ...(isOnlinePayment && { paymentDetails: { platform: paymentMethod, senderNumber: onlinePayment.senderNumber, transactionId: onlinePayment.transactionId, screenshot: screenshotUrl } }),
+        ...(paymentReceiverPayload && { paymentReceivedBy: paymentReceiverPayload })
       };
       console.log('=== Order Submission Debug ===');
       console.log('Full payload:', JSON.stringify(orderPayload, null, 2));
@@ -187,6 +210,7 @@ const ManualOrder = () => {
       setPaymentMethod('Cash on Delivery'); setPaymentStatus('Unpaid');
       setFreeDelivery(false);
       setOnlinePayment({ senderNumber: '', transactionId: '', screenshot: null, screenshotUrl: '' });
+      setSelectedReceiver(null);
       fetchData();
       alert('Manual Order Recorded Successfully!');
     } catch (err) { 
@@ -350,12 +374,50 @@ const ManualOrder = () => {
             <option value="Nagad">Nagad</option>
             <option value="Bank Transfer">Bank Transfer</option>
           </select>
-          <select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)}
+          <select value={paymentStatus} onChange={e => { setPaymentStatus(e.target.value); if (e.target.value !== 'Paid') setSelectedReceiver(null); }}
             className={`flex-1 p-3 border border-[#ddd] outline-none text-[13px] font-bold ${paymentStatus === 'Paid' ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}>
             <option value="Unpaid">Unpaid</option>
             <option value="Paid">Paid</option>
           </select>
         </div>
+
+        {/* ── Payment Receiver Selection (required when Paid) ── */}
+        {paymentStatus === 'Paid' && (
+          <div className="p-5 bg-[#f9f9f9] border border-[#eee] rounded">
+            <p className="text-[10px] font-bold text-gray-500 tracking-wider mt-0 mb-3">
+              WHO RECEIVED THE PAYMENT? *
+            </p>
+            <div className="flex flex-col gap-1.5 max-h-[250px] overflow-y-auto">
+              {adminList.map(admin => (
+                <label key={admin._id}
+                  className={`flex items-center gap-3 p-3 border cursor-pointer transition-colors ${
+                    selectedReceiver === admin._id
+                      ? 'border-black bg-white'
+                      : 'border-[#eee] hover:border-gray-300 bg-white'
+                  }`}>
+                  <input type="radio" name="paymentReceiver" value={admin._id}
+                    checked={selectedReceiver === admin._id}
+                    onChange={() => setSelectedReceiver(admin._id)}
+                    className="cursor-pointer" />
+                  <div className="flex-1">
+                    <div className="text-[12px] font-bold">
+                      {admin.name}
+                      {admin._id === adminData?.id && (
+                        <span className="ml-2 text-[9px] bg-black text-white px-1.5 py-0.5 rounded-sm">YOU</span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-gray-400">
+                      {admin.role === 'superadmin' ? '⭐ Super Admin' : 'Admin'}
+                    </div>
+                  </div>
+                </label>
+              ))}
+              {adminList.length === 0 && (
+                <p className="text-[11px] text-[#ccc] text-center py-4">Loading admins...</p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── Online Payment Fields ── */}
         {isOnlinePayment && (
