@@ -54,7 +54,8 @@ const ManualOrder = () => {
   const shippingCost = useMemo(() => {
     if (freeDelivery) return 0;
     if (!district) return 0;
-    return district.value === 'Dhaka' ? 80 : 120;
+    if (district.value === 'Dhaka' || district.value === 'Ashulia (Daffodil Area)') return 0;
+    return 120;
   }, [district, freeDelivery]);
 
   const perfumeOptions = useMemo(() => {
@@ -358,7 +359,7 @@ const ManualOrder = () => {
           <div>
             <p className="text-[11px] font-bold tracking-wider m-0">FREE DELIVERY</p>
             <p className="text-[10px] text-gray-400 m-0">
-              {freeDelivery ? '✓ Shipping charge waived' : `Normal charge: ${district ? (district.value === 'Dhaka' ? '80' : '120') : '80–120'} TK`}
+              {freeDelivery ? '✓ Shipping charge waived' : `Normal charge: ${district ? (district.value === 'Dhaka' || district.value === 'Ashulia (Daffodil Area)' ? '0 (Free)' : '120') : '0–120'} TK`}
             </p>
           </div>
         </div>

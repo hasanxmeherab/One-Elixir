@@ -80,6 +80,10 @@ const createOrderSchema = z.object({
   createdBy: z.string().max(200).optional(),
   createdAt: z.string().optional(),
   freeDelivery: z.boolean().optional(),
+  paymentReceivedBy: z.object({
+    adminId: z.string().min(1),
+    adminName: z.string().optional(),
+  }).optional(),
 });
 
 const updateOrderSchema = z.object({

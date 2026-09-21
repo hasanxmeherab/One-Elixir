@@ -158,11 +158,6 @@ router.post('/manual', verifyAdmin, validate(createOrderSchema), asyncHandler(as
         adminName: paymentReceivedBy.adminName || ''
       };
       order.paymentReceivedAt = new Date();
-
-      // Check if receiver is superadmin → auto-settle
-      const receiverAdmin = await Admin.findById(paymentReceivedBy.adminId).session(session);
-      const isSuperadmin = receiverAdmin?.role === 'superadmin';
-      order.settlementStatus = isSuperadmin ? 'settled' : 'unsettled';
     }
 
     const newOrder = await order.save({ session });
@@ -172,15 +167,50 @@ router.post('/manual', verifyAdmin, validate(createOrderSchema), asyncHandler(as
 
     // ── Create ledger entry for paid manual orders ──
     if (req.body.paymentStatus?.toLowerCase() === 'paid' && paymentReceivedBy?.adminId) {
-      await PaymentLedger.create([{
-        orderId: newOrder._id,
-        adminId: paymentReceivedBy.adminId,
-        adminName: paymentReceivedBy.adminName || '',
-        amount: newOrder.totalAmount,
-        type: 'collection',
-        paymentMethod: newOrder.paymentMethod || 'Cash',
-        note: `Manual order payment — #${newOrder._id.toString().slice(-6).toUpperCase()}`
-      }], { session });
+      const receiverAdmin = await Admin.findById(paymentReceivedBy.adminId).session(session);
+      const receiverIsSuperadmin = receiverAdmin?.role === 'superadmin';
+      const reportingAdmin = req.admin;
+
+      if (receiverIsSuperadmin) {
+        // Receiver is superadmin → collection attributed to reporting admin, auto-create pending settlement
+        await PaymentLedger.create([{
+          orderId: newOrder._id,
+          adminId: reportingAdmin.id,
+          adminName: reportingAdmin.name || '',
+          amount: newOrder.totalAmount,
+          type: 'collection',
+          paymentMethod: newOrder.paymentMethod || 'Cash',
+          note: `Manual order payment collected — #${newOrder._id.toString().slice(-6).toUpperCase()} (pending transfer to superadmin)`
+        }], { session });
+
+        // Auto-create a pending settlement request so it shows in the settlement dashboard
+        await Settlement.create([{
+          adminId: reportingAdmin.id,
+          adminName: reportingAdmin.name || '',
+          amount: newOrder.totalAmount,
+          paymentMethod: newOrder.paymentMethod || 'Cash',
+          note: `Auto-settlement for manual order #${newOrder._id.toString().slice(-6).toUpperCase()} — superadmin selected as receiver`,
+          status: 'pending'
+        }], { session });
+
+        // Order settlement status: pending (awaiting superadmin confirmation)
+        newOrder.settlementStatus = 'pending';
+        await newOrder.save({ session });
+      } else {
+        // Regular admin received payment — normal collection flow
+        await PaymentLedger.create([{
+          orderId: newOrder._id,
+          adminId: paymentReceivedBy.adminId,
+          adminName: paymentReceivedBy.adminName || '',
+          amount: newOrder.totalAmount,
+          type: 'collection',
+          paymentMethod: newOrder.paymentMethod || 'Cash',
+          note: `Manual order payment — #${newOrder._id.toString().slice(-6).toUpperCase()}`
+        }], { session });
+
+        newOrder.settlementStatus = 'unsettled';
+        await newOrder.save({ session });
+      }
     }
 
     // Commit transaction
