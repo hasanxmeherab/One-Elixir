@@ -1,16 +1,24 @@
 const jwt = require('jsonwebtoken');
 
+const ADMIN_ROLES = ['admin', 'superadmin'];
+
 // Verify admin JWT and attach admin info to req
 const verifyAdmin = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ message: 'No token provided' });
+  let decoded;
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.admin = decoded; // { id, role, name }
-    next();
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
   } catch (err) {
-    res.status(401).json({ message: 'Invalid or expired token' });
+    return res.status(401).json({ message: 'Invalid or expired token' });
   }
+  // 🔒 Customer tokens are signed with the same secret but carry no role claim.
+  // Only tokens issued by the admin login/refresh routes include an admin role.
+  if (!ADMIN_ROLES.includes(decoded.role)) {
+    return res.status(403).json({ message: 'Admin access required' });
+  }
+  req.admin = decoded; // { id, role, name }
+  next();
 };
 
 // Allow only superadmin

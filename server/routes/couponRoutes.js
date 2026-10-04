@@ -16,10 +16,19 @@ const couponLimiter = rateLimit({
 // 1. VALIDATE COUPON (For Customers at Checkout)
 router.post('/validate', couponLimiter, async (req, res) => {
   const { code } = req.body;
+  if (typeof code !== 'string' || !code.trim()) {
+    return res.status(400).json({ message: "Coupon code is required." });
+  }
   try {
+    // 🔒 Reject expired coupons (coupons without an expiryDate never expire)
     const coupon = await Coupon.findOne({ 
-      code: code.toUpperCase(), 
-      isActive: true 
+      code: code.trim().toUpperCase(), 
+      isActive: true,
+      $or: [
+        { expiryDate: null },
+        { expiryDate: { $exists: false } },
+        { expiryDate: { $gt: new Date() } },
+      ],
     });
     
     if (!coupon) {

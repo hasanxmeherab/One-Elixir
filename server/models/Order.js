@@ -21,6 +21,7 @@ const orderSchema = new mongoose.Schema({
   totalAmount: { type: Number, required: true },
   shippingCost: { type: Number, default: 0 },
   discountApplied: { type: Number, default: 0 }, 
+  couponCode: { type: String, default: null },
   status: { type: String, default: 'Pending' },
   paymentMethod: { type: String, default: 'Cash on Delivery' }, 
   paymentStatus: { type: String, default: 'Unpaid' }, 

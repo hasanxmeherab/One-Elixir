@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useCart } from '../context/CartContext';
 import { useUser } from '../context/UserContext';
 import { useNavigate } from 'react-router-dom';
@@ -25,7 +25,7 @@ const Checkout = () => {
 
   const [loading, setLoading] = useState(false);
   const [couponCode, setCouponCode] = useState('');
-  const [discount, setDiscount] = useState(0);
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponLoading, setCouponLoading] = useState(false);
 
   const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery');
@@ -37,7 +37,8 @@ const Checkout = () => {
     screenshot: null
   });
 
-  const shippingCost = useMemo(() => {
+  // Local estimate only — shown until the server quote arrives. The server is the source of truth.
+  const localShipping = useMemo(() => {
     if (!formData.district) return 0;
     const district = formData.district.value;
     if (district === 'Ashulia (Daffodil Area)') return 0;
@@ -45,58 +46,98 @@ const Checkout = () => {
     return district === 'Dhaka' ? 80 : 120;
   }, [formData.district]);
 
-  const finalAmount = cartTotal - discount + shippingCost;
+  // 🔒 Only send WHAT is being bought — the server looks up all prices itself
+  const quoteItems = useMemo(() => cart.map(item => {
+    if (item.isBundle) {
+      const bundleId = item.bundleId || String(item._id).replace(/^bundle_/, '');
+      return { bundleId, quantity: Number(item.quantity) };
+    }
+    return { perfumeId: item._id, variantLabel: item.selectedSize || null, quantity: Number(item.quantity) };
+  }), [cart]);
+
+  // ── Server-side quote (prices, discount, shipping, total) ──
+  const [quote, setQuote] = useState(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState('');
+
+  const fetchQuote = useCallback(async (couponOverride) => {
+    const code = couponOverride !== undefined ? couponOverride : appliedCoupon;
+    const res = await axios.post(`${API_URL}/api/orders/quote`, {
+      items: quoteItems,
+      couponCode: code || null,
+      district: formData.district?.value || null,
+    });
+    return res.data;
+  }, [API_URL, quoteItems, appliedCoupon, formData.district]);
+
+  useEffect(() => {
+    if (quoteItems.length === 0) { setQuote(null); return; }
+    let cancelled = false;
+    setQuoteLoading(true);
+    fetchQuote()
+      .then(q => { if (!cancelled) { setQuote(q); setQuoteError(''); } })
+      .catch(err => {
+        if (cancelled) return;
+        const msg = err.response?.data?.message || 'Could not calculate your total. Please try again.';
+        // Applied coupon became invalid → drop it (this re-runs the quote without it)
+        if (appliedCoupon && /coupon/i.test(msg)) {
+          setAppliedCoupon(null);
+          toast.error(msg);
+          return;
+        }
+        setQuote(null);
+        setQuoteError(msg);
+      })
+      .finally(() => { if (!cancelled) setQuoteLoading(false); });
+    return () => { cancelled = true; };
+  }, [fetchQuote]);
+
+  const subtotal     = quote?.subtotal ?? cartTotal;
+  const discount     = quote?.discount ?? 0;
+  const shippingCost = quote?.shippingCost ?? localShipping;
+  const finalAmount  = quote?.total ?? (cartTotal + localShipping);
   const amountToVerify = paymentMethod === 'Cash on Delivery' ? shippingCost : finalAmount;
+  const quoteReady   = !!quote && !quoteLoading && !quoteError;
 
   const handleApplyCoupon = async () => {
     if (!couponCode) return;
     setCouponLoading(true);
     try {
-      const res = await axios.post(`${API_URL}/api/coupons/validate`, { code: couponCode });
-      let discountAmount = res.data.discountType === 'percentage' 
-        ? (cartTotal * res.data.discountValue) / 100 
-        : res.data.discountValue;
-      setDiscount(discountAmount);
+      const q = await fetchQuote(couponCode);
+      setQuote(q);
+      setAppliedCoupon(couponCode);
       toast.success("Coupon applied successfully!");
     } catch (err) {
-      toast.error("Invalid or expired coupon.");
-      setDiscount(0);
+      toast.error(err.response?.data?.message || "Invalid or expired coupon.");
     } finally {
       setCouponLoading(false);
     }
   };
 
-  // Build the base order payload (used by both submit paths)
+  // Build the order payload — no prices/totals are sent; the server prices the order
   const buildOrderData = (paymentDetails = {}) => ({
     customerName: formData.name,
     customerEmail: user.email.toLowerCase(),
     phone: formData.phone,
     address: `${formData.address}, ${formData.district.label}, ${formData.division.label}`,
-    items: cart.flatMap(item => {
-      if (item.isBundle && item.bundleProducts) {
-        return item.bundleProducts.map(p => ({
-          perfumeId: p._id,
-          name: `${p.name} (${item.name})`,
-          quantity: item.quantity,
-          price: Math.round(item.price / item.bundleProducts.length),
-        }));
-      }
-      return [{
-        perfumeId: item._id,
-        name: item.selectedSize ? `${item.name} (${item.selectedSize})` : item.name,
-        quantity: item.quantity,
-        price: item.price,
-      }];
-    }),
-    totalAmount: finalAmount,
-    shippingCost: shippingCost,
-    discountApplied: discount,
-    status: 'Pending',
+    district: formData.district.value,
+    items: quoteItems,
+    couponCode: appliedCoupon || null,
     paymentMethod: paymentMethod,
-    paymentStatus: shippingCost === 0 && paymentMethod === 'Cash on Delivery' ? 'Free Delivery' : 'Pending Verification',
     paymentDetails,
-    isManual: false
+    expectedTotal: finalAmount,
   });
+
+  const handleOrderError = (err) => {
+    // 409 → prices changed since checkout loaded: refresh totals and let the customer re-confirm
+    if (err.response?.status === 409 && err.response.data?.quote) {
+      setQuote(err.response.data.quote);
+      setShowModal(false);
+      toast.warning(err.response.data.message);
+      return;
+    }
+    toast.error(err.response?.data?.message || "Order placement failed. Please try again.");
+  };
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
@@ -107,6 +148,9 @@ const Checkout = () => {
     if (!user) return navigate('/signin', { state: { from: '/checkout' } });
     if (!formData.division || !formData.district || !formData.phone || !formData.address) {
       return toast.warning("Please complete the shipping details form first.");
+    }
+    if (!quoteReady) {
+      return toast.warning(quoteError || "Calculating your total, please wait a moment...");
     }
     // Free delivery + Cash on Delivery → skip payment modal
     if (shippingCost === 0 && paymentMethod === 'Cash on Delivery') {
@@ -119,12 +163,11 @@ const Checkout = () => {
   const handleDirectOrderSubmit = async () => {
     setLoading(true);
     try {
-      const orderData = buildOrderData({ amountPaid: 0 });
-      const res = await axios.post(`${API_URL}/api/orders`, orderData);
+      const res = await axios.post(`${API_URL}/api/orders`, buildOrderData({}));
       clearCart();
-      navigate('/thank-you', { state: { order: { ...orderData, _id: res.data._id || res.data.order?._id } } });
+      navigate('/thank-you', { state: { order: res.data } });
     } catch (err) {
-      toast.error("Order placement failed. Please try again.");
+      handleOrderError(err);
     } finally {
       setLoading(false);
     }
@@ -149,16 +192,17 @@ const Checkout = () => {
       }
     }
     const orderData = buildOrderData({
-      ...mobilePayment,
+      senderNumber: mobilePayment.senderNumber,
+      transactionId: mobilePayment.transactionId,
+      platform: mobilePayment.platform,
       screenshot: screenshotUrl,
-      amountPaid: amountToVerify
     });
     try {
       const res = await axios.post(`${API_URL}/api/orders`, orderData);
       clearCart();
-      navigate('/thank-you', { state: { order: { ...orderData, _id: res.data._id || res.data.order?._id } } });
+      navigate('/thank-you', { state: { order: res.data } });
     } catch (err) {
-      toast.error("Order placement failed. Please try again.");
+      handleOrderError(err);
     } finally {
       setLoading(false);
     }
@@ -311,17 +355,17 @@ const Checkout = () => {
         <div className="bg-[#fcfcfc] p-10 border border-[#eee] h-fit">
           <h2 className="text-xs tracking-[3px] font-bold mb-5">ORDER SUMMARY</h2>
 
-          {cart.map(item => (
+          {cart.map((item, idx) => (
             <div key={item.cartKey || item._id} className="flex justify-between text-sm mb-4">
               <span>{item.name}{item.selectedSize ? ` (${item.selectedSize})` : ''} (x{item.quantity})</span>
-              <span>{(item.price * item.quantity).toLocaleString()} TK</span>
+              <span>{(quote?.lines?.[idx]?.lineTotal ?? item.price * item.quantity).toLocaleString()} TK</span>
             </div>
           ))}
 
           <div className="h-px bg-[#ddd] my-5"></div>
 
           <div className="flex justify-between text-sm mb-4">
-            <span>SUBTOTAL</span><span>{cartTotal.toLocaleString()} TK</span>
+            <span>SUBTOTAL</span><span>{subtotal.toLocaleString()} TK</span>
           </div>
           {shippingCost > 0 && (
             <div className="flex justify-between text-sm mb-4">
@@ -338,8 +382,12 @@ const Checkout = () => {
           <div className="h-px bg-[#ddd] my-5"></div>
 
           <div className="flex justify-between font-bold text-lg">
-            <span>TOTAL</span><span>{finalAmount.toLocaleString()} TK</span>
+            <span>TOTAL</span><span>{quoteLoading ? '...' : `${finalAmount.toLocaleString()} TK`}</span>
           </div>
+
+          {quoteError && (
+            <p className="text-xs text-[#e63946] mt-4">{quoteError}</p>
+          )}
 
           <button
             type="submit"

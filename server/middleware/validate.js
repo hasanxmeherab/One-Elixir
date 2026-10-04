@@ -86,6 +86,41 @@ const createOrderSchema = z.object({
   }).optional(),
 });
 
+// ── Public web order (customer checkout) ─────────────────────
+// 🔒 Clients only send WHAT they want to buy — never prices, totals,
+// payment status or admin-only fields. Pricing happens in utils/pricing.js.
+const webOrderItemSchema = z.object({
+  perfumeId: z.string().min(1).optional(),
+  bundleId: z.string().min(1).optional(),
+  variantLabel: z.string().max(50).optional().nullable(),
+  quantity: z.number().int().min(1).max(99),
+}).refine(i => !!i.perfumeId !== !!i.bundleId, {
+  message: 'Each item must have exactly one of perfumeId or bundleId',
+});
+
+const quoteOrderSchema = z.object({
+  items: z.array(webOrderItemSchema).min(1).max(50),
+  couponCode: z.string().max(30).optional().nullable(),
+  district: z.string().max(100).optional().nullable(),
+});
+
+const createWebOrderSchema = quoteOrderSchema.extend({
+  customerName: z.string().min(1).max(200),
+  customerEmail: z.string().email().optional(),
+  phone: z.string().min(1).max(30),
+  address: z.string().max(500).optional(),
+  district: z.string().min(1).max(100),
+  paymentMethod: z.enum(['Cash on Delivery', 'Full Payment']),
+  paymentDetails: z.object({
+    senderNumber: z.string().max(30).optional(),
+    transactionId: z.string().max(100).optional(),
+    platform: z.string().max(30).optional(),
+    screenshot: z.string().max(500).optional(),
+  }).optional(),
+  // Total the customer saw at checkout — rejected if it no longer matches server pricing
+  expectedTotal: z.number().min(0).optional(),
+});
+
 const updateOrderSchema = z.object({
   customerName: z.string().min(1).max(200).optional(),
   customerEmail: z.string().email().optional().nullable(),
@@ -223,6 +258,8 @@ module.exports = {
   updatePerfumeSchema,
   createOrderSchema,
   updateOrderSchema,
+  quoteOrderSchema,
+  createWebOrderSchema,
   createReviewSchema,
   createCouponSchema,
   createBannerSchema,

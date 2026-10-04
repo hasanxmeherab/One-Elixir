@@ -8,14 +8,28 @@ const PaymentLedger  = require('../models/PaymentLedger');
 const Admin          = require('../models/Admin');
 const SystemConfig   = require('../models/SystemConfig');
 const Settlement     = require('../models/Settlement');
+const User           = require('../models/User');
 const { Resend } = require('resend');
 
 const { verifyAdmin, verifyUser } = require('../middleware/authMiddleware');
-const { validate, createOrderSchema, updateOrderSchema } = require('../middleware/validate');
+const { validate, createOrderSchema, updateOrderSchema, quoteOrderSchema, createWebOrderSchema } = require('../middleware/validate');
+const { priceOrder, PricingError } = require('../utils/pricing');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const writeLog = require('../utils/writeLog');
+
+const escapeRegex = (str) => String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeHtml  = (str) => String(str ?? '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+// 🔒 Resolve the logged-in customer's email from the DB (never trust the URL/body)
+const getUserEmail = async (userId) => {
+  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) return null;
+  const user = await User.findById(userId).select('email');
+  return user?.email ? user.email.toLowerCase() : null;
+};
 
 // ✅ Async error wrapper for route handlers
 const asyncHandler = (fn) => (req, res, next) => {
@@ -57,10 +71,15 @@ const restoreStockAtomic = async (items, session = null) => {
   return Perfume.bulkWrite(bulkOps, { session });
 };
 
-// 1. GET customer history (auth required)
+// 1. GET customer history (auth required — own orders only)
 router.get('/customer/:email', verifyUser, asyncHandler(async (req, res) => {
+  const userEmail = await getUserEmail(req.userId);
+  if (!userEmail) return res.status(403).json({ message: 'Access denied' });
+  if (String(req.params.email).toLowerCase() !== userEmail) {
+    return res.status(403).json({ message: 'You can only view your own orders.' });
+  }
   const orders = await Order.find({
-    customerEmail: { $regex: new RegExp(`^${req.params.email}$`, 'i') },
+    customerEmail: { $regex: new RegExp(`^${escapeRegex(userEmail)}$`, 'i') },
     isManual: false
   }).sort({ createdAt: -1 });
   res.json(orders);
@@ -80,13 +99,73 @@ router.get('/', verifyAdmin, asyncHandler(async (req, res) => {
   res.json(orders);
 }));
 
-// 3. POST standard website order (✅ ATOMIC STOCK DECREMENT)
-router.post('/', validate(createOrderSchema), asyncHandler(async (req, res) => {
+// 3a. POST checkout quote — server-calculated prices/discount/shipping for display
+router.post('/quote', validate(quoteOrderSchema), asyncHandler(async (req, res) => {
+  try {
+    const quote = await priceOrder(req.body);
+    res.json(quote);
+  } catch (err) {
+    if (err instanceof PricingError) return res.status(err.status).json({ message: err.message });
+    throw err;
+  }
+}));
+
+// 3. POST standard website order (✅ SERVER-SIDE PRICING + ATOMIC STOCK DECREMENT)
+router.post('/', validate(createWebOrderSchema), asyncHandler(async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   
   try {
-    const order = new Order(req.body);
+    const {
+      items, couponCode, district, expectedTotal,
+      customerName, customerEmail, phone, address,
+      paymentMethod, paymentDetails = {},
+    } = req.body;
+
+    // 🔒 Price everything from the DB — client-sent prices are never used
+    const quote = await priceOrder({ items, couponCode, district }, session);
+
+    // If the customer saw a different total (stale cart / price change), make them review it
+    if (expectedTotal !== undefined && Math.abs(expectedTotal - quote.total) > 0.5) {
+      await session.abortTransaction();
+      return res.status(409).json({
+        message: `Prices have changed. Your new total is ${quote.total} TK — please review and confirm again.`,
+        quote,
+      });
+    }
+
+    const isFreeCod  = quote.shippingCost === 0 && paymentMethod === 'Cash on Delivery';
+    const amountDue  = isFreeCod ? 0 : (paymentMethod === 'Cash on Delivery' ? quote.shippingCost : quote.total);
+
+    if (!isFreeCod && (!paymentDetails.senderNumber || !paymentDetails.transactionId)) {
+      await session.abortTransaction();
+      return res.status(400).json({ message: 'Payment sender number and transaction ID are required.' });
+    }
+
+    const order = new Order({
+      customerName,
+      customerEmail: customerEmail ? customerEmail.toLowerCase() : undefined,
+      phone,
+      address,
+      items: quote.items,
+      totalAmount: quote.total,
+      shippingCost: quote.shippingCost,
+      discountApplied: quote.discount,
+      couponCode: quote.couponCode,
+      status: 'Pending',
+      paymentMethod,
+      paymentStatus: isFreeCod ? 'Free Delivery' : 'Pending Verification',
+      paymentDetails: isFreeCod
+        ? { amountPaid: 0 }
+        : {
+            senderNumber: paymentDetails.senderNumber,
+            transactionId: paymentDetails.transactionId,
+            platform: paymentDetails.platform,
+            screenshot: paymentDetails.screenshot,
+            amountPaid: amountDue,
+          },
+      isManual: false,
+    });
 
     // ✅ Batch fetch all required perfumes in ONE query (eliminates N+1)
     const perfumeIds = order.items
@@ -129,13 +208,13 @@ router.post('/', validate(createOrderSchema), asyncHandler(async (req, res) => {
           html: `
             <div style="font-family:sans-serif;max-width:600px;margin:auto;border:1px solid #eee;padding:20px;">
               <h2 style="text-align:center;letter-spacing:2px;">ONEELIXIR</h2>
-              <p>Hi ${newOrder.customerName},</p>
+              <p>Hi ${escapeHtml(newOrder.customerName)},</p>
               <p>Your order has been placed successfully!</p>
               <hr/>
               <p><strong>Order ID:</strong> #${newOrder._id}</p>
-              <ul>${newOrder.items.map(i => `<li>${i.quantity}x ${i.name} - ${i.price} TK</li>`).join('')}</ul>
+              <ul>${newOrder.items.map(i => `<li>${i.quantity}x ${escapeHtml(i.name)} - ${i.price} TK</li>`).join('')}</ul>
               <p><strong>Total:</strong> ${newOrder.totalAmount} TK</p>
-              <p><strong>Address:</strong> ${newOrder.address}</p>
+              <p><strong>Address:</strong> ${escapeHtml(newOrder.address)}</p>
             </div>`
         });
       } catch (emailErr) {
@@ -145,8 +224,9 @@ router.post('/', validate(createOrderSchema), asyncHandler(async (req, res) => {
 
     res.status(201).json(newOrder);
   } catch (err) {
-    await session.abortTransaction();
-    res.status(400).json({ message: err.message });
+    if (session.inTransaction()) await session.abortTransaction();
+    const status = err instanceof PricingError ? err.status : 400;
+    res.status(status).json({ message: err.message });
   } finally {
     session.endSession();
   }
@@ -284,8 +364,11 @@ router.put('/bulk-update', verifyAdmin, asyncHandler(async (req, res) => {
   res.json({ success: true, message: `${result.modifiedCount} orders updated` });
 }));
 
-// 5. PUT user cancellation (auth required) (✅ ATOMIC STOCK RESTORATION)
+// 5. PUT user cancellation (auth required — own orders only) (✅ ATOMIC STOCK RESTORATION)
 router.put('/:id/cancel', verifyUser, asyncHandler(async (req, res) => {
+  const userEmail = await getUserEmail(req.userId);
+  if (!userEmail) return res.status(403).json({ message: 'Access denied' });
+
   const session = await mongoose.startSession();
   session.startTransaction();
   
@@ -294,6 +377,11 @@ router.put('/:id/cancel', verifyUser, asyncHandler(async (req, res) => {
     if (!order) {
       await session.abortTransaction();
       return res.status(404).json({ message: 'Order not found' });
+    }
+    // 🔒 Only the customer who placed the order may cancel it
+    if ((order.customerEmail || '').toLowerCase() !== userEmail) {
+      await session.abortTransaction();
+      return res.status(403).json({ message: 'You can only cancel your own orders.' });
     }
     if (order.status.toLowerCase() !== 'pending') {
       await session.abortTransaction();
