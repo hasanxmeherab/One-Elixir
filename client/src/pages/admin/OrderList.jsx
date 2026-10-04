@@ -451,7 +451,9 @@ const OrderList = () => {
       order.customerName.toLowerCase().includes(s) ||
       order.phone.includes(s) ||
       order._id.slice(-6).toUpperCase().includes(s.toUpperCase());
-    const matchesPaymentStatus = paymentStatusFilter === 'ALL' || order.paymentStatus === paymentStatusFilter;
+    const orderPaymentStatus = order.paymentStatus || 'Unpaid';
+    const matchesPaymentStatus = paymentStatusFilter === 'ALL' ||
+      orderPaymentStatus.toLowerCase() === paymentStatusFilter.toLowerCase();
     const matchesPaymentMethod = paymentMethodFilter === 'ALL' || order.paymentMethod === paymentMethodFilter;
     const matchesOrderStatus = orderStatusFilter === 'ALL' || order.status === orderStatusFilter;
     // Date range filter
@@ -465,6 +467,82 @@ const OrderList = () => {
   });
   const totalPages = Math.ceil(allFiltered.length / PAGE_SIZE);
   const displayedOrders = allFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const isUnpaidSelected = paymentStatusFilter.toLowerCase() === 'unpaid';
+
+  // Stats for unpaid orders matching current filters
+  const unpaidStats = useMemo(() => {
+    if (!isUnpaidSelected) {
+      return {
+        totalAmount: 0,
+        count: 0,
+        deliveredAmount: 0,
+        deliveredCount: 0,
+        shippedAmount: 0,
+        shippedCount: 0,
+        processingAmount: 0,
+        processingCount: 0,
+        pendingAmount: 0,
+        pendingCount: 0,
+      };
+    }
+
+    let totalAmount = 0;
+    let deliveredAmount = 0;
+    let deliveredCount = 0;
+    let shippedAmount = 0;
+    let shippedCount = 0;
+    let processingAmount = 0;
+    let processingCount = 0;
+    let pendingAmount = 0;
+    let pendingCount = 0;
+
+    allFiltered.forEach(order => {
+      const amt = Number(order.totalAmount) || 0;
+      totalAmount += amt;
+
+      const status = (order.status || '').toLowerCase();
+      if (status === 'delivered') {
+        deliveredAmount += amt;
+        deliveredCount++;
+      } else if (status === 'shipped') {
+        shippedAmount += amt;
+        shippedCount++;
+      } else if (status === 'processing') {
+        processingAmount += amt;
+        processingCount++;
+      } else if (status === 'pending') {
+        pendingAmount += amt;
+        pendingCount++;
+      }
+    });
+
+    return {
+      totalAmount,
+      count: allFiltered.length,
+      deliveredAmount,
+      deliveredCount,
+      shippedAmount,
+      shippedCount,
+      processingAmount,
+      processingCount,
+      pendingAmount,
+      pendingCount,
+    };
+  }, [allFiltered, isUnpaidSelected]);
+
+  // Overall unpaid stats across all active/archived orders in this view (ignoring search/date filters)
+  const overallUnpaidStats = useMemo(() => {
+    if (!isUnpaidSelected) return { totalAmount: 0, count: 0 };
+    const allUnpaid = baseFiltered.filter(
+      o => (o.paymentStatus || 'Unpaid').toLowerCase() === 'unpaid'
+    );
+    const totalAmount = allUnpaid.reduce(
+      (sum, o) => sum + (Number(o.totalAmount) || 0),
+      0
+    );
+    return { totalAmount, count: allUnpaid.length };
+  }, [baseFiltered, isUnpaidSelected]);
 
   const getStatusClass = (status) => {
     if (status === 'Delivered') return 'bg-emerald-100 text-emerald-800';
@@ -496,11 +574,24 @@ const OrderList = () => {
             <option value="Canceled">CANCELED</option>
           </select>
           <select value={paymentStatusFilter} onChange={e => setPaymentStatusFilter(e.target.value)}
-            className="px-2 py-2 border border-[#ddd] text-[11px] outline-none cursor-pointer font-bold">
+            className={`px-2 py-2 border text-[11px] outline-none cursor-pointer font-bold transition-colors ${
+              paymentStatusFilter === 'Unpaid'
+                ? 'border-red-500 bg-red-50 text-red-700'
+                : paymentStatusFilter === 'Paid'
+                ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                : 'border-[#ddd] bg-white text-black'
+            }`}>
             <option value="ALL">ALL PAYMENT</option>
             <option value="Paid">PAID</option>
             <option value="Unpaid">UNPAID</option>
+            <option value="Pending Verification">PENDING VERIFICATION</option>
           </select>
+          {isUnpaidSelected && (
+            <div className="px-2.5 py-1.5 bg-red-50 border border-red-300 text-red-800 rounded text-[11px] font-bold tracking-wide flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-red-600"></span>
+              <span>UNPAID: <strong className="text-red-950 font-extrabold">{unpaidStats.totalAmount.toLocaleString()} TK</strong></span>
+            </div>
+          )}
           <select value={paymentMethodFilter} onChange={e => setPaymentMethodFilter(e.target.value)}
             className="px-2 py-2 border border-[#ddd] text-[11px] outline-none cursor-pointer font-bold">
             <option value="ALL">ALL METHODS</option>
@@ -553,6 +644,131 @@ const OrderList = () => {
           </button>
           <button onClick={() => setSelectedIds(new Set())}
             className="text-[10px] text-[#888] underline cursor-pointer bg-transparent border-none ml-auto">DESELECT ALL</button>
+        </div>
+      )}
+
+      {/* ── Unpaid Summary Banner ── */}
+      {isUnpaidSelected && (
+        <div className="mb-5 p-4 sm:p-5 bg-gradient-to-r from-red-50 via-rose-50/60 to-amber-50/40 border border-red-200 border-l-4 border-l-red-600 rounded-sm shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            {/* Primary Stat */}
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-full bg-red-100 border border-red-200 flex items-center justify-center text-red-600 font-extrabold text-2xl shrink-0 shadow-xs">
+                ৳
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold tracking-[1.5px] uppercase text-red-800">
+                    Total Unpaid Amount
+                  </span>
+                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-red-600 text-white tracking-wide">
+                    {unpaidStats.count} {unpaidStats.count === 1 ? 'ORDER' : 'ORDERS'}
+                  </span>
+                </div>
+                <div className="text-2xl sm:text-3xl font-black text-red-950 tracking-tight mt-0.5">
+                  {unpaidStats.totalAmount.toLocaleString()}{' '}
+                  <span className="text-base font-bold text-red-700">TK</span>
+                </div>
+                {allFiltered.length !== overallUnpaidStats.count && (
+                  <p className="text-[11px] text-red-700 m-0 mt-1">
+                    Filtered view ({unpaidStats.count} of {overallUnpaidStats.count} unpaid orders). Total across all unpaid:{' '}
+                    <span className="font-bold underline">{overallUnpaidStats.totalAmount.toLocaleString()} TK</span>
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Status Breakdown Pills */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 text-xs">
+              {unpaidStats.deliveredCount > 0 && (
+                <button
+                  type="button"
+                  title="Click to filter by Delivered"
+                  onClick={() => setOrderStatusFilter(orderStatusFilter === 'Delivered' ? 'ALL' : 'Delivered')}
+                  className={`px-3 py-2 border rounded-sm text-left transition-all cursor-pointer ${
+                    orderStatusFilter === 'Delivered'
+                      ? 'bg-emerald-100 border-emerald-500 ring-2 ring-emerald-500/20'
+                      : 'bg-white border-emerald-200 hover:border-emerald-400'
+                  }`}
+                >
+                  <div className="text-[9px] font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    Delivered (Due)
+                  </div>
+                  <div className="text-sm font-bold text-emerald-950 mt-0.5">
+                    {unpaidStats.deliveredAmount.toLocaleString()} TK
+                  </div>
+                  <div className="text-[10px] text-gray-500">{unpaidStats.deliveredCount} orders</div>
+                </button>
+              )}
+
+              {unpaidStats.shippedCount > 0 && (
+                <button
+                  type="button"
+                  title="Click to filter by Shipped"
+                  onClick={() => setOrderStatusFilter(orderStatusFilter === 'Shipped' ? 'ALL' : 'Shipped')}
+                  className={`px-3 py-2 border rounded-sm text-left transition-all cursor-pointer ${
+                    orderStatusFilter === 'Shipped'
+                      ? 'bg-violet-100 border-violet-500 ring-2 ring-violet-500/20'
+                      : 'bg-white border-violet-200 hover:border-violet-400'
+                  }`}
+                >
+                  <div className="text-[9px] font-bold text-violet-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-violet-500"></span>
+                    Shipped
+                  </div>
+                  <div className="text-sm font-bold text-violet-950 mt-0.5">
+                    {unpaidStats.shippedAmount.toLocaleString()} TK
+                  </div>
+                  <div className="text-[10px] text-gray-500">{unpaidStats.shippedCount} orders</div>
+                </button>
+              )}
+
+              {unpaidStats.processingCount > 0 && (
+                <button
+                  type="button"
+                  title="Click to filter by Processing"
+                  onClick={() => setOrderStatusFilter(orderStatusFilter === 'Processing' ? 'ALL' : 'Processing')}
+                  className={`px-3 py-2 border rounded-sm text-left transition-all cursor-pointer ${
+                    orderStatusFilter === 'Processing'
+                      ? 'bg-blue-100 border-blue-500 ring-2 ring-blue-500/20'
+                      : 'bg-white border-blue-200 hover:border-blue-400'
+                  }`}
+                >
+                  <div className="text-[9px] font-bold text-blue-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                    Processing
+                  </div>
+                  <div className="text-sm font-bold text-blue-950 mt-0.5">
+                    {unpaidStats.processingAmount.toLocaleString()} TK
+                  </div>
+                  <div className="text-[10px] text-gray-500">{unpaidStats.processingCount} orders</div>
+                </button>
+              )}
+
+              {unpaidStats.pendingCount > 0 && (
+                <button
+                  type="button"
+                  title="Click to filter by Pending"
+                  onClick={() => setOrderStatusFilter(orderStatusFilter === 'Pending' ? 'ALL' : 'Pending')}
+                  className={`px-3 py-2 border rounded-sm text-left transition-all cursor-pointer ${
+                    orderStatusFilter === 'Pending'
+                      ? 'bg-amber-100 border-amber-500 ring-2 ring-amber-500/20'
+                      : 'bg-white border-amber-200 hover:border-amber-400'
+                  }`}
+                >
+                  <div className="text-[9px] font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                    Pending
+                  </div>
+                  <div className="text-sm font-bold text-amber-950 mt-0.5">
+                    {unpaidStats.pendingAmount.toLocaleString()} TK
+                  </div>
+                  <div className="text-[10px] text-gray-500">{unpaidStats.pendingCount} orders</div>
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -690,6 +906,21 @@ const OrderList = () => {
               <tr><td colSpan="16" className="text-center py-12 text-gray-300">No orders found.</td></tr>
             )}
           </tbody>
+          {isUnpaidSelected && displayedOrders.length > 0 && (
+            <tfoot>
+              <tr className="bg-red-50/90 font-bold border-t-2 border-red-300 border-b border-red-200 text-red-950">
+                <td colSpan={7} className="py-3 px-2 text-right text-[11px] tracking-wider uppercase font-bold text-red-900">
+                  TOTAL UNPAID ({allFiltered.length} {allFiltered.length === 1 ? 'order' : 'orders'}):
+                </td>
+                <td className="py-3 px-2 text-xs font-black text-red-700 whitespace-nowrap">
+                  {unpaidStats.totalAmount.toLocaleString()} TK
+                </td>
+                <td colSpan={8} className="py-3 px-2 text-[10px] text-red-600 font-normal">
+                  {totalPages > 1 ? `(Page ${page} of ${totalPages} · Total across all ${totalPages} pages)` : ''}
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
 
