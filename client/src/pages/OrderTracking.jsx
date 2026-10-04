@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Package, CheckCircle, Truck, Clock, XCircle } from 'lucide-react';
 import { TrackingSkeleton } from '../components/Skeleton';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 const STEPS = [
   { key: 'Pending',    label: 'ORDER PLACED',  icon: Clock,       desc: 'Your order has been received and is awaiting confirmation.' },
@@ -29,6 +30,11 @@ const formatDeliveryDate = (date) =>
 
 const OrderTracking = () => {
   const { orderId } = useParams();
+  usePageMeta(
+    orderId ? `Track Order #${orderId.slice(-6).toUpperCase()} | OneElixir` : 'Track Your Order | OneElixir',
+    'Track the real-time status and delivery progress of your OneElixir perfume order.'
+  );
+
   const navigate = useNavigate();
   const [order, setOrder]     = useState(null);
   const [loading, setLoading] = useState(true);

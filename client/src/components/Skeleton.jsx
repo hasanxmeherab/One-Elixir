@@ -155,4 +155,28 @@ export const ReviewsSkeleton = ({ count = 3 }) => (
   </div>
 );
 
+// Full-page fallback skeleton for route transitions
+export const PageFallbackSkeleton = () => (
+  <div className="w-full min-h-[70vh] px-[6%] md:px-[10%] pt-12 pb-20 animate-pulse">
+    {/* Header banner shimmer */}
+    <div className="w-full max-w-xl mx-auto flex flex-col items-center gap-3 mb-14 text-center">
+      <Shimmer className="w-24 h-3 rounded-full" />
+      <Shimmer className="w-64 md:w-80 h-8 rounded-md" />
+      <Shimmer className="w-48 h-3 rounded-full" />
+    </div>
+
+    {/* Content cards grid shimmer */}
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="flex flex-col gap-3">
+          <Shimmer className="w-full h-[260px] rounded-lg" />
+          <Shimmer className="w-3/4 h-3.5 rounded" />
+          <Shimmer className="w-1/2 h-3 rounded" />
+          <Shimmer className="w-1/3 h-3 rounded" />
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 export default Shimmer;

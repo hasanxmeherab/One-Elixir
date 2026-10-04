@@ -1,10 +1,12 @@
-import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useWishlist } from '../context/WishlistContext';
 import { useCart } from '../context/CartContext';
 import { Heart, ShoppingBag, Trash2 } from 'lucide-react';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 const Wishlist = ({ openCart }) => {
+  usePageMeta('My Wishlist | OneElixir', 'View and manage your saved favorite luxury fragrances on OneElixir.');
+
   const { wishlist, removeFromWishlist } = useWishlist();
   const { addToCart } = useCart();
   const navigate = useNavigate();

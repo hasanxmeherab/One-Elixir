@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useToast } from '../context/ToastContext';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 const ResetPassword = () => {
+  usePageMeta('Reset Password | OneElixir', 'Enter your new password to restore access to your OneElixir account.');
+
   const toast = useToast();
   const { token } = useParams();
   const navigate = useNavigate();

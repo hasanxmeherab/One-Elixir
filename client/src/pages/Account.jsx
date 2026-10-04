@@ -5,11 +5,14 @@ import { AccountSkeleton } from '../components/Skeleton';
 import { useNavigate, Link } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import { MapPin, Plus, Trash2, Star, Home, Briefcase, Map, Camera, Eye, EyeOff, User, ShoppingBag } from 'lucide-react';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 const LABEL_ICONS = { Home: <Home size={13}/>, Work: <Briefcase size={13}/>, Other: <Map size={13}/> };
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 
 const Account = () => {
+  usePageMeta('My Account | OneElixir', 'Manage your OneElixir profile, shipping addresses, and review previous perfume orders.');
+
   const toast = useToast();
   const { user, updateUser } = useUser();
   const [orders, setOrders] = useState([]);

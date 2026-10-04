@@ -4,8 +4,11 @@ import { useUser } from '../context/UserContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import { ShoppingBag } from 'lucide-react';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 const Cart = () => {
+  usePageMeta('Shopping Cart | OneElixir', 'Review the selected perfumes in your OneElixir shopping cart before checkout.');
+
   const toast = useToast();
   const { cart, removeFromCart, addToCart, cartTotal } = useCart();
   const { user } = useUser();

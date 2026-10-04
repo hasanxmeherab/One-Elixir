@@ -7,7 +7,7 @@ const Review = require('../models/Review');
 const generateSitemap = require('../utils/generateSitemap');
 const sendEmail = require('../utils/sendEmail');
 const { verifyAdmin } = require('../middleware/authMiddleware');
-const { validate, createPerfumeSchema, updatePerfumeSchema } = require('../middleware/validate');
+const { validate, createPerfumeSchema } = require('../middleware/validate');
 
 
 
@@ -71,20 +71,11 @@ router.get('/', async (req, res) => {
     console.log(`[${req.id}] Fetched ${perfumes.length} perfumes from DB${search ? ' (search: ' + search + ')' : ''}`);
     res.json(perfumes);
   } catch (err) {
-    console.error(`[${req.id}] Perfumes fetch error:`, {
-      message: err.message,
-      stack: err.stack,
-      mongoState: require('mongoose').connection.readyState,
-      mongoConnected: require('mongoose').connection.readyState === 1
-    });
+    console.error(`[${req.id}] Perfumes fetch error:`, err);
     res.status(500).json({ 
       success: false, 
       message: 'Failed to fetch products', 
-      error: err.message,
-      debug: {
-        mongoState: require('mongoose').connection.readyState,
-        mongoConnected: require('mongoose').connection.readyState === 1
-      }
+      error: err.message
     });
   }
 });
@@ -154,11 +145,7 @@ router.get('/best-sellers', async (req, res) => {
     console.log(`[${req.id}] Fetched ${sorted.length} best-sellers from DB`);
     res.json(sorted);
   } catch (err) {
-    console.error(`[${req.id}] Best-sellers fetch error:`, {
-      message: err.message,
-      stack: err.stack,
-      mongoState: require('mongoose').connection.readyState
-    });
+    console.error(`[${req.id}] Best-sellers fetch error:`, err);
     res.status(500).json({ message: err.message, error: err.message });
   }
 });
@@ -246,11 +233,7 @@ router.get('/ratings', async (req, res) => {
     console.log(`[${req.id}] Fetched ratings for ${ratings.length} products from DB`);
     res.json(map);
   } catch (err) {
-    console.error(`[${req.id}] Ratings fetch error:`, {
-      message: err.message,
-      stack: err.stack,
-      mongoState: require('mongoose').connection.readyState
-    });
+    console.error(`[${req.id}] Ratings fetch error:`, err);
     res.status(500).json({ success: false, message: 'Failed to fetch ratings', error: err.message });
   }
 });

@@ -6,21 +6,13 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { Heart, Star, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { optimizeImage } from '../utils/optimizeImage';
+import { getCountdown } from '../utils/countdown';
 
 // ── Flash Sale Countdown Hook ─────────────────────────────────
 const useCountdown = (endsAt) => {
-  const calc = () => {
-    const diff = new Date(endsAt) - new Date();
-    if (diff <= 0) return null;
-    return {
-      h: String(Math.floor(diff / 3600000)).padStart(2, '0'),
-      m: String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0'),
-      s: String(Math.floor((diff % 60000) / 1000)).padStart(2, '0'),
-    };
-  };
-  const [time, setTime] = useState(calc);
+  const [time, setTime] = useState(() => getCountdown(endsAt));
   useEffect(() => {
-    const t = setInterval(() => setTime(calc()), 1000);
+    const t = setInterval(() => setTime(getCountdown(endsAt)), 1000);
     return () => clearInterval(t);
   }, [endsAt]);
   return time;

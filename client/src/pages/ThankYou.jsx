@@ -1,8 +1,10 @@
-import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { CheckCircle } from 'lucide-react';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 const ThankYou = () => {
+  usePageMeta('Order Confirmed | OneElixir', 'Your OneElixir perfume order has been placed successfully.');
+
   const { state } = useLocation();
   const order = state?.order || null;
 

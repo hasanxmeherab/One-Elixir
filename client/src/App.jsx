@@ -18,6 +18,8 @@ import Account from './pages/Account';
 import Wishlist from './pages/Wishlist';
 import OrderTracking from './pages/OrderTracking';
 import Bundles from './pages/Bundles';
+import NotFound from './pages/NotFound';
+import { PageFallbackSkeleton } from './components/Skeleton';
 
 // --- COMPONENTS ---
 import Navbar from './components/Navbar';
@@ -65,7 +67,7 @@ const AppContent = () => {
     <>      {!isHideNavbar && <Navbar onCartClick={() => console.log("Cart Open")} />}
       
       <div style={{ minHeight: '80vh' }} className={!isHideNavbar ? 'pb-16 md:pb-0' : ''}>
-        <Suspense fallback={<div style={{ textAlign: 'center', padding: '60px 0', color: '#999', letterSpacing: '2px', fontSize: '13px' }}>Loading...</div>}>
+        <Suspense fallback={<PageFallbackSkeleton />}>
         <div key={location.pathname} className="page-transition">
         <Routes>
           <Route path="/" element={<Home />} />
@@ -110,13 +112,7 @@ const AppContent = () => {
           <Route path="/track/:orderId" element={<OrderTracking />} />
           <Route path="/track" element={<OrderTracking />} />
           <Route path="/bundles" element={<Bundles />} />
-          <Route path="*" element={
-            <div style={{ textAlign: 'center', padding: '120px 20px', minHeight: '60vh' }}>
-              <h1 style={{ fontSize: '72px', fontWeight: 200, letterSpacing: '8px', marginBottom: '16px' }}>404</h1>
-              <p style={{ fontSize: '12px', letterSpacing: '3px', color: '#888', marginBottom: '32px' }}>PAGE NOT FOUND</p>
-              <a href="/" style={{ background: '#000', color: '#fff', padding: '14px 36px', textDecoration: 'none', fontSize: '11px', fontWeight: 'bold', letterSpacing: '3px' }}>BACK TO HOME</a>
-            </div>
-          } />
+          <Route path="*" element={<NotFound />} />
         </Routes>
         </div>
         </Suspense>

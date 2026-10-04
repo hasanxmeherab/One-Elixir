@@ -6,8 +6,11 @@ import { useWishlist } from '../context/WishlistContext';
 import { Eye, EyeOff } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { GoogleLogin } from '@react-oauth/google';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 const SignIn = () => {
+  usePageMeta('Sign In | OneElixir', 'Sign in to your OneElixir account to track orders and manage your saved perfumes.');
+
   const toast = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

@@ -4,10 +4,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import { optimizeImage } from '../utils/optimizeImage';
 import { useDebounce } from '../hooks/useDebounce';
+import { usePageMeta } from '../hooks/usePageMeta';
+import { getCountdown } from '../utils/countdown';
 
 const PAGE_SIZE = 12;
 
 const Collection = () => {
+  usePageMeta('The Collection | OneElixir Perfumes', 'Browse our complete catalog of luxury perfumes, signature scents, and handcrafted elixirs.');
+
   const [perfumes, setPerfumes]     = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearch = useDebounce(searchTerm, 350); // ⚡ only recomputes after user pauses
@@ -99,15 +103,6 @@ const Collection = () => {
     if (p.flashSale?.active && p.flashSale?.salePrice && new Date(p.flashSale.endsAt) > now)
       return p.flashSale.salePrice;
     return null;
-  };
-
-  const getCountdown = (endsAt) => {
-    const diff = new Date(endsAt) - now;
-    if (diff <= 0) return null;
-    const h = String(Math.floor(diff / 3600000)).padStart(2, '0');
-    const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
-    const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
-    return { h, m, s };
   };
 
   return (
@@ -235,8 +230,8 @@ const Collection = () => {
                   {salePrice && (
                     <div className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 text-[9px] font-bold tracking-[2px]">🔥 SALE</div>
                   )}
-                  {salePrice && getCountdown(p.flashSale?.endsAt) && (() => {
-                    const cd = getCountdown(p.flashSale.endsAt);
+                  {salePrice && getCountdown(p.flashSale?.endsAt, now) && (() => {
+                    const cd = getCountdown(p.flashSale.endsAt, now);
                     return (
                       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-3 py-2.5 flex items-center justify-center gap-1.5">
                         <span className="text-[9px] text-white/70 font-bold tracking-wider">ENDS IN</span>

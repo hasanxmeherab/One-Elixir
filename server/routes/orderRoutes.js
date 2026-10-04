@@ -12,7 +12,7 @@ const User           = require('../models/User');
 const { Resend } = require('resend');
 
 const { verifyAdmin, verifyUser } = require('../middleware/authMiddleware');
-const { validate, createOrderSchema, updateOrderSchema, quoteOrderSchema, createWebOrderSchema } = require('../middleware/validate');
+const { validate, createOrderSchema, quoteOrderSchema, createWebOrderSchema } = require('../middleware/validate');
 const { priceOrder, PricingError } = require('../utils/pricing');
 
 const resend = new Resend(process.env.RESEND_API_KEY);

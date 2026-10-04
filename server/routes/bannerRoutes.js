@@ -18,11 +18,7 @@ router.get('/', async (req, res) => {
     console.log(`[${req.id}] Fetched ${banners.length} active banners from DB`);
     res.json(banners);
   } catch (err) {
-    console.error(`[${req.id}] Banner fetch error:`, {
-      message: err.message,
-      stack: err.stack,
-      mongoState: require('mongoose').connection.readyState
-    });
+    console.error(`[${req.id}] Banner fetch error:`, err);
     res.status(500).json({ success: false, message: 'Failed to fetch banners', error: err.message });
   }
 });

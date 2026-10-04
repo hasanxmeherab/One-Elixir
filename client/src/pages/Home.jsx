@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { HomeSkeleton } from '../components/Skeleton';
 import axios from 'axios';
 import { useCart } from '../context/CartContext';
 import { Link, useNavigate } from 'react-router-dom';
@@ -7,6 +6,8 @@ import { Star, ChevronLeft, ChevronRight } from 'lucide-react';
 // ⚡ Lazy-load BannerManagement so it doesn't inflate the customer-facing bundle
 const BannerManagement = lazy(() => import('./admin/BannerManagement'));
 import { optimizeImage } from '../utils/optimizeImage';
+import { usePageMeta } from '../hooks/usePageMeta';
+import { getCountdown } from '../utils/countdown';
 
 /* ─── Horizontal scroll carousel hook ─── */
 const useCarousel = () => {
@@ -238,6 +239,8 @@ const FlashCarousel = ({ products, getCountdown, addToCart, navigate }) => {
 
 /* ══════════════════════════════════════ */
 const Home = () => {
+  usePageMeta('OneElixir | Luxury Artisanal Fragrances & Scents', 'Discover luxury bespoke fragrances and artisanal scents crafted for excellence at OneElixir.');
+
   const [perfumes, setPerfumes]       = useState([]);
   const [bestSellers, setBestSellers] = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -299,14 +302,7 @@ const Home = () => {
     return () => clearInterval(id);
   }, [flashSaleProducts.length > 0]);
 
-  const getCountdown = (endsAt) => {
-    const diff = new Date(endsAt) - now;
-    if (diff <= 0) return null;
-    const h = String(Math.floor(diff / 3600000)).padStart(2, '0');
-    const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
-    const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
-    return { h, m, s };
-  };
+  const calcCountdown = (endsAt) => getCountdown(endsAt, now);
 
   return (
     <div style={{ backgroundColor: '#fff' }}>
@@ -350,7 +346,7 @@ const Home = () => {
 
             {/* Cards with side arrows */}
             <div className="relative mt-2">
-              <FlashCarousel products={flashSaleProducts} getCountdown={getCountdown} addToCart={addToCart} navigate={navigate} />
+              <FlashCarousel products={flashSaleProducts} getCountdown={calcCountdown} addToCart={addToCart} navigate={navigate} />
             </div>
           </div>
         </section>

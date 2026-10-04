@@ -7,8 +7,11 @@ import Select from 'react-select';
 import locationData from '../data/locationData.json'; 
 import { useToast } from '../context/ToastContext';
 import { ImagePlus, Check } from 'lucide-react';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 const Checkout = () => {
+  usePageMeta('Checkout | OneElixir', 'Complete your fragrance order securely with Cash on Delivery or Mobile Banking.');
+
   const toast = useToast();
   const { cart, cartTotal, clearCart } = useCart();
   const { user } = useUser();

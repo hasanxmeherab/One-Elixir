@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 const Bundles = () => {
+  usePageMeta('Curated Bundles & Sets | OneElixir', 'Explore exclusive fragrance sets and perfume bundles at special prices.');
+
   const [bundles, setBundles] = useState([]);
   const [loading, setLoading] = useState(true);
   const { addToCart } = useCart();

@@ -1,37 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import axios from 'axios';
 import adminAxios from '../../utils/adminAxios';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useOutletContext } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
-
+import Pagination from '../../components/Pagination';
+import PaymentDetailsModal from './order-modals/PaymentDetailsModal';
+import EditPaymentModal from './order-modals/EditPaymentModal';
+import EditOrderModal from './order-modals/EditOrderModal';
+import OrderNotesModal from './order-modals/OrderNotesModal';
+import CustomerHistoryDrawer from './order-modals/CustomerHistoryDrawer';
+import PaymentReceiverModal from './order-modals/PaymentReceiverModal';
 
 const PAGE_SIZE = 15;
-
-const Pagination = ({ page, totalPages, onPageChange }) => {
-  if (totalPages <= 1) return null;
-  return (
-    <div className="flex justify-center items-center gap-2 mt-8">
-      <button onClick={() => onPageChange(page - 1)} disabled={page === 1}
-        className="px-4 py-2 border border-[#ddd] text-xs font-bold tracking-wider disabled:opacity-30 hover:border-black transition-colors cursor-pointer bg-white">
-        ← PREV
-      </button>
-      {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
-        <button key={n} onClick={() => onPageChange(n)}
-          className={`w-9 h-9 text-xs font-bold border transition-colors cursor-pointer ${n === page ? 'bg-black text-white border-black' : 'bg-white border-[#ddd] hover:border-black'
-            }`}>
-          {n}
-        </button>
-      ))}
-      <button onClick={() => onPageChange(page + 1)} disabled={page === totalPages}
-        className="px-4 py-2 border border-[#ddd] text-xs font-bold tracking-wider disabled:opacity-30 hover:border-black transition-colors cursor-pointer bg-white">
-        NEXT →
-      </button>
-    </div>
-  );
-};
 
 const OrderList = () => {
   const { orders = [], perfumes = [], fetchData } = useOutletContext();
@@ -925,372 +907,63 @@ const OrderList = () => {
       </div>
 
       {/* ── Payment Info Modal ── */}
-      {selectedPayment && (
-        <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-[3000]" onClick={() => setSelectedPayment(null)}>
-          <div className="bg-white p-8 w-[350px] flex flex-col gap-2.5" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-[13px] tracking-[2px] m-0 font-bold">PAYMENT DETAILS</h3>
-              <button onClick={() => setSelectedPayment(null)} className="bg-transparent border-none text-lg cursor-pointer text-gray-400">×</button>
-            </div>
-            <div className="flex flex-col gap-2.5">
-              {selectedPayment.platform && (
-                <div className="flex justify-between items-center py-2 border-b border-[#f0f0f0]">
-                  <span className="text-[10px] font-bold tracking-wider text-gray-400">PLATFORM</span>
-                  <span className="text-xs text-gray-600">{selectedPayment.platform}</span>
-                </div>
-              )}
-              <div className="flex justify-between items-center py-2 border-b border-[#f0f0f0]">
-                <span className="text-[10px] font-bold tracking-wider text-gray-400">SENDER NUMBER</span>
-                <span className="text-xs text-gray-600">{selectedPayment.senderNumber || '—'}</span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-[#f0f0f0]">
-                <span className="text-[10px] font-bold tracking-wider text-gray-400">TRANSACTION ID</span>
-                <span className="text-xs font-mono font-bold text-black tracking-wider">{selectedPayment.transactionId || '—'}</span>
-              </div>
-              {selectedPayment.amountPaid && (
-                <div className="flex justify-between items-center py-2 border-b border-[#f0f0f0]">
-                  <span className="text-[10px] font-bold tracking-wider text-gray-400">AMOUNT PAID</span>
-                  <span className="text-xs font-bold text-emerald-700">{selectedPayment.amountPaid} TK</span>
-                </div>
-              )}
-            </div>
-            {selectedPayment.screenshot && (
-              <div className="mt-2">
-                <p className="text-[10px] font-bold tracking-wider text-gray-400 mb-2">PAYMENT SCREENSHOT</p>
-                <a href={selectedPayment.screenshot} target="_blank" rel="noreferrer">
-                  <img src={selectedPayment.screenshot} alt="Payment proof" className="w-full max-h-[280px] object-contain border border-[#eee] cursor-zoom-in" />
-                  <p className="text-[10px] text-gray-400 text-center mt-1">Click to open full size</p>
-                </a>
-              </div>
-            )}
-            <button onClick={() => setSelectedPayment(null)}
-              className="bg-black text-white border-none p-2.5 cursor-pointer font-bold mt-4 tracking-wider">CLOSE</button>
-          </div>
-        </div>
-      )}
+      <PaymentDetailsModal
+        payment={selectedPayment}
+        onClose={() => setSelectedPayment(null)}
+      />
 
       {/* ── Edit Payment Modal ── */}
-      {editPaymentOrder && (
-        <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-[3000]" onClick={() => setEditPaymentOrder(null)}>
-          <div className="bg-white p-8 w-[400px] flex flex-col gap-2.5" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-[13px] tracking-[2px] m-0 font-bold">EDIT PAYMENT INFO</h3>
-              <button onClick={() => setEditPaymentOrder(null)} className="bg-transparent border-none text-lg cursor-pointer text-gray-400">×</button>
-            </div>
-            <p className="text-[11px] text-gray-400 mb-1">{editPaymentOrder.paymentMethod} — {editPaymentOrder.customerName}</p>
-            <div className="flex flex-col gap-2.5">
-              <input type="tel" placeholder="Sender Number" inputMode="numeric"
-                value={editPaymentForm.senderNumber}
-                onChange={e => setEditPaymentForm({ ...editPaymentForm, senderNumber: e.target.value.replace(/\D/g, '') })}
-                className="p-2.5 border border-[#ddd] text-[13px] outline-none" />
-              <input type="text" placeholder="Transaction ID"
-                value={editPaymentForm.transactionId}
-                onChange={e => setEditPaymentForm({ ...editPaymentForm, transactionId: e.target.value })}
-                className="p-2.5 border border-[#ddd] text-[13px] outline-none" />
-              <label className={`flex flex-col items-center gap-1.5 p-4 border-2 border-dashed cursor-pointer rounded transition-colors ${editPaymentForm.screenshot || editPaymentForm.screenshotUrl ? 'border-black bg-green-50' : 'border-[#ddd] bg-[#fafafa]'}`}>
-                <span className="text-[11px] font-bold tracking-wider">
-                  {editPaymentForm.screenshot ? '✓ ' + editPaymentForm.screenshot.name : editPaymentForm.screenshotUrl ? '✓ SCREENSHOT SAVED — CLICK TO REPLACE' : 'CLICK TO UPLOAD SCREENSHOT'}
-                </span>
-                <input type="file" accept="image/*" className="hidden"
-                  onChange={e => setEditPaymentForm({ ...editPaymentForm, screenshot: e.target.files[0] })} />
-              </label>
-              {editPaymentForm.screenshotUrl && !editPaymentForm.screenshot && (
-                <img src={editPaymentForm.screenshotUrl} alt="Current screenshot"
-                  className="w-full max-h-[160px] object-contain border border-[#eee]" />
-              )}
-            </div>
-            <button onClick={savePaymentDetails} disabled={editUploading}
-              className={`bg-black text-white border-none p-2.5 cursor-pointer font-bold mt-4 tracking-wider transition-opacity ${editUploading ? 'opacity-60' : ''}`}>
-              {editUploading ? 'SAVING...' : 'SAVE PAYMENT INFO'}
-            </button>
-          </div>
-        </div>
-      )}
+      <EditPaymentModal
+        order={editPaymentOrder}
+        form={editPaymentForm}
+        setForm={setEditPaymentForm}
+        uploading={editUploading}
+        onSave={savePaymentDetails}
+        onClose={() => setEditPaymentOrder(null)}
+      />
 
-      {/* ── NEW: Full Edit Order Modal ── */}
-      {editOrder && editForm && (
-        <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-[3000] overflow-y-auto py-10" onClick={() => { setEditOrder(null); setEditForm(null); }}>
-          <div className="bg-white p-5 sm:p-6 w-[95vw] max-w-[650px] max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-[13px] tracking-[2px] m-0 font-bold">EDIT ORDER #{editOrder._id.slice(-6).toUpperCase()}</h3>
-              <button onClick={() => { setEditOrder(null); setEditForm(null); }} className="bg-transparent border-none text-lg cursor-pointer text-gray-400">×</button>
-            </div>
+      {/* ── Full Edit Order Modal ── */}
+      <EditOrderModal
+        editOrder={editOrder}
+        editForm={editForm}
+        setEditForm={setEditForm}
+        perfumes={perfumes}
+        addEditItem={addEditItem}
+        removeEditItem={removeEditItem}
+        updateEditItem={updateEditItem}
+        calcEditTotal={calcEditTotal}
+        editSaving={editSaving}
+        onSave={saveEditOrder}
+        onClose={() => { setEditOrder(null); setEditForm(null); }}
+      />
 
-            {/* Customer Info */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-              <div>
-                <label className="block text-[10px] font-bold tracking-wider text-[#888] mb-1">CUSTOMER NAME *</label>
-                <input value={editForm.customerName} onChange={e => setEditForm({ ...editForm, customerName: e.target.value })}
-                  className="w-full p-2.5 border border-[#ddd] text-[13px] outline-none box-border" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold tracking-wider text-[#888] mb-1">PHONE *</label>
-                <input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
-                  className="w-full p-2.5 border border-[#ddd] text-[13px] outline-none box-border" />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-[10px] font-bold tracking-wider text-[#888] mb-1">ADDRESS</label>
-                <input value={editForm.address} onChange={e => setEditForm({ ...editForm, address: e.target.value })}
-                  className="w-full p-2.5 border border-[#ddd] text-[13px] outline-none box-border" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold tracking-wider text-[#888] mb-1">EMAIL</label>
-                <input value={editForm.customerEmail} onChange={e => setEditForm({ ...editForm, customerEmail: e.target.value })}
-                  className="w-full p-2.5 border border-[#ddd] text-[13px] outline-none box-border" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold tracking-wider text-[#888] mb-1">PAYMENT METHOD</label>
-                <select value={editForm.paymentMethod} onChange={e => setEditForm({ ...editForm, paymentMethod: e.target.value })}
-                  className="w-full p-2.5 border border-[#ddd] text-[13px] outline-none cursor-pointer box-border">
-                  <option value="Cash on Delivery">Cash on Delivery</option>
-                  <option value="Full Payment">Full Payment</option>
-                  <option value="Bkash">Bkash</option>
-                  <option value="Nagad">Nagad</option>
-                  <option value="Bank Transfer">Bank Transfer</option>
-                </select>
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-[10px] font-bold tracking-wider text-[#888] mb-1">ORDER DATE</label>
-                <input type="datetime-local" value={editForm.orderDate} onChange={e => setEditForm({ ...editForm, orderDate: e.target.value })}
-                  className="w-full p-2.5 border border-[#ddd] text-[13px] outline-none box-border" />
-              </div>
-            </div>
+      {/* ── Notes Modal ── */}
+      <OrderNotesModal
+        order={notesOrder}
+        noteText={noteText}
+        setNoteText={setNoteText}
+        onAddNote={addNote}
+        onClose={() => setNotesOrder(null)}
+      />
 
-            {/* Items */}
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-[10px] font-bold tracking-wider text-[#888]">ORDER ITEMS</label>
-                <button onClick={addEditItem}
-                  className="text-[10px] font-bold border border-[#ddd] px-2 py-1 cursor-pointer hover:border-black transition-colors bg-white">
-                  + ADD ITEM
-                </button>
-              </div>
-              {editForm.items.map((item, idx) => {
-                let itemSubtotal = item.price;
-                if (item.discountType === 'percentage') itemSubtotal = itemSubtotal - (itemSubtotal * item.discountValue / 100);
-                else if (item.discountType === 'fixed') itemSubtotal = itemSubtotal - (item.discountValue || 0);
-                itemSubtotal = Math.max(0, itemSubtotal) * item.quantity;
-
-                return (
-                  <div key={idx} className="border border-[#eee] p-3 mb-2 rounded relative">
-                    {editForm.items.length > 1 && (
-                      <button onClick={() => removeEditItem(idx)}
-                        className="absolute top-2 right-2 text-red-400 cursor-pointer bg-transparent border-none text-base hover:text-red-600">×</button>
-                    )}
-                    {/* Row 1: Product selector */}
-                    <div className="mb-2">
-                      <label className="text-[9px] text-[#aaa] block mb-0.5">Product</label>
-                      <select value={item.perfumeId || ''} onChange={e => updateEditItem(idx, 'perfumeId', e.target.value)}
-                        className="w-full p-1.5 border border-[#ddd] text-[11px] outline-none box-border">
-                        <option value="">— Custom —</option>
-                        {perfumes.map(p => <option key={p._id} value={p._id}>{p.name} ({p.price} TK)</option>)}
-                      </select>
-                      {!item.perfumeId && (
-                        <input value={item.name} onChange={e => updateEditItem(idx, 'name', e.target.value)}
-                          placeholder="Item name" className="w-full p-1.5 border border-[#ddd] text-[11px] outline-none mt-1 box-border" />
-                      )}
-                    </div>
-                    {/* Row 2: Price, Qty, Discount, Subtotal */}
-                    <div className="flex flex-wrap gap-2 items-end">
-                      <div className="w-20">
-                        <label className="text-[9px] text-[#aaa] block mb-0.5">Price</label>
-                        <input type="number" value={item.price} onChange={e => updateEditItem(idx, 'price', Number(e.target.value))}
-                          className="w-full p-1.5 border border-[#ddd] text-[11px] outline-none box-border" />
-                      </div>
-                      <div className="w-14">
-                        <label className="text-[9px] text-[#aaa] block mb-0.5">Qty</label>
-                        <input type="number" min="1" value={item.quantity} onChange={e => updateEditItem(idx, 'quantity', Number(e.target.value) || 1)}
-                          className="w-full p-1.5 border border-[#ddd] text-[11px] outline-none box-border" />
-                      </div>
-                      <div>
-                        <label className="text-[9px] text-[#aaa] block mb-0.5">Discount</label>
-                        <div className="flex gap-1">
-                          <select value={item.discountType} onChange={e => updateEditItem(idx, 'discountType', e.target.value)}
-                            className="p-1.5 border border-[#ddd] text-[10px] outline-none w-16">
-                            <option value="none">None</option>
-                            <option value="fixed">Fixed</option>
-                            <option value="percentage">%</option>
-                          </select>
-                          {item.discountType !== 'none' && (
-                            <input type="number" value={item.discountValue} onChange={e => updateEditItem(idx, 'discountValue', Number(e.target.value))}
-                              className="p-1.5 border border-[#ddd] text-[10px] outline-none w-14 box-border" />
-                          )}
-                        </div>
-                      </div>
-                      <div className="ml-auto text-right">
-                        <label className="text-[9px] text-[#aaa] block mb-0.5">Subtotal</label>
-                        <p className="text-[12px] font-bold m-0">{itemSubtotal.toLocaleString()} TK</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Shipping + Total */}
-            <div className="flex flex-wrap items-center gap-4 border-t border-[#eee] pt-4">
-              <div>
-                <label className="text-[10px] font-bold text-[#888] block mb-1">SHIPPING</label>
-                <input type="number" value={editForm.shippingCost} onChange={e => setEditForm({ ...editForm, shippingCost: Number(e.target.value) })}
-                  className="w-24 p-2 border border-[#ddd] text-sm outline-none box-border" />
-              </div>
-              <div className="ml-auto text-right">
-                <span className="text-[10px] text-[#888] font-bold">GRAND TOTAL</span>
-                <p className="text-xl font-bold m-0">{calcEditTotal(editForm).toLocaleString()} TK</p>
-              </div>
-            </div>
-
-            <button onClick={saveEditOrder} disabled={editSaving}
-              className="w-full bg-black text-white border-none p-3 cursor-pointer font-bold tracking-wider mt-5 hover:bg-gray-800 transition-colors disabled:opacity-60">
-              {editSaving ? 'SAVING ORDER...' : 'SAVE CHANGES'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── NEW: Notes Modal ── */}
-      {notesOrder && (
-        <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-[3000]" onClick={() => setNotesOrder(null)}>
-          <div className="bg-white p-6 w-[420px] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-[13px] tracking-[2px] m-0 font-bold">ORDER NOTES</h3>
-              <button onClick={() => setNotesOrder(null)} className="bg-transparent border-none text-lg cursor-pointer text-gray-400">×</button>
-            </div>
-            <p className="text-[11px] text-[#888] mb-3">#{notesOrder._id.slice(-6).toUpperCase()} — {notesOrder.customerName}</p>
-
-            {/* Existing notes */}
-            <div className="flex-1 overflow-y-auto mb-4 max-h-[300px]">
-              {(!notesOrder.adminNotes || notesOrder.adminNotes.length === 0) ? (
-                <p className="text-xs text-[#ccc] text-center py-6">No notes yet.</p>
-              ) : (
-                notesOrder.adminNotes.map((note, i) => (
-                  <div key={i} className="border-b border-[#f0f0f0] py-3">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-[10px] font-bold text-[#555]">{note.adminName}</span>
-                      <span className="text-[9px] text-[#aaa]">{new Date(note.createdAt).toLocaleString()}</span>
-                    </div>
-                    <p className="text-[12px] text-[#333] leading-relaxed">{note.text}</p>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Add note */}
-            <div className="flex gap-2 border-t border-[#eee] pt-3">
-              <input value={noteText} onChange={e => setNoteText(e.target.value)}
-                placeholder="Add a note..." onKeyDown={e => e.key === 'Enter' && addNote()}
-                className="flex-1 p-2.5 border border-[#ddd] text-[13px] outline-none" />
-              <button onClick={addNote} disabled={!noteText.trim()}
-                className="bg-black text-white border-none px-4 cursor-pointer font-bold text-[11px] disabled:opacity-40">
-                ADD
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── NEW: Customer History Side Panel ── */}
-      {customerHistory && (
-        <div className="fixed inset-0 bg-black/80 flex justify-end z-[3000]" onClick={() => setCustomerHistory(null)}>
-          <div className="bg-white w-[450px] h-full overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-[13px] tracking-[2px] m-0 font-bold">CUSTOMER HISTORY</h3>
-              <button onClick={() => setCustomerHistory(null)} className="bg-transparent border-none text-lg cursor-pointer text-gray-400">×</button>
-            </div>
-
-            <div className="mb-6">
-              <h4 className="text-lg font-bold mb-1">{customerHistory.name}</h4>
-              <p className="text-sm text-[#666]">{customerHistory.phone}</p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3 mb-6">
-              <div className="p-3 bg-[#f9f9f9] border border-[#eee] text-center">
-                <p className="text-[10px] font-bold text-[#888] tracking-wider">TOTAL ORDERS</p>
-                <p className="text-xl font-bold">{customerHistory.orders.length}</p>
-              </div>
-              <div className="p-3 bg-[#f9f9f9] border border-[#eee] text-center">
-                <p className="text-[10px] font-bold text-[#888] tracking-wider">TOTAL SPENT</p>
-                <p className="text-xl font-bold">{customerHistory.totalSpent.toLocaleString()}</p>
-              </div>
-              <div className="p-3 bg-[#f9f9f9] border border-[#eee] text-center">
-                <p className="text-[10px] font-bold text-[#888] tracking-wider">AVG ORDER</p>
-                <p className="text-xl font-bold">
-                  {customerHistory.orders.length ? Math.round(customerHistory.totalSpent / customerHistory.orders.filter(o => o.status?.toLowerCase() === 'delivered').length || 1).toLocaleString() : 0}
-                </p>
-              </div>
-            </div>
-
-            <p className="text-[10px] font-bold text-[#888] tracking-wider mb-3">ORDER HISTORY</p>
-            {customerHistory.orders.map(o => (
-              <div key={o._id} className="border-b border-[#f0f0f0] py-3">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-[11px] font-mono text-[#888]">#{o._id.slice(-6).toUpperCase()}</span>
-                  <span className={`px-2 py-0.5 rounded-sm text-[9px] font-bold ${getStatusClass(o.status)}`}>{o.status}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-[11px] text-[#666]">{new Date(o.createdAt).toLocaleDateString()}</span>
-                  <span className="text-[12px] font-bold">{o.totalAmount.toLocaleString()} TK</span>
-                </div>
-                <div className="text-[10px] text-[#999] mt-1">
-                  {o.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* ── Customer History Side Panel ── */}
+      <CustomerHistoryDrawer
+        customerHistory={customerHistory}
+        getStatusClass={getStatusClass}
+        onClose={() => setCustomerHistory(null)}
+      />
 
       {/* ── Payment Receiver Selection Modal ── */}
-      {receiverModal && (
-        <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-[3000]" onClick={() => { setReceiverModal(null); setSelectedReceiver(null); }}>
-          <div className="bg-white p-6 w-[380px] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-[13px] tracking-[2px] m-0 font-bold">WHO RECEIVED PAYMENT?</h3>
-              <button onClick={() => { setReceiverModal(null); setSelectedReceiver(null); }} className="bg-transparent border-none text-lg cursor-pointer text-gray-400">×</button>
-            </div>
-            <p className="text-[11px] text-[#888] mb-4">
-              {receiverModal.bulk
-                ? `Select the admin who received payment for ${selectedIds.size} order(s).`
-                : 'Select the admin who received this payment.'}
-            </p>
-
-            <div className="flex flex-col gap-1.5 mb-5 max-h-[300px] overflow-y-auto">
-              {adminList.map(admin => (
-                <label key={admin._id}
-                  className={`flex items-center gap-3 p-3 border cursor-pointer transition-colors ${
-                    selectedReceiver === admin._id
-                      ? 'border-black bg-gray-50'
-                      : 'border-[#eee] hover:border-gray-300'
-                  }`}>
-                  <input type="radio" name="paymentReceiver" value={admin._id}
-                    checked={selectedReceiver === admin._id}
-                    onChange={() => setSelectedReceiver(admin._id)}
-                    className="cursor-pointer" />
-                  <div className="flex-1">
-                    <div className="text-[12px] font-bold">
-                      {admin.name}
-                      {admin._id === adminData?.id && (
-                        <span className="ml-2 text-[9px] bg-black text-white px-1.5 py-0.5 rounded-sm">YOU</span>
-                      )}
-                    </div>
-                    <div className="text-[10px] text-gray-400">
-                      {admin.role === 'superadmin' ? '⭐ Super Admin (Cashier)' : 'Admin'}
-                    </div>
-                  </div>
-                </label>
-              ))}
-              {adminList.length === 0 && (
-                <p className="text-[11px] text-[#ccc] text-center py-6">Loading admins...</p>
-              )}
-            </div>
-
-            <button onClick={confirmPaymentReceiver} disabled={!selectedReceiver}
-              className="w-full bg-black text-white border-none p-3 cursor-pointer font-bold tracking-wider hover:bg-gray-800 transition-colors disabled:opacity-40">
-              CONFIRM PAYMENT RECEIVED
-            </button>
-          </div>
-        </div>
-      )}
+      <PaymentReceiverModal
+        receiverModal={receiverModal}
+        selectedReceiver={selectedReceiver}
+        setSelectedReceiver={setSelectedReceiver}
+        adminList={adminList}
+        adminData={adminData}
+        selectedCount={selectedIds.size}
+        onConfirm={confirmPaymentReceiver}
+        onClose={() => { setReceiverModal(null); setSelectedReceiver(null); }}
+      />
 
       <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
     </div>
