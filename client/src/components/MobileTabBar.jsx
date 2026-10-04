@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, Search, ShoppingBag, Heart, User } from 'lucide-react';
 import { useCart } from '../context/CartContext';
@@ -12,7 +12,7 @@ const TABS = [
   { path: '/account',    icon: User,        label: 'YOU' },
 ];
 
-const MobileTabBar = () => {
+const MobileTabBar = memo(() => {
   const navigate = useNavigate();
   const location = useLocation();
   const { cart } = useCart();
@@ -47,6 +47,6 @@ const MobileTabBar = () => {
       })}
     </nav>
   );
-};
+});
 
 export default MobileTabBar;

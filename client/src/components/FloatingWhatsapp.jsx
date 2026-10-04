@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { X } from 'lucide-react';
 
 const WHATSAPP_NUMBER = '8801636400363';
 const WHATSAPP_MESSAGE = 'Hello! I have a question about your fragrances.';
 
-export default function FloatingWhatsApp() {
+const FloatingWhatsApp = memo(function FloatingWhatsApp() {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -147,4 +147,6 @@ export default function FloatingWhatsApp() {
       `}</style>
     </>
   );
-}
+});
+
+export default FloatingWhatsApp;

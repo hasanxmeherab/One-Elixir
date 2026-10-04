@@ -1,14 +1,16 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import { optimizeImage } from '../utils/optimizeImage';
+import { useDebounce } from '../hooks/useDebounce';
 
 const PAGE_SIZE = 12;
 
 const Collection = () => {
   const [perfumes, setPerfumes]     = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 350); // ⚡ only recomputes after user pauses
   const [sortBy, setSortBy]         = useState('default');
   const [priceRange, setPriceRange] = useState([0, 10000]);
   const [maxPrice, setMaxPrice]     = useState(10000);
@@ -57,16 +59,16 @@ const Collection = () => {
     return Array.from(set).sort();
   }, [perfumes]);
 
-  const toggleScent = (scent) => {
+  const toggleScent = useCallback((scent) => {
     setSelectedScents(prev =>
       prev.includes(scent) ? prev.filter(s => s !== scent) : [...prev, scent]
     );
-  };
+  }, []);
 
   // ── Filter + Sort ─────────────────────────────────────────
   const filtered = useMemo(() => {
     let result = perfumes.filter(p =>
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+      p.name.toLowerCase().includes(debouncedSearch.toLowerCase()) &&
       p.price >= priceRange[0] && p.price <= priceRange[1] &&
       (selectedScents.length === 0 || selectedScents.every(s => p.scentProfile?.includes(s)))
     );
@@ -75,10 +77,10 @@ const Collection = () => {
     if (sortBy === 'newest')     result = [...result].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     if (sortBy === 'rating')     result = [...result].sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
     return result;
-  }, [perfumes, searchTerm, priceRange, sortBy, selectedScents]);
+  }, [perfumes, debouncedSearch, priceRange, sortBy, selectedScents]);
 
-  // Reset to page 1 on filter change
-  useEffect(() => { setPage(1); }, [searchTerm, priceRange, sortBy, selectedScents]);
+  // Reset to page 1 on filter change (use debouncedSearch to avoid resetting mid-keystroke)
+  useEffect(() => { setPage(1); }, [debouncedSearch, priceRange, sortBy, selectedScents]);
 
   // ── Live clock for flash sale countdowns (only if sales exist) ─
   const hasFlashSales = perfumes.some(p => p.flashSale?.active && p.flashSale?.endsAt);

@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useUser } from '../context/UserContext';
 import { Menu, Search, ShoppingCart, Heart, User, X, Phone, Mail, Truck } from 'lucide-react';
 import axios from 'axios';
 import { optimizeImage } from '../utils/optimizeImage';
+import { useDebounce } from '../hooks/useDebounce';
 
-const Navbar = () => {
+const Navbar = memo(() => {
   const { user, logout } = useUser();
   const { cart } = useCart();
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ const Navbar = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedQuery = useDebounce(searchQuery, 300); // ⚡ debounce API calls
   const [suggestions, setSuggestions] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const searchInputRef = useRef(null);
@@ -105,10 +107,10 @@ const Navbar = () => {
 
   useEffect(() => {
     const fetchSuggestions = async () => {
-      if (searchQuery.trim().length > 1) {
+      if (debouncedQuery.trim().length > 1) {
         try {
           setSearchLoading(true);
-          const res = await axios.get(`${API_URL}/api/perfumes/search?q=${encodeURIComponent(searchQuery.trim())}`);
+          const res = await axios.get(`${API_URL}/api/perfumes/search?q=${encodeURIComponent(debouncedQuery.trim())}`);
           setSuggestions(res.data);
         } catch (err) {
           console.error('Search Error:', err);
@@ -119,9 +121,8 @@ const Navbar = () => {
         setSuggestions([]);
       }
     };
-    const timeoutId = setTimeout(fetchSuggestions, 300);
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery, API_URL]);
+    fetchSuggestions();
+  }, [debouncedQuery, API_URL]);
 
   const handleSearchKeyDown = (e) => {
     if (e.key === 'Enter' && searchQuery.trim()) {
@@ -638,6 +639,6 @@ const Navbar = () => {
       )}
     </>
   );
-};
+});
 
 export default Navbar;

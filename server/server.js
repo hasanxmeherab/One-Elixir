@@ -1,13 +1,14 @@
 const dns = require('dns');
 dns.setServers(['8.8.8.8', '8.8.4.4']);
 
-const express    = require('express');
-const mongoose   = require('mongoose');
-const cors       = require('cors');
-const path       = require('path');
-const rateLimit  = require('express-rate-limit');
-const helmet     = require('helmet');
-const costRoutes = require('./routes/costRoutes');
+const express      = require('express');
+const mongoose     = require('mongoose');
+const cors         = require('cors');
+const path         = require('path');
+const rateLimit    = require('express-rate-limit');
+const helmet       = require('helmet');
+const compression  = require('compression');
+const costRoutes   = require('./routes/costRoutes');
 
 require('dotenv').config();
 
@@ -22,6 +23,18 @@ const app = express();
 
 // ── Helmet Security Headers ───────────────────────────────
 app.use(helmet()); // default security headers
+
+// ── Gzip Compression ────────────────────────────────────────
+// Compresses all API JSON responses ≥ 1 KB — saves 60-80% bandwidth
+app.use(compression({
+  threshold: 1024,  // Only compress responses larger than 1 KB
+  level: 6,         // Level 6 = good balance of speed vs ratio
+  filter: (req, res) => {
+    // Skip if caller explicitly opts out
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  },
+}));
 
 // ── CORS Configuration ───────────────────────────────────
 app.use(cors({

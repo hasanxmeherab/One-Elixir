@@ -1,6 +1,7 @@
+import { memo } from 'react';
 import { Link } from 'react-router-dom';
 
-export default function Footer() {
+const Footer = memo(function Footer() {
   return (
     <footer className="bg-white text-white">
       <div className="bg-black mx-2 md:mx-[5%] rounded-xl border-t-4 border-[#e74c3c]">
@@ -158,4 +159,6 @@ export default function Footer() {
       </div>
   </footer>
   );
-}
+});
+
+export default Footer;

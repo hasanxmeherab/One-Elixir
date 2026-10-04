@@ -22,35 +22,39 @@ const asyncHandler = (fn) => (req, res, next) => {
   Promise.resolve(fn(req, res, next)).catch(next);
 };
 
-// ✅ Atomic stock decrement with transaction support
+// ✅ Atomic stock decrement with transaction support — uses bulkWrite (single query)
 const decrementStockAtomic = async (items, session = null) => {
-  for (const item of items) {
-    if (!item.perfumeId) continue;
-    
-    // Decrement base product stock
-    const result = await Perfume.findByIdAndUpdate(
-      item.perfumeId,
-      { $inc: { stock: -item.quantity } },
-      { new: true, session }
-    );
-    if (!result || result.stock < 0) {
-      throw new Error(`Insufficient stock for "${item.name}". Transaction rolled back.`);
-    }
+  const bulkOps = items
+    .filter(item => item.perfumeId)
+    .map(item => ({
+      updateOne: {
+        filter: { _id: item.perfumeId },
+        update: { $inc: { stock: -item.quantity } },
+      },
+    }));
+  if (bulkOps.length === 0) return;
+  const result = await Perfume.bulkWrite(bulkOps, { session });
+  // Verify no stock went negative after the bulk write
+  const updatedIds = items.filter(i => i.perfumeId).map(i => i.perfumeId);
+  const updated = await Perfume.find({ _id: { $in: updatedIds }, stock: { $lt: 0 } }).session(session);
+  if (updated.length > 0) {
+    throw new Error(`Insufficient stock for "${updated[0].name}". Transaction rolled back.`);
   }
+  return result;
 };
 
-// ✅ Restore stock with transaction support
+// ✅ Restore stock with transaction support — uses bulkWrite (single query)
 const restoreStockAtomic = async (items, session = null) => {
-  for (const item of items) {
-    if (!item.perfumeId) continue;
-    
-    // Restore base product stock
-    await Perfume.findByIdAndUpdate(
-      item.perfumeId,
-      { $inc: { stock: item.quantity } },
-      { session }
-    );
-  }
+  const bulkOps = items
+    .filter(item => item.perfumeId)
+    .map(item => ({
+      updateOne: {
+        filter: { _id: item.perfumeId },
+        update: { $inc: { stock: item.quantity } },
+      },
+    }));
+  if (bulkOps.length === 0) return;
+  return Perfume.bulkWrite(bulkOps, { session });
 };
 
 // 1. GET customer history (auth required)
@@ -84,20 +88,26 @@ router.post('/', validate(createOrderSchema), asyncHandler(async (req, res) => {
   try {
     const order = new Order(req.body);
 
-    // Validate and reserve stock (base products only)
+    // ✅ Batch fetch all required perfumes in ONE query (eliminates N+1)
+    const perfumeIds = order.items
+      .filter(item => item.perfumeId)
+      .map(item => item.perfumeId);
+
+    const perfumes = await Perfume.find({ _id: { $in: perfumeIds } }).session(session);
+    const perfumeMap = Object.fromEntries(perfumes.map(p => [p._id.toString(), p]));
+
+    // Validate stock availability for all items
     for (const item of order.items) {
       if (!item.perfumeId) continue;
-      const perfume = await Perfume.findById(item.perfumeId).session(session);
+      const perfume = perfumeMap[item.perfumeId.toString()];
       if (!perfume) {
         await session.abortTransaction();
         return res.status(400).json({ message: `Product "${item.name}" not found` });
       }
-      
-      // Check base product stock
       if (perfume.stock < item.quantity) {
         await session.abortTransaction();
-        return res.status(400).json({ 
-          message: `"${item.name}" only has ${perfume.stock} units available (you requested ${item.quantity})` 
+        return res.status(400).json({
+          message: `"${item.name}" only has ${perfume.stock} units available (you requested ${item.quantity})`
         });
       }
     }

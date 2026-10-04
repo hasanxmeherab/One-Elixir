@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { HomeSkeleton } from '../components/Skeleton';
 import axios from 'axios';
 import { useCart } from '../context/CartContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { Star, ChevronLeft, ChevronRight } from 'lucide-react';
-import BannerManagement from './admin/BannerManagement';
+// ⚡ Lazy-load BannerManagement so it doesn't inflate the customer-facing bundle
+const BannerManagement = lazy(() => import('./admin/BannerManagement'));
 import { optimizeImage } from '../utils/optimizeImage';
 
 /* ─── Horizontal scroll carousel hook ─── */
@@ -310,8 +311,8 @@ const Home = () => {
   return (
     <div style={{ backgroundColor: '#fff' }}>
 
-      {/* 1. BANNER */}
-      <section><BannerManagement /></section>
+      {/* 1. BANNER — lazy-loaded to avoid admin code in customer bundle */}
+      <section><Suspense fallback={<div style={{ height: '300px' }} />}><BannerManagement /></Suspense></section>
 
       {/* 2. BRAND LOGOS */}
       <section style={{ width: '100%', overflow: 'hidden', padding: '20px 0', backgroundColor: '#fff' }}>
