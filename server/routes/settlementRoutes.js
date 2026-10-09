@@ -588,6 +588,120 @@ router.get('/reports', verifySuperadmin, asyncHandler(async (req, res) => {
 }));
 
 // ══════════════════════════════════════════════════════════════
+// POST /direct-settle — superadmin directly settles an admin's balance
+//   No pending request needed. Creates + auto-confirms in one step.
+// ══════════════════════════════════════════════════════════════
+router.post('/direct-settle', verifySuperadmin, asyncHandler(async (req, res) => {
+  const { adminId, amount, paymentMethod, transactionId, note } = req.body;
+
+  if (!adminId) {
+    return res.status(400).json({ message: 'adminId is required' });
+  }
+  if (!amount || Number(amount) <= 0) {
+    return res.status(400).json({ message: 'Amount must be greater than 0' });
+  }
+  if (!paymentMethod) {
+    return res.status(400).json({ message: 'Payment method is required' });
+  }
+
+  // Fetch target admin
+  const targetAdmin = await Admin.findById(adminId).select('_id name role');
+  if (!targetAdmin) {
+    return res.status(404).json({ message: 'Admin not found' });
+  }
+
+  // Verify target admin has sufficient outstanding balance
+  const ledgerAgg = await PaymentLedger.aggregate([
+    { $match: { adminId: new mongoose.Types.ObjectId(adminId) } },
+    {
+      $group: {
+        _id: null,
+        totalCollected: { $sum: { $cond: [{ $eq: ['$type', 'collection'] }, '$amount', 0] } },
+        totalSettled:   { $sum: { $cond: [{ $eq: ['$type', 'settlement'] }, '$amount', 0] } },
+        totalAdjustments: { $sum: { $cond: [{ $eq: ['$type', 'adjustment'] }, '$amount', 0] } }
+      }
+    }
+  ]);
+  const balance = ledgerAgg[0]
+    ? (ledgerAgg[0].totalCollected + ledgerAgg[0].totalAdjustments) - ledgerAgg[0].totalSettled
+    : 0;
+
+  if (Number(amount) > balance) {
+    return res.status(400).json({
+      message: `Insufficient balance. Outstanding balance is ৳${balance.toLocaleString()}`
+    });
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    // Create settlement record — already confirmed
+    const settlement = new Settlement({
+      adminId: targetAdmin._id,
+      adminName: targetAdmin.name,
+      amount: Number(amount),
+      paymentMethod,
+      transactionId: transactionId || '',
+      note: note || '',
+      status: 'confirmed',
+      confirmedBy: { adminId: req.admin.id, adminName: req.admin.name },
+      confirmedAt: new Date()
+    });
+    await settlement.save({ session });
+
+    // Deduct from admin's balance (settlement ledger entry)
+    await PaymentLedger.create([{
+      adminId: targetAdmin._id,
+      adminName: targetAdmin.name,
+      amount: Number(amount),
+      type: 'settlement',
+      paymentMethod,
+      settlementId: settlement._id,
+      note: `Direct settlement by ${req.admin.name}${note ? ': ' + note : ''}`
+    }], { session });
+
+    // Credit superadmin's holding (received_from_admin)
+    await PaymentLedger.create([{
+      adminId: req.admin.id,
+      adminName: req.admin.name,
+      amount: Number(amount),
+      type: 'received_from_admin',
+      paymentMethod,
+      settlementId: settlement._id,
+      note: `Received ৳${Number(amount).toLocaleString()} from ${targetAdmin.name} (Direct settlement #${settlement._id.toString().slice(-6).toUpperCase()})`
+    }], { session });
+
+    // Mark unsettled orders up to the settled amount
+    const unsettledOrders = await Order.find({
+      'paymentReceivedBy.adminId': targetAdmin._id,
+      settlementStatus: 'unsettled'
+    }).sort({ createdAt: 1 }).session(session);
+
+    let remaining = Number(amount);
+    for (const order of unsettledOrders) {
+      if (remaining <= 0) break;
+      order.settlementStatus = 'settled';
+      order.settlementRef = settlement._id;
+      await order.save({ session });
+      remaining -= order.totalAmount;
+    }
+
+    await session.commitTransaction();
+
+    await writeLog(req, 'DIRECT_SETTLEMENT', 'Settlement',
+      `${req.admin.name} directly settled ৳${Number(amount).toLocaleString()} for ${targetAdmin.name} via ${paymentMethod}`);
+
+    res.status(201).json(settlement);
+  } catch (err) {
+    await session.abortTransaction();
+    res.status(500).json({ message: err.message });
+  } finally {
+    session.endSession();
+  }
+}));
+
+// ══════════════════════════════════════════════════════════════
 // POST /vault-transfer — superadmin transfers from holding to main vault
 // ══════════════════════════════════════════════════════════════
 router.post('/vault-transfer', verifySuperadmin, asyncHandler(async (req, res) => {

@@ -55,6 +55,11 @@ const SettlementDashboard = () => {
   const [rejectingId, setRejectingId] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
 
+  // ── Direct Settle state (superadmin) ──
+  const [directSettleTarget, setDirectSettleTarget] = useState(null); // { adminId, adminName, outstandingBalance }
+  const [directSettleForm, setDirectSettleForm] = useState({ amount: '', paymentMethod: 'Cash', transactionId: '', note: '' });
+  const [directSettling, setDirectSettling] = useState(false);
+
   // ── Fetch data ──
   const fetchAll = async () => {
     setLoading(true);
@@ -127,6 +132,31 @@ const SettlementDashboard = () => {
       toast.error(err.response?.data?.message || 'Failed to confirm.');
     } finally {
       setConfirmingId(null);
+    }
+  };
+
+  // ── Direct settle (superadmin → admin, no request needed) ──
+  const submitDirectSettle = async () => {
+    if (!directSettleForm.amount || Number(directSettleForm.amount) <= 0) {
+      return toast.warning('Enter a valid amount.');
+    }
+    setDirectSettling(true);
+    try {
+      await adminAxios.post(`${API_URL}/api/settlements/direct-settle`, {
+        adminId: directSettleTarget.adminId,
+        amount: Number(directSettleForm.amount),
+        paymentMethod: directSettleForm.paymentMethod,
+        transactionId: directSettleForm.transactionId,
+        note: directSettleForm.note
+      });
+      toast.success(`৳${Number(directSettleForm.amount).toLocaleString()} settled for ${directSettleTarget.adminName}!`);
+      setDirectSettleTarget(null);
+      setDirectSettleForm({ amount: '', paymentMethod: 'Cash', transactionId: '', note: '' });
+      fetchAll();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to settle.');
+    } finally {
+      setDirectSettling(false);
     }
   };
 
@@ -257,7 +287,7 @@ const SettlementDashboard = () => {
               <table className="w-full border-collapse text-xs">
                 <thead>
                   <tr className="border-b-2 border-black">
-                    {['ADMIN', 'ROLE', 'ORDERS', 'COLLECTED', 'SETTLED', 'OUTSTANDING', 'PENDING', 'LAST SETTLEMENT', 'STATUS'].map(h => (
+                    {['ADMIN', 'ROLE', 'ORDERS', 'COLLECTED', 'SETTLED', 'OUTSTANDING', 'PENDING', 'LAST SETTLEMENT', 'STATUS', 'ACTION'].map(h => (
                       <th key={h} className="py-2.5 px-3 text-left text-[10px] font-bold tracking-wider">{h}</th>
                     ))}
                   </tr>
@@ -297,6 +327,18 @@ const SettlementDashboard = () => {
                         }`}>
                           {admin.status.toUpperCase()}
                         </span>
+                      </td>
+                      <td className="py-3 px-3">
+                        {admin.outstandingBalance > 0 && (
+                          <button
+                            onClick={() => {
+                              setDirectSettleTarget({ adminId: admin.adminId, adminName: admin.adminName, outstandingBalance: admin.outstandingBalance });
+                              setDirectSettleForm({ amount: String(admin.outstandingBalance), paymentMethod: 'Cash', transactionId: '', note: '' });
+                            }}
+                            className="px-3 py-1.5 bg-black text-white border-none cursor-pointer text-[9px] font-bold tracking-wider hover:bg-gray-700 transition-colors whitespace-nowrap">
+                            💸 SETTLE
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -653,6 +695,84 @@ const SettlementDashboard = () => {
             <button onClick={submitSettlementRequest} disabled={requesting}
               className="w-full bg-black text-white border-none p-3 cursor-pointer font-bold tracking-wider mt-5 hover:bg-gray-800 transition-colors disabled:opacity-60">
               {requesting ? 'SUBMITTING...' : 'SUBMIT SETTLEMENT REQUEST'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════ */}
+      {/* Direct Settle Modal (Superadmin only)                   */}
+      {/* ════════════════════════════════════════════════════════ */}
+      {directSettleTarget && (
+        <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-[3000]" onClick={() => setDirectSettleTarget(null)}>
+          <div className="bg-white p-6 w-[440px] flex flex-col" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <p className="text-[9px] font-bold tracking-[2px] text-[#888] mb-0.5">DIRECT SETTLE BALANCE</p>
+                <h3 className="text-[15px] font-bold m-0">{directSettleTarget.adminName}</h3>
+              </div>
+              <button onClick={() => setDirectSettleTarget(null)} className="bg-transparent border-none text-xl cursor-pointer text-gray-400 leading-none">×</button>
+            </div>
+
+            {/* Outstanding balance info */}
+            <div className="mb-4 p-3 bg-red-50 border border-red-100 flex justify-between items-center">
+              <div>
+                <p className="text-[9px] font-bold text-[#888] tracking-wider">OUTSTANDING BALANCE</p>
+                <p className="text-xl font-bold m-0 text-red-600">৳{directSettleTarget.outstandingBalance.toLocaleString()}</p>
+              </div>
+              <button
+                onClick={() => setDirectSettleForm(f => ({ ...f, amount: String(directSettleTarget.outstandingBalance) }))}
+                className="text-[9px] font-bold text-black underline bg-transparent border-none cursor-pointer tracking-wider">
+                FILL FULL
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="block text-[10px] font-bold tracking-wider text-[#888] mb-1">AMOUNT TO SETTLE *</label>
+                <input type="number" value={directSettleForm.amount}
+                  onChange={e => setDirectSettleForm({ ...directSettleForm, amount: e.target.value })}
+                  placeholder="Enter amount"
+                  className="w-full p-2.5 border border-[#ddd] text-[13px] outline-none box-border" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold tracking-wider text-[#888] mb-1">PAYMENT METHOD *</label>
+                <select value={directSettleForm.paymentMethod}
+                  onChange={e => setDirectSettleForm({ ...directSettleForm, paymentMethod: e.target.value })}
+                  className="w-full p-2.5 border border-[#ddd] text-[13px] outline-none cursor-pointer box-border">
+                  <option value="Cash">Cash (Hand to Hand)</option>
+                  <option value="Bkash">Bkash</option>
+                  <option value="Nagad">Nagad</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold tracking-wider text-[#888] mb-1">TRANSACTION ID (OPTIONAL)</label>
+                <input type="text" value={directSettleForm.transactionId}
+                  onChange={e => setDirectSettleForm({ ...directSettleForm, transactionId: e.target.value })}
+                  placeholder="Enter transaction reference"
+                  className="w-full p-2.5 border border-[#ddd] text-[13px] outline-none box-border" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold tracking-wider text-[#888] mb-1">NOTE (OPTIONAL)</label>
+                <input type="text" value={directSettleForm.note}
+                  onChange={e => setDirectSettleForm({ ...directSettleForm, note: e.target.value })}
+                  placeholder="Any additional notes"
+                  className="w-full p-2.5 border border-[#ddd] text-[13px] outline-none box-border" />
+              </div>
+            </div>
+
+            <div className="mt-5 p-3 bg-amber-50 border border-amber-100">
+              <p className="text-[10px] text-amber-800 m-0">
+                ⚡ This settlement will be <strong>immediately confirmed</strong> without an admin request. Use this when you have already received the cash from the admin.
+              </p>
+            </div>
+
+            <button onClick={submitDirectSettle} disabled={directSettling}
+              className="w-full bg-black text-white border-none p-3 cursor-pointer font-bold tracking-wider mt-4 hover:bg-gray-800 transition-colors disabled:opacity-60">
+              {directSettling ? 'SETTLING...' : '✅ CONFIRM & SETTLE NOW'}
             </button>
           </div>
         </div>
