@@ -12,6 +12,7 @@ import EditOrderModal from './order-modals/EditOrderModal';
 import OrderNotesModal from './order-modals/OrderNotesModal';
 import CustomerHistoryDrawer from './order-modals/CustomerHistoryDrawer';
 import PaymentReceiverModal from './order-modals/PaymentReceiverModal';
+import PartialPaymentModal from './order-modals/PartialPaymentModal';
 
 const PAGE_SIZE = 15;
 
@@ -53,6 +54,11 @@ const OrderList = () => {
   // ── NEW: Payment Receiver Modal ──
   const [receiverModal, setReceiverModal] = useState(null); // { orderId, currentStatus } or { bulk: true }
   const [adminList, setAdminList] = useState([]);
+
+  // ── Partial Payment Modal ──
+  const [partialPaymentOrder, setPartialPaymentOrder] = useState(null);
+  const [partialSaving, setPartialSaving]   = useState(false);
+  const [partialDeleting, setPartialDeleting] = useState(null); // paymentId being deleted
   const [selectedReceiver, setSelectedReceiver] = useState(null);
 
   const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
@@ -305,6 +311,38 @@ const OrderList = () => {
     finally { setBulkLoading(false); }
   };
 
+  // ── Partial Payment ──
+  const savePartialPayment = async ({ amount, method, note }) => {
+    if (!partialPaymentOrder) return;
+    setPartialSaving(true);
+    try {
+      const res = await adminAxios.post(`${API_URL}/api/orders/${partialPaymentOrder._id}/partial-payment`, { amount, method, note });
+      toast.success(`${amount.toLocaleString()} TK recorded successfully.`);
+      // Update the modal order in-place so history shows immediately
+      setPartialPaymentOrder(res.data.order);
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to record partial payment.');
+    } finally {
+      setPartialSaving(false);
+    }
+  };
+
+  const deletePartialPayment = async (paymentId) => {
+    if (!partialPaymentOrder) return;
+    setPartialDeleting(paymentId);
+    try {
+      const res = await adminAxios.delete(`${API_URL}/api/orders/${partialPaymentOrder._id}/partial-payment/${paymentId}`);
+      toast.success('Partial payment removed.');
+      setPartialPaymentOrder(res.data.order);
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to remove partial payment.');
+    } finally {
+      setPartialDeleting(null);
+    }
+  };
+
   // ── NEW: Notes ──
   const addNote = async () => {
     if (!noteText.trim()) return;
@@ -480,7 +518,9 @@ const OrderList = () => {
     let pendingCount = 0;
 
     allFiltered.forEach(order => {
-      const amt = Number(order.totalAmount) || 0;
+      const amt = order.amountDue != null 
+        ? Math.max(0, Number(order.amountDue)) 
+        : Math.max(0, (Number(order.totalAmount) || 0) - (Number(order.amountPaid) || 0));
       totalAmount += amt;
 
       const status = (order.status || '').toLowerCase();
@@ -566,6 +606,7 @@ const OrderList = () => {
             <option value="ALL">ALL PAYMENT</option>
             <option value="Paid">PAID</option>
             <option value="Unpaid">UNPAID</option>
+            <option value="Partial">PARTIAL</option>
             <option value="Pending Verification">PENDING VERIFICATION</option>
           </select>
           {isUnpaidSelected && (
@@ -795,11 +836,41 @@ const OrderList = () => {
                 <td className="py-2.5 px-2">
                   <div className="text-[10px] mb-1 font-bold">{order.paymentMethod}</div>
                   <select value={order.paymentStatus || 'Unpaid'} onChange={e => updatePaymentStatus(order._id, e.target.value)}
-                    className={`p-1 text-[10px] font-bold border border-[#ddd] cursor-pointer outline-none ${order.paymentStatus === 'Paid' ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}>
+                    className={`p-1 text-[10px] font-bold border border-[#ddd] cursor-pointer outline-none ${
+                      order.paymentStatus === 'Paid' ? 'bg-emerald-50 text-emerald-800'
+                      : order.paymentStatus === 'Partial' ? 'bg-amber-50 text-amber-800'
+                      : 'bg-red-50 text-red-800'
+                    }`}>
                     <option value="Unpaid">Unpaid</option>
                     <option value="Pending Verification">Pending Verification</option>
+                    <option value="Partial">Partial</option>
                     <option value="Paid">Paid</option>
                   </select>
+                  {/* Partial payment summary */}
+                  {(order.partialPayments?.length > 0 || order.paymentStatus === 'Partial') && (
+                    <div className="mt-1.5 bg-amber-50 border border-amber-200 rounded px-1.5 py-1">
+                      <div className="text-[9px] font-bold text-amber-700 flex justify-between">
+                        <span>Paid: {(Number(order.amountPaid) || 0).toLocaleString()} TK</span>
+                        <span className="text-red-600">Due: {Math.max(0, order.amountDue != null ? Number(order.amountDue) : (order.totalAmount - (Number(order.amountPaid) || 0))).toLocaleString()} TK</span>
+                      </div>
+                      {/* Mini progress bar */}
+                      <div className="w-full h-1 bg-amber-100 rounded-full mt-1 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-amber-500"
+                          style={{ width: `${Math.min(100, Math.round(((Number(order.amountPaid) || 0) / (Number(order.totalAmount) || 1)) * 100))}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {/* Partial pay button */}
+                  {(order.paymentStatus !== 'Paid' || order.partialPayments?.length > 0) && (
+                    <button
+                      onClick={() => setPartialPaymentOrder(order)}
+                      className="mt-1 w-full text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-300 px-1.5 py-0.5 rounded cursor-pointer hover:bg-amber-100 transition-colors text-center"
+                    >
+                      {order.paymentStatus === 'Paid' ? '₿ VIEW PAYMENTS' : '₿ PARTIAL PAY'}
+                    </button>
+                  )}
                   {order.paymentStatus === 'Paid' && (
                     order.paymentReceivedBy?.adminName ? (
                       <div className="mt-1 text-[9px] text-gray-600 flex items-center gap-1">
@@ -963,6 +1034,16 @@ const OrderList = () => {
         selectedCount={selectedIds.size}
         onConfirm={confirmPaymentReceiver}
         onClose={() => { setReceiverModal(null); setSelectedReceiver(null); }}
+      />
+
+      {/* ── Partial Payment Modal ── */}
+      <PartialPaymentModal
+        order={partialPaymentOrder}
+        saving={partialSaving}
+        deleting={partialDeleting}
+        onSave={savePartialPayment}
+        onDelete={deletePartialPayment}
+        onClose={() => setPartialPaymentOrder(null)}
       />
 
       <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />

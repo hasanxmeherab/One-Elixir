@@ -605,6 +605,197 @@ router.put('/:id', verifyAdmin, asyncHandler(async (req, res) => {
   }
 }));
 
+// 7a. POST partial payment for an order (Admin)
+router.post('/:id/partial-payment', verifyAdmin, asyncHandler(async (req, res) => {
+  const { amount, method, note } = req.body;
+  if (!amount || isNaN(amount) || Number(amount) <= 0) {
+    return res.status(400).json({ message: 'A valid payment amount is required.' });
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const order = await Order.findById(req.params.id).session(session);
+    if (!order) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    const paymentAmount = Number(amount);
+    const totalAmount   = Number(order.totalAmount) || 0;
+    const currentPaid   = Number(order.amountPaid) || 0;
+    const newPaid       = currentPaid + paymentAmount;
+    const newDue        = Math.max(0, totalAmount - newPaid);
+
+    // ── Push the installment record ──
+    const partialEntry = {
+      amount: paymentAmount,
+      method: method || 'Cash',
+      note:   note   || '',
+      recordedBy: {
+        adminId:   req.admin.id,
+        adminName: req.admin.name || '',
+      },
+      paidAt: new Date(),
+    };
+
+    order.partialPayments.push(partialEntry);
+    order.amountPaid = newPaid;
+    order.amountDue  = newDue;
+
+    // Auto-mark as Paid when fully settled
+    if (newDue <= 0) {
+      order.paymentStatus = 'Paid';
+      if (!order.paymentReceivedBy?.adminId) {
+        order.paymentReceivedBy = { adminId: req.admin.id, adminName: req.admin.name || '' };
+        order.paymentReceivedAt = new Date();
+      }
+    } else {
+      if (order.paymentStatus !== 'Paid') {
+        order.paymentStatus = 'Partial';
+      }
+    }
+
+    // ── Payment Receiver logic (mirrors regular "mark as Paid") ──
+    // The admin who records this partial payment is the one holding the money.
+    const reportingAdmin   = req.admin;
+    const receiverAdmin    = await Admin.findById(req.admin.id).session(session);
+    const receiverIsSuperadmin = receiverAdmin?.role === 'superadmin';
+
+    // Always create a collection ledger entry for the admin recording the payment
+    await PaymentLedger.create([{
+      orderId:       order._id,
+      adminId:       reportingAdmin.id,
+      adminName:     reportingAdmin.name || '',
+      amount:        paymentAmount,
+      type:          'collection',
+      paymentMethod: method || order.paymentMethod || 'Cash',
+      note: `Partial payment ${paymentAmount} TK — order #${order._id.toString().slice(-6).toUpperCase()}${receiverIsSuperadmin ? ' (superadmin collected)' : ''}`
+    }], { session });
+
+    if (receiverIsSuperadmin) {
+      // Superadmin collected directly → money is already in superadmin's holding
+      if (order.settlementStatus !== 'settled') {
+        order.settlementStatus = newDue <= 0 ? 'settled' : 'unsettled';
+      }
+    } else {
+      // Regular admin holds the money → unsettled until settled with superadmin
+      if (order.settlementStatus !== 'settled') {
+        order.settlementStatus = 'unsettled';
+      }
+    }
+
+    await order.save({ session });
+    await session.commitTransaction();
+
+    await writeLog(req, 'PARTIAL_PAYMENT', 'Order',
+      `Partial payment of ${paymentAmount} TK recorded for order #${order._id.toString().slice(-6).toUpperCase()} (paid: ${newPaid}, due: ${newDue})`);
+
+    res.json({ message: 'Partial payment recorded.', order });
+  } catch (err) {
+    await session.abortTransaction();
+    res.status(400).json({ message: err.message });
+  } finally {
+    session.endSession();
+  }
+}));
+
+// 7b. DELETE a single partial payment installment (Admin)
+router.delete('/:id/partial-payment/:paymentId', verifyAdmin, asyncHandler(async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const order = await Order.findById(req.params.id).session(session);
+    if (!order) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Find the specific partial payment sub-document
+    const paymentIndex = order.partialPayments.findIndex(
+      p => p._id.toString() === req.params.paymentId
+    );
+    if (paymentIndex === -1) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: 'Partial payment not found' });
+    }
+
+    const removedPayment = order.partialPayments[paymentIndex];
+    const removedAmount  = Number(removedPayment.amount) || 0;
+
+    // Remove the sub-document
+    order.partialPayments.splice(paymentIndex, 1);
+
+    // Recalculate totals
+    const newPaid = Math.max(0, (Number(order.amountPaid) || 0) - removedAmount);
+    const newDue  = Math.max(0, (Number(order.totalAmount) || 0) - newPaid);
+
+    order.amountPaid = newPaid;
+    order.amountDue  = newDue;
+
+    // If the order was marked Paid (possibly auto-set) but now has remaining due, revert
+    if (newDue > 0 && order.paymentStatus === 'Paid') {
+      order.paymentStatus = order.partialPayments.length > 0 ? 'Partial' : 'Unpaid';
+      // Clear receiver info only if no partial payments remain
+      if (order.partialPayments.length === 0) {
+        order.paymentReceivedBy  = undefined;
+        order.paymentReceivedAt  = null;
+        order.settlementStatus   = null;
+        order.markModified('paymentReceivedBy');
+      }
+    }
+
+    // If no partial payments remain at all, reset to Unpaid
+    if (order.partialPayments.length === 0 && newDue >= (Number(order.totalAmount) || 0)) {
+      order.paymentStatus    = 'Unpaid';
+      order.amountPaid       = 0;
+      order.amountDue        = null;
+      order.settlementStatus = null;
+    }
+
+    order.markModified('partialPayments');
+
+    // Reverse the matching PaymentLedger entry for this payment.
+    // Match by orderId + amount + type='collection' (most recent first) to avoid over-deleting.
+    const ledgerEntry = await PaymentLedger.findOne({
+      orderId: order._id,
+      type:    'collection',
+      amount:  removedAmount,
+    }).sort({ createdAt: -1 }).session(session);
+
+    if (ledgerEntry) {
+      await PaymentLedger.deleteOne({ _id: ledgerEntry._id }).session(session);
+    }
+
+    // Clean up any pending settlement that might have been created
+    await Settlement.deleteOne({
+      adminId: req.admin.id,
+      amount: removedAmount,
+      status: 'pending'
+    }).session(session);
+
+    // Update settlementStatus: if some payments remain, keep unsettled; if none, null
+    if (order.partialPayments.length > 0 && order.settlementStatus !== 'settled') {
+      order.settlementStatus = 'unsettled';
+    }
+
+    await order.save({ session });
+    await session.commitTransaction();
+
+    await writeLog(req, 'DELETE_PARTIAL_PAYMENT', 'Order',
+      `Removed partial payment of ${removedAmount} TK from order #${order._id.toString().slice(-6).toUpperCase()} (new paid: ${order.amountPaid}, due: ${order.amountDue})`);
+
+    res.json({ message: 'Partial payment removed.', order });
+  } catch (err) {
+    await session.abortTransaction();
+    res.status(400).json({ message: err.message });
+  } finally {
+    session.endSession();
+  }
+}));
+
 // 7. DELETE (Admin Archive)
 router.delete('/:id', verifyAdmin, asyncHandler(async (req, res) => {
   const updatedOrder = await Order.findByIdAndUpdate(

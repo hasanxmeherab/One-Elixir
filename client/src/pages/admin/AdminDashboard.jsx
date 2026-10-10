@@ -55,7 +55,7 @@ const AdminDashboard = () => {
 
   // Auto-refresh admin holding balances when any order's payment status changes
   // e.g. when an order is marked unpaid, the admin's holding should immediately decrease
-  const orderPaymentFingerprint = orders.map(o => `${o._id}:${o.paymentStatus}`).join('|');
+  const orderPaymentFingerprint = orders.map(o => `${o._id}:${o.paymentStatus}:${o.amountPaid || 0}`).join('|');
   useEffect(() => {
     if (isSuperadmin) fetchSettlementDashboard();
   }, [orderPaymentFingerprint]);
@@ -80,9 +80,22 @@ const AdminDashboard = () => {
     const price = flashActive ? p.flashSale.salePrice : p.price;
     return a + (price * (Number(p.stock) || 0));
   }, 0);
-  const totalRevenue = orders
-    .filter(o => o.status?.toLowerCase() === 'delivered' && o.paymentStatus?.toLowerCase() === 'paid')
-    .reduce((a, o) => a + (Number(o.totalAmount) || 0), 0);
+  const totalRevenue = orders.reduce((sum, o) => {
+    const oStatus = (o.status || '').toLowerCase();
+    if (oStatus === 'cancelled' || oStatus === 'canceled' || oStatus === 'archived') return sum;
+
+    const pStatus = (o.paymentStatus || '').toLowerCase();
+    const paidAmt = Number(o.amountPaid) || 0;
+    const totalAmt = Number(o.totalAmount) || 0;
+
+    if (pStatus === 'paid') {
+      return sum + totalAmt;
+    }
+    if (pStatus === 'partial' || paidAmt > 0) {
+      return sum + paidAmt;
+    }
+    return sum;
+  }, 0);
   const totalInvestment = investments.reduce((a, inv) => {
     const v = parseFloat(inv.totalAmount); return a + (isNaN(v) ? 0 : v);
   }, 0);
@@ -128,8 +141,13 @@ const AdminDashboard = () => {
         const key = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
         if (map[key]) {
           map[key].orders += 1;
-          if (o.status?.toLowerCase() === 'delivered' && o.paymentStatus?.toLowerCase() === 'paid')
+          const pStatus = (o.paymentStatus || '').toLowerCase();
+          const paidAmt = Number(o.amountPaid) || 0;
+          if (pStatus === 'paid') {
             map[key].revenue += Number(o.totalAmount) || 0;
+          } else if (pStatus === 'partial' || paidAmt > 0) {
+            map[key].revenue += paidAmt;
+          }
         }
       }
     });

@@ -33,6 +33,19 @@ const orderSchema = new mongoose.Schema({
     screenshot: String,
     amountPaid: Number // To track if they paid delivery charge or full amount
   },
+  // --- PARTIAL PAYMENTS ---
+  partialPayments: [{
+    amount:    { type: Number, required: true },
+    method:    { type: String, default: 'Cash' },
+    note:      { type: String, default: '' },
+    recordedBy: {
+      adminId:   { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+      adminName: { type: String, default: '' }
+    },
+    paidAt:    { type: Date, default: Date.now }
+  }],
+  amountPaid:   { type: Number, default: 0 }, // running total of partial payments
+  amountDue:    { type: Number, default: null }, // null = no partial payment tracking yet
   // --- PAYMENT RECEIVER TRACKING ---
   paymentReceivedBy: {
     adminId:   { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },

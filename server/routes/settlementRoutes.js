@@ -91,6 +91,47 @@ const syncMissingLedgerEntries = async () => {
       }
     }
 
+    // 3. Query orders with partial payments that might be missing ledger entries
+    const partialOrdersFilter = {
+      'partialPayments.0': { $exists: true }
+    };
+    if (resetAt) {
+      partialOrdersFilter.createdAt = { $gt: resetAt };
+    }
+    const partialOrders = await Order.find(partialOrdersFilter);
+
+    for (const order of partialOrders) {
+      const existingEntries = await PaymentLedger.find({ orderId: order._id, type: 'collection' });
+      const existingLedgerTotal = existingEntries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+      const orderPaidTotal = Number(order.amountPaid) || 0;
+
+      if (orderPaidTotal > existingLedgerTotal) {
+        const missingAmount = orderPaidTotal - existingLedgerTotal;
+        const lastInstallment = order.partialPayments[order.partialPayments.length - 1];
+        let targetAdminId = lastInstallment?.recordedBy?.adminId || order.paymentReceivedBy?.adminId;
+        let targetAdminName = lastInstallment?.recordedBy?.adminName || order.paymentReceivedBy?.adminName;
+
+        if (!targetAdminId) {
+          const defaultAdmin = admins.find(a => a.role === 'superadmin') || admins[0];
+          targetAdminId = defaultAdmin?._id;
+          targetAdminName = defaultAdmin?.name;
+        }
+
+        if (targetAdminId) {
+          newLedgerEntries.push({
+            orderId: order._id,
+            adminId: targetAdminId,
+            adminName: targetAdminName || 'Admin',
+            amount: missingAmount,
+            type: 'collection',
+            paymentMethod: lastInstallment?.method || order.paymentMethod || 'Cash',
+            note: `Auto-synced ledger entry for partial payment on order #${order._id.toString().slice(-6).toUpperCase()}`,
+            createdAt: lastInstallment?.paidAt || new Date()
+          });
+        }
+      }
+    }
+
     if (newLedgerEntries.length > 0) {
       await PaymentLedger.insertMany(newLedgerEntries);
     }
