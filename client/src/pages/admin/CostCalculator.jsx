@@ -161,6 +161,7 @@ const CostCalculator = () => {
   const [perfumes, setPerfumes]           = useState([]);
   const [records, setRecords]             = useState([]);
   const [selectedPerfume, setSelectedPerfume] = useState('');
+  const [customSellingPrice, setCustomSellingPrice] = useState('');
   const [ingredients, setIngredients]     = useState([emptyIngredient()]);
   const [packaging, setPackaging]         = useState([emptyPackaging()]);
   const [bottles, setBottles]             = useState('');
@@ -171,6 +172,7 @@ const CostCalculator = () => {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [wacSummaries, setWacSummaries]   = useState([]);
   const [stockEdit, setStockEdit]         = useState(null); // { recordId, sold: '' }
+  const [priceEdit, setPriceEdit]         = useState(null); // { recordId, price: '' }
 
   useEffect(() => {
     adminAxios.get(`${API_URL}/api/perfumes`).then(r => setPerfumes(r.data)).catch(() => {});
@@ -203,7 +205,7 @@ const CostCalculator = () => {
   const bottleCount    = Number(bottles) || 0;
   const costPerBottle  = bottleCount > 0 ? totalCost / bottleCount : 0;
   const perfumeData    = perfumes.find(p => p._id === selectedPerfume);
-  const sellingPrice   = perfumeData?.price || 0;
+  const sellingPrice   = customSellingPrice !== '' ? Number(customSellingPrice) : (perfumeData?.price || 0);
   const profit         = sellingPrice - costPerBottle;
   const margin         = sellingPrice > 0 ? ((profit / sellingPrice) * 100) : 0;
 
@@ -228,12 +230,14 @@ const CostCalculator = () => {
         ingredients: ingredients.map(i => ({ ...i, qty: Number(i.qty), cost: Number(i.cost) })),
         packaging:   packaging.filter(p => p.name).map(p => ({ ...p, qty: Number(p.qty), cost: Number(p.cost) })),
         bottlesProduced: bottleCount,
+        sellingPrice: customSellingPrice !== '' ? Number(customSellingPrice) : undefined,
         notes,
       });
       showToast('✓ Cost record saved');
       setIngredients([emptyIngredient()]);
       setPackaging([emptyPackaging()]);
       setBottles('');
+      setCustomSellingPrice('');
       setNotes('');
       setSelectedPerfume('');
       fetchRecords(filterPerfume);
@@ -267,6 +271,20 @@ const CostCalculator = () => {
     }
   };
 
+  const handlePriceUpdate = async (recordId) => {
+    const newPrice = Number(priceEdit?.price);
+    if (isNaN(newPrice) || newPrice < 0) return showToast('Enter a valid selling price');
+    try {
+      await adminAxios.patch(`${API_URL}/api/costs/${recordId}/price`, { sellingPrice: newPrice });
+      showToast('✓ Selling price updated for this batch');
+      setPriceEdit(null);
+      fetchRecords(filterPerfume);
+      fetchWac(filterPerfume);
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to update selling price');
+    }
+  };
+
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
   const marginColor = margin >= 60 ? '#16a34a' : margin >= 30 ? '#d97706' : '#dc2626';
 
@@ -291,15 +309,30 @@ const CostCalculator = () => {
             <SearchableSelect
               perfumes={perfumes}
               value={selectedPerfume}
-              onChange={setSelectedPerfume}
+              onChange={(id) => {
+                setSelectedPerfume(id);
+                setCustomSellingPrice('');
+              }}
             />
           </div>
 
-          {/* Bottles */}
-          <div className="mb-6">
-            <label className="text-[10px] font-bold tracking-[2px] text-[#888] block mb-2">BOTTLES PRODUCED FROM THIS BATCH</label>
-            <input type="number" min="1" value={bottles} onChange={e => setBottles(e.target.value)}
-              placeholder="e.g. 10" className="w-full border border-[#ddd] px-3 py-2.5 text-sm outline-none" />
+          {/* Bottles & Selling Price */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <div>
+              <label className="text-[10px] font-bold tracking-[2px] text-[#888] block mb-2">BOTTLES PRODUCED</label>
+              <input type="number" min="1" value={bottles} onChange={e => setBottles(e.target.value)}
+                placeholder="e.g. 10" className="w-full border border-[#ddd] px-3 py-2.5 text-sm outline-none" />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-[10px] font-bold tracking-[2px] text-[#888]">BATCH SELL PRICE (TK)</label>
+                {perfumeData && (
+                  <span className="text-[9px] text-[#aaa]">Default: {perfumeData.price.toLocaleString()} TK</span>
+                )}
+              </div>
+              <input type="number" min="0" value={customSellingPrice} onChange={e => setCustomSellingPrice(e.target.value)}
+                placeholder={perfumeData ? `${perfumeData.price}` : "e.g. 1500"} className="w-full border border-[#ddd] px-3 py-2.5 text-sm outline-none" />
+            </div>
           </div>
 
           {/* Ingredients */}
@@ -482,27 +515,52 @@ const CostCalculator = () => {
                       ))}
                     </div>
 
-                    {/* Stock adjustment */}
-                    {(r.remainingBottles ?? r.bottlesProduced) > 0 && (
-                      <div className="border-t border-[#f5f5f5] pt-2 mb-3">
-                        {stockEdit?.recordId === r._id ? (
-                          <div className="flex flex-wrap gap-2 items-center">
-                            <input type="number" min="1" max={r.remainingBottles ?? r.bottlesProduced}
-                              value={stockEdit.sold} onChange={e => setStockEdit({ ...stockEdit, sold: e.target.value })}
-                              placeholder="Sold qty" className="border border-[#ddd] px-2 py-1.5 text-xs outline-none w-20" />
-                            <button onClick={() => handleStockUpdate(r._id)}
-                              className="bg-black text-white text-[9px] font-bold tracking-wider px-3 py-1.5 cursor-pointer border-none">SELL</button>
-                            <button onClick={() => setStockEdit(null)}
-                              className="text-[10px] text-[#aaa] cursor-pointer bg-transparent border-none">Cancel</button>
-                          </div>
-                        ) : (
-                          <button onClick={() => setStockEdit({ recordId: r._id, sold: '' })}
-                            className="text-[10px] text-[#888] hover:text-black transition-colors cursor-pointer bg-transparent border-none tracking-wider">
-                            MARK SOLD FROM BATCH
+                    {/* Actions: Edit Sell Price & Stock adjustment */}
+                    <div className="border-t border-[#f5f5f5] pt-2 mb-3 flex flex-col gap-2">
+                      {/* Price Edit */}
+                      {priceEdit?.recordId === r._id ? (
+                        <div className="flex flex-wrap gap-2 items-center bg-[#fafafa] p-2 border border-[#eee]">
+                          <span className="text-[9px] font-bold text-[#888] tracking-wider">NEW SELL PRICE:</span>
+                          <input type="number" min="0"
+                            value={priceEdit.price} onChange={e => setPriceEdit({ ...priceEdit, price: e.target.value })}
+                            placeholder="Price (TK)" className="border border-[#ddd] px-2 py-1.5 text-xs outline-none w-28 bg-white" />
+                          <button onClick={() => handlePriceUpdate(r._id)}
+                            className="bg-black text-white text-[9px] font-bold tracking-wider px-3 py-1.5 cursor-pointer border-none">SAVE</button>
+                          <button onClick={() => setPriceEdit(null)}
+                            className="text-[10px] text-[#aaa] cursor-pointer bg-transparent border-none">Cancel</button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <button onClick={() => setPriceEdit({ recordId: r._id, price: r.sellingPrice })}
+                            className="text-[10px] text-[#888] hover:text-black transition-colors cursor-pointer bg-transparent border-none tracking-wider flex items-center gap-1 font-medium">
+                            ✏️ EDIT SELL PRICE ({r.sellingPrice.toLocaleString()} TK)
                           </button>
-                        )}
-                      </div>
-                    )}
+                        </div>
+                      )}
+
+                      {/* Stock adjustment */}
+                      {(r.remainingBottles ?? r.bottlesProduced) > 0 && (
+                        <div>
+                          {stockEdit?.recordId === r._id ? (
+                            <div className="flex flex-wrap gap-2 items-center bg-[#fafafa] p-2 border border-[#eee]">
+                              <span className="text-[9px] font-bold text-[#888] tracking-wider">SOLD BOTTLES:</span>
+                              <input type="number" min="1" max={r.remainingBottles ?? r.bottlesProduced}
+                                value={stockEdit.sold} onChange={e => setStockEdit({ ...stockEdit, sold: e.target.value })}
+                                placeholder="Sold qty" className="border border-[#ddd] px-2 py-1.5 text-xs outline-none w-20 bg-white" />
+                              <button onClick={() => handleStockUpdate(r._id)}
+                                className="bg-black text-white text-[9px] font-bold tracking-wider px-3 py-1.5 cursor-pointer border-none">SELL</button>
+                              <button onClick={() => setStockEdit(null)}
+                                className="text-[10px] text-[#aaa] cursor-pointer bg-transparent border-none">Cancel</button>
+                            </div>
+                          ) : (
+                            <button onClick={() => setStockEdit({ recordId: r._id, sold: '' })}
+                              className="text-[10px] text-[#888] hover:text-black transition-colors cursor-pointer bg-transparent border-none tracking-wider">
+                              MARK SOLD FROM BATCH
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
 
                     {r.notes && (
                       <p className="text-[10px] text-[#888] italic border-t border-[#f5f5f5] pt-2 mb-3">{r.notes}</p>

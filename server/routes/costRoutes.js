@@ -73,7 +73,7 @@ router.post('/', verifyAdmin, validate(createCostRecordSchema), async (req, res)
     const packagingCost   = (packaging || []).reduce((sum, p) => sum + Number(p.cost || 0), 0);
     const totalCost       = ingredients.reduce((sum, i) => sum + Number(i.cost), 0) + packagingCost;
     const costPerBottle   = totalCost / bottlesProduced;
-    const sellingPrice    = perfume.price;
+    const sellingPrice    = (req.body.sellingPrice != null && Number(req.body.sellingPrice) >= 0) ? Number(req.body.sellingPrice) : perfume.price;
     const profitPerBottle = sellingPrice - costPerBottle;
     const profitMargin    = ((profitPerBottle / sellingPrice) * 100);
 
@@ -109,6 +109,30 @@ router.patch('/:id/stock', verifyAdmin, async (req, res) => {
     if (sold > current) return res.status(400).json({ message: `Only ${current} bottles remaining in this batch` });
 
     record.remainingBottles = current - sold;
+    await record.save();
+    res.json(record);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// PATCH update selling price for a cost record (admin only)
+router.patch('/:id/price', verifyAdmin, async (req, res) => {
+  try {
+    const { sellingPrice } = req.body;
+    if (sellingPrice == null || sellingPrice < 0) {
+      return res.status(400).json({ message: 'Valid selling price is required' });
+    }
+
+    const record = await CostRecord.findById(req.params.id);
+    if (!record) return res.status(404).json({ message: 'Record not found' });
+
+    record.sellingPrice    = Number(sellingPrice);
+    record.profitPerBottle = record.sellingPrice - record.costPerBottle;
+    record.profitMargin    = record.sellingPrice > 0
+      ? ((record.profitPerBottle / record.sellingPrice) * 100)
+      : 0;
+
     await record.save();
     res.json(record);
   } catch (err) {

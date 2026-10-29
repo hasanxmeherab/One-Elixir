@@ -228,6 +228,7 @@ const createCostRecordSchema = z.object({
     cost: z.number(),
   })).optional(),
   bottlesProduced: z.number().int().positive(),
+  sellingPrice: z.number().positive().optional(),
   notes: z.string().max(1000).optional(),
 });
 
