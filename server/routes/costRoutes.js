@@ -140,6 +140,66 @@ router.patch('/:id/price', verifyAdmin, async (req, res) => {
   }
 });
 
+// PUT update entire cost record (admin only)
+router.put('/:id', verifyAdmin, async (req, res) => {
+  try {
+    const { ingredients, packaging, bottlesProduced, remainingBottles, sellingPrice, notes } = req.body;
+
+    const record = await CostRecord.findById(req.params.id);
+    if (!record) return res.status(404).json({ message: 'Record not found' });
+
+    if (bottlesProduced != null) {
+      const bp = Number(bottlesProduced);
+      if (bp <= 0) return res.status(400).json({ message: 'Bottles produced must be greater than 0' });
+      record.bottlesProduced = bp;
+    }
+
+    if (remainingBottles != null) {
+      record.remainingBottles = Math.max(0, Number(remainingBottles));
+    }
+
+    if (ingredients != null && Array.isArray(ingredients)) {
+      record.ingredients = ingredients.map(i => ({
+        name: i.name || '',
+        qty: Number(i.qty || 0),
+        unit: i.unit || 'ml',
+        cost: Number(i.cost || 0),
+      }));
+    }
+
+    if (packaging != null && Array.isArray(packaging)) {
+      record.packaging = packaging
+        .filter(p => p.name)
+        .map(p => ({
+          name: p.name,
+          qty: Number(p.qty || 0),
+          unit: p.unit || 'pcs',
+          cost: Number(p.cost || 0),
+        }));
+    }
+
+    if (sellingPrice != null && Number(sellingPrice) >= 0) {
+      record.sellingPrice = Number(sellingPrice);
+    }
+
+    if (notes !== undefined) {
+      record.notes = notes;
+    }
+
+    const packagingCost   = (record.packaging || []).reduce((sum, p) => sum + Number(p.cost || 0), 0);
+    const totalCost       = record.ingredients.reduce((sum, i) => sum + Number(i.cost || 0), 0) + packagingCost;
+    record.totalCost      = totalCost;
+    record.costPerBottle  = record.bottlesProduced > 0 ? (totalCost / record.bottlesProduced) : 0;
+    record.profitPerBottle = record.sellingPrice - record.costPerBottle;
+    record.profitMargin   = record.sellingPrice > 0 ? ((record.profitPerBottle / record.sellingPrice) * 100) : 0;
+
+    await record.save();
+    res.json(record);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // DELETE cost record (admin only)
 router.delete('/:id', verifyAdmin, async (req, res) => {
   try {

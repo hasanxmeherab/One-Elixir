@@ -173,6 +173,8 @@ const CostCalculator = () => {
   const [wacSummaries, setWacSummaries]   = useState([]);
   const [stockEdit, setStockEdit]         = useState(null); // { recordId, sold: '' }
   const [priceEdit, setPriceEdit]         = useState(null); // { recordId, price: '' }
+  const [editingBatch, setEditingBatch]   = useState(null); // Complete batch edit object
+  const [updatingBatch, setUpdatingBatch] = useState(false);
 
   useEffect(() => {
     adminAxios.get(`${API_URL}/api/perfumes`).then(r => setPerfumes(r.data)).catch(() => {});
@@ -209,6 +211,17 @@ const CostCalculator = () => {
   const profit         = sellingPrice - costPerBottle;
   const margin         = sellingPrice > 0 ? ((profit / sellingPrice) * 100) : 0;
 
+  // ── Modal live calculations for editing batch ─────────────
+  const editIngredientCost = editingBatch?.ingredients?.reduce((s, i) => s + (Number(i.cost) || 0), 0) || 0;
+  const editPackagingCost  = editingBatch?.packaging?.reduce((s, p) => s + (Number(p.cost) || 0), 0) || 0;
+  const editTotalCost      = editIngredientCost + editPackagingCost;
+  const editBottleCount    = Number(editingBatch?.bottlesProduced) || 0;
+  const editCostPerBottle  = editBottleCount > 0 ? editTotalCost / editBottleCount : 0;
+  const editSellingPrice   = Number(editingBatch?.sellingPrice) || 0;
+  const editProfit         = editSellingPrice - editCostPerBottle;
+  const editMargin         = editSellingPrice > 0 ? ((editProfit / editSellingPrice) * 100) : 0;
+  const editMarginColor    = editMargin >= 60 ? '#16a34a' : editMargin >= 30 ? '#d97706' : '#dc2626';
+
   // ── Ingredient helpers ────────────────────────────────────
   const updateIngredient = (i, field, value) => {
     const u = [...ingredients]; u[i] = { ...u[i], [field]: value }; setIngredients(u);
@@ -217,7 +230,66 @@ const CostCalculator = () => {
     const u = [...packaging]; u[i] = { ...u[i], [field]: value }; setPackaging(u);
   };
 
-  // ── Save ─────────────────────────────────────────────────
+  // ── Batch Edit Helpers ────────────────────────────────────
+  const openEditBatchModal = (r) => {
+    setEditingBatch({
+      _id: r._id,
+      perfumeName: r.perfumeName,
+      createdAt: r.createdAt,
+      bottlesProduced: r.bottlesProduced,
+      remainingBottles: r.remainingBottles ?? r.bottlesProduced,
+      sellingPrice: r.sellingPrice,
+      ingredients: r.ingredients && r.ingredients.length > 0
+        ? r.ingredients.map(i => ({ name: i.name, qty: i.qty, unit: i.unit, cost: i.cost }))
+        : [emptyIngredient()],
+      packaging: r.packaging && r.packaging.length > 0
+        ? r.packaging.map(p => ({ name: p.name, qty: p.qty, unit: p.unit, cost: p.cost }))
+        : [emptyPackaging()],
+      notes: r.notes || '',
+    });
+  };
+
+  const updateEditIngredient = (i, field, value) => {
+    if (!editingBatch) return;
+    const u = [...editingBatch.ingredients];
+    u[i] = { ...u[i], [field]: value };
+    setEditingBatch({ ...editingBatch, ingredients: u });
+  };
+
+  const updateEditPackaging = (i, field, value) => {
+    if (!editingBatch) return;
+    const u = [...editingBatch.packaging];
+    u[i] = { ...u[i], [field]: value };
+    setEditingBatch({ ...editingBatch, packaging: u });
+  };
+
+  const handleSaveBatchEdit = async () => {
+    if (!editingBatch) return;
+    if (Number(editingBatch.bottlesProduced) <= 0) return showToast('Enter valid bottles produced');
+    if (editingBatch.ingredients.some(i => !i.name || !i.cost)) return showToast('Fill in all ingredient names and costs');
+
+    setUpdatingBatch(true);
+    try {
+      await adminAxios.put(`${API_URL}/api/costs/${editingBatch._id}`, {
+        bottlesProduced: Number(editingBatch.bottlesProduced),
+        remainingBottles: Number(editingBatch.remainingBottles),
+        sellingPrice: Number(editingBatch.sellingPrice),
+        ingredients: editingBatch.ingredients.map(i => ({ ...i, qty: Number(i.qty), cost: Number(i.cost) })),
+        packaging: editingBatch.packaging.filter(p => p.name).map(p => ({ ...p, qty: Number(p.qty), cost: Number(p.cost) })),
+        notes: editingBatch.notes,
+      });
+      showToast('✓ Batch updated successfully');
+      setEditingBatch(null);
+      fetchRecords(filterPerfume);
+      fetchWac(filterPerfume);
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to update batch');
+    } finally {
+      setUpdatingBatch(false);
+    }
+  };
+
+  // ── Save New Cost Record ─────────────────────────────────
   const handleSave = async () => {
     if (!selectedPerfume)   return showToast('Please select a perfume');
     if (bottleCount <= 0)   return showToast('Enter number of bottles produced');
@@ -515,9 +587,9 @@ const CostCalculator = () => {
                       ))}
                     </div>
 
-                    {/* Actions: Edit Sell Price & Stock adjustment */}
+                    {/* Quick Inline Actions: Edit Sell Price & Stock adjustment */}
                     <div className="border-t border-[#f5f5f5] pt-2 mb-3 flex flex-col gap-2">
-                      {/* Price Edit */}
+                      {/* Quick Price Edit */}
                       {priceEdit?.recordId === r._id ? (
                         <div className="flex flex-wrap gap-2 items-center bg-[#fafafa] p-2 border border-[#eee]">
                           <span className="text-[9px] font-bold text-[#888] tracking-wider">NEW SELL PRICE:</span>
@@ -533,7 +605,7 @@ const CostCalculator = () => {
                         <div className="flex items-center justify-between">
                           <button onClick={() => setPriceEdit({ recordId: r._id, price: r.sellingPrice })}
                             className="text-[10px] text-[#888] hover:text-black transition-colors cursor-pointer bg-transparent border-none tracking-wider flex items-center gap-1 font-medium">
-                            ✏️ EDIT SELL PRICE ({r.sellingPrice.toLocaleString()} TK)
+                            ✏️ QUICK EDIT SELL PRICE ({r.sellingPrice.toLocaleString()} TK)
                           </button>
                         </div>
                       )}
@@ -566,19 +638,27 @@ const CostCalculator = () => {
                       <p className="text-[10px] text-[#888] italic border-t border-[#f5f5f5] pt-2 mb-3">{r.notes}</p>
                     )}
 
-                    {deleteConfirm === r._id ? (
-                      <div className="flex gap-2">
-                        <button onClick={() => handleDelete(r._id)}
-                          className="flex-1 bg-red-600 text-white text-[10px] font-bold tracking-wider py-2 cursor-pointer border-none">CONFIRM DELETE</button>
-                        <button onClick={() => setDeleteConfirm(null)}
-                          className="flex-1 border border-[#ddd] text-[10px] font-bold tracking-wider py-2 cursor-pointer bg-white">CANCEL</button>
-                      </div>
-                    ) : (
-                      <button onClick={() => setDeleteConfirm(r._id)}
-                        className="text-[10px] text-[#ccc] hover:text-red-500 transition-colors cursor-pointer bg-transparent border-none tracking-wider">
-                        DELETE RECORD
+                    {/* Footer Actions: Full Batch Edit & Delete */}
+                    <div className="flex items-center justify-between border-t border-[#f5f5f5] pt-3">
+                      <button onClick={() => openEditBatchModal(r)}
+                        className="text-[10px] font-bold tracking-wider text-black hover:underline cursor-pointer bg-transparent border-none flex items-center gap-1">
+                        ✏️ EDIT FULL BATCH
                       </button>
-                    )}
+
+                      {deleteConfirm === r._id ? (
+                        <div className="flex gap-2">
+                          <button onClick={() => handleDelete(r._id)}
+                            className="bg-red-600 text-white text-[10px] font-bold tracking-wider px-3 py-1.5 cursor-pointer border-none">CONFIRM DELETE</button>
+                          <button onClick={() => setDeleteConfirm(null)}
+                            className="border border-[#ddd] text-[10px] font-bold tracking-wider px-3 py-1.5 cursor-pointer bg-white">CANCEL</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setDeleteConfirm(r._id)}
+                          className="text-[10px] text-[#ccc] hover:text-red-500 transition-colors cursor-pointer bg-transparent border-none tracking-wider">
+                          DELETE RECORD
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -586,6 +666,152 @@ const CostCalculator = () => {
           )}
         </div>
       </div>
+
+      {/* ── EDIT BATCH MODAL ── */}
+      {editingBatch && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="bg-white w-full max-w-3xl max-h-[92vh] flex flex-col border border-[#ddd] shadow-2xl my-auto">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-[#eee] flex items-center justify-between bg-white sticky top-0 z-10">
+              <div>
+                <p className="text-xs sm:text-sm font-bold tracking-[2px]">EDIT BATCH: {editingBatch.perfumeName?.toUpperCase()}</p>
+                <p className="text-[10px] text-[#888] tracking-wider mt-0.5">
+                  Batch date: {new Date(editingBatch.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </p>
+              </div>
+              <button
+                onClick={() => setEditingBatch(null)}
+                className="text-[#999] hover:text-black text-2xl leading-none bg-transparent border-none cursor-pointer px-2"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+              {/* Batch quantities and price */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                <div>
+                  <label className="text-[10px] font-bold tracking-[2px] text-[#888] block mb-2">BOTTLES PRODUCED</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editingBatch.bottlesProduced}
+                    onChange={e => setEditingBatch({ ...editingBatch, bottlesProduced: e.target.value })}
+                    className="w-full border border-[#ddd] px-3 py-2 text-sm outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold tracking-[2px] text-[#888] block mb-2">REMAINING IN STOCK</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editingBatch.remainingBottles}
+                    onChange={e => setEditingBatch({ ...editingBatch, remainingBottles: e.target.value })}
+                    className="w-full border border-[#ddd] px-3 py-2 text-sm outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold tracking-[2px] text-[#888] block mb-2">SELLING PRICE (TK)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editingBatch.sellingPrice}
+                    onChange={e => setEditingBatch({ ...editingBatch, sellingPrice: e.target.value })}
+                    className="w-full border border-[#ddd] px-3 py-2 text-sm outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Ingredients */}
+              <RowEditor
+                rows={editingBatch.ingredients}
+                label="INGREDIENTS / ITEMS"
+                onUpdate={updateEditIngredient}
+                onAdd={() => setEditingBatch({ ...editingBatch, ingredients: [...editingBatch.ingredients, emptyIngredient()] })}
+                onRemove={i => setEditingBatch({ ...editingBatch, ingredients: editingBatch.ingredients.filter((_, idx) => idx !== i) })}
+              />
+
+              {/* Packaging */}
+              <div className="border-t border-[#eee] pt-5 mb-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-[10px] font-bold tracking-[2px] text-[#888]">📦 PACKAGING MATERIALS</span>
+                  {editPackagingCost > 0 && (
+                    <span className="text-[9px] bg-[#f0f0f0] px-2 py-0.5 font-bold text-[#555]">
+                      {editPackagingCost.toLocaleString()} TK total
+                    </span>
+                  )}
+                </div>
+                <RowEditor
+                  rows={editingBatch.packaging}
+                  label="PACKAGING ITEMS"
+                  onUpdate={updateEditPackaging}
+                  onAdd={() => setEditingBatch({ ...editingBatch, packaging: [...editingBatch.packaging, emptyPackaging()] })}
+                  onRemove={i => setEditingBatch({ ...editingBatch, packaging: editingBatch.packaging.filter((_, idx) => idx !== i) })}
+                />
+              </div>
+
+              {/* Notes */}
+              <div className="mb-6">
+                <label className="text-[10px] font-bold tracking-[2px] text-[#888] block mb-2">NOTES (OPTIONAL)</label>
+                <textarea
+                  value={editingBatch.notes}
+                  onChange={e => setEditingBatch({ ...editingBatch, notes: e.target.value })}
+                  placeholder="Notes about this batch..."
+                  rows={2}
+                  className="w-full border border-[#ddd] px-3 py-2 text-sm outline-none resize-none"
+                />
+              </div>
+
+              {/* Recalculated live summary in Modal */}
+              <div className="bg-[#fafafa] border border-[#eee] p-4 sm:p-5">
+                <p className="text-[10px] font-bold tracking-[3px] text-[#888] mb-3">UPDATED BATCH SUMMARY</p>
+                <div className="grid grid-cols-2 gap-y-2 text-xs">
+                  <span className="text-[#888]">Ingredient Cost:</span>
+                  <span className="font-bold text-right">{editIngredientCost.toLocaleString()} TK</span>
+
+                  <span className="text-[#888]">Packaging Cost:</span>
+                  <span className="font-bold text-right">{editPackagingCost > 0 ? `${editPackagingCost.toLocaleString()} TK` : '—'}</span>
+
+                  <span className="text-[#888]">Total Batch Cost:</span>
+                  <span className="font-bold text-right">{editTotalCost.toLocaleString()} TK</span>
+
+                  <span className="text-[#888]">Cost Per Bottle:</span>
+                  <span className="font-bold text-right">{editCostPerBottle > 0 ? `${editCostPerBottle.toFixed(0)} TK` : '—'}</span>
+
+                  <span className="text-[#888]">Selling Price:</span>
+                  <span className="font-bold text-right">{editSellingPrice > 0 ? `${editSellingPrice.toLocaleString()} TK` : '—'}</span>
+
+                  <span className="text-[#888]">Profit Per Bottle:</span>
+                  <span className="font-bold text-right">{editProfit > 0 ? `${editProfit.toFixed(0)} TK` : '—'}</span>
+
+                  <span className="text-[#888]">Profit Margin:</span>
+                  <span className="font-bold text-right text-sm" style={{ color: editMarginColor }}>
+                    {editMargin > 0 ? `${editMargin.toFixed(1)}%` : '—'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 border-t border-[#eee] bg-[#fafafa] flex gap-3 justify-end sticky bottom-0">
+              <button
+                onClick={() => setEditingBatch(null)}
+                className="px-5 py-2.5 border border-[#ddd] text-xs font-bold tracking-wider hover:bg-gray-100 transition-colors cursor-pointer bg-white"
+              >
+                CANCEL
+              </button>
+              <button
+                onClick={handleSaveBatchEdit}
+                disabled={updatingBatch}
+                className="px-6 py-2.5 bg-black text-white text-xs font-bold tracking-wider hover:bg-gray-800 transition-colors disabled:opacity-50 cursor-pointer border-none"
+              >
+                {updatingBatch ? 'SAVING...' : 'SAVE CHANGES'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
