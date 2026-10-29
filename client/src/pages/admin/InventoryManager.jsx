@@ -167,12 +167,54 @@ const InventoryManager = () => {
     }));
   };
 
-  const uploadSingleFile = async (file) => {
+  // Compress image client-side before uploading (max 1200px, ~80% quality)
+  const compressImage = (file, maxWidth = 1200, quality = 0.8) => {
+    return new Promise((resolve) => {
+      if (!file.type.startsWith('image/') || file.size < 200 * 1024) {
+        return resolve(file);
+      }
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob && blob.size < file.size) {
+              resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+            } else {
+              resolve(file);
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  const [uploadProgress, setUploadProgress] = useState('');
+
+  const uploadSingleFile = async (file, label) => {
+    const compressed = await compressImage(file);
+    if (label) setUploadProgress(label);
     const data = new FormData();
-    data.append('file', file);
+    data.append('file', compressed);
     data.append('upload_preset', UPLOAD_PRESET);
-    data.append('cloud_name', CLOUD_NAME);
-    const res = await axios.post(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, data);
+    const res = await axios.post(
+      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+      data,
+      { timeout: 60000 }
+    );
     return optimizeCloudinaryUrl(res.data.secure_url, 1200);
   };
 
@@ -187,7 +229,11 @@ const InventoryManager = () => {
     }
     try {
       setUploading(true);
-      const newUrls   = files.length > 0 ? await Promise.all(files.map(uploadSingleFile)) : [];
+      const newUrls = [];
+      for (let i = 0; i < files.length; i++) {
+        const url = await uploadSingleFile(files[i], 'Uploading image ' + (i + 1) + ' of ' + files.length + '...');
+        newUrls.push(url);
+      }
       const allImages = [...(formData.images || []), ...newUrls];
       const primaryImage = allImages[0] || formData.image || '';
 
@@ -198,7 +244,7 @@ const InventoryManager = () => {
           .map(async (v) => {
             let img = v.image || '';
             if (v._file) {
-              img = await uploadSingleFile(v._file);
+              img = await uploadSingleFile(v._file, 'Uploading ' + v.label + ' image...');
             }
             return { label: v.label, price: Number(v.price), stock: Number(v.stock) || 0, image: img };
           })
@@ -236,6 +282,7 @@ const InventoryManager = () => {
       toast.error(err.response?.data?.message || 'Operation failed. Please try again.');
     } finally {
       setUploading(false);
+      setUploadProgress('');
     }
   };
 
@@ -433,7 +480,7 @@ const InventoryManager = () => {
         <div className="flex flex-col sm:flex-row gap-2.5">
           <button type="submit" disabled={uploading}
             className="px-6 py-4 bg-black text-white border-none cursor-pointer font-bold hover:bg-gray-800 transition-colors disabled:opacity-60">
-            {uploading ? 'UPLOADING...' : editId ? 'UPDATE CHANGES' : 'UPLOAD ELIXIR'}
+            {uploading ? (uploadProgress || 'UPLOADING...') : editId ? 'UPDATE CHANGES' : 'UPLOAD ELIXIR'}
           </button>
           {editId && (
             <button type="button" onClick={cancelEdit}
