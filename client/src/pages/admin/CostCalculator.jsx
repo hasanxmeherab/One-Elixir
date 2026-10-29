@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import adminAxios from '../../utils/adminAxios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -60,6 +60,102 @@ const RowEditor = ({ rows, onUpdate, onAdd, onRemove, label }) => (
     </div>
   </div>
 );
+
+/* ── Searchable Perfume Selector ──────────────────────────── */
+const SearchableSelect = ({ perfumes, value, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const wrapperRef = useRef(null);
+  const inputRef = useRef(null);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const filtered = perfumes.filter(p =>
+    p.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const selected = perfumes.find(p => p._id === value);
+
+  const handleSelect = (id) => {
+    onChange(id);
+    setOpen(false);
+    setSearch('');
+  };
+
+  const handleClear = (e) => {
+    e.stopPropagation();
+    onChange('');
+    setSearch('');
+  };
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      {/* Trigger */}
+      <div
+        onClick={() => { setOpen(!open); setTimeout(() => inputRef.current?.focus(), 50); }}
+        className="w-full border border-[#ddd] px-3 py-2.5 text-sm outline-none bg-white cursor-pointer flex items-center justify-between"
+      >
+        <span className={selected ? 'text-black' : 'text-[#999]'}>
+          {selected ? `${selected.name} — ${selected.price.toLocaleString()} TK` : '— Choose a perfume —'}
+        </span>
+        <div className="flex items-center gap-1">
+          {selected && (
+            <button
+              onClick={handleClear}
+              className="text-[#aaa] hover:text-red-500 text-base leading-none bg-transparent border-none cursor-pointer px-1"
+            >
+              ×
+            </button>
+          )}
+          <span className="text-[10px] text-[#aaa]">{open ? '▲' : '▼'}</span>
+        </div>
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-[#ddd] shadow-lg max-h-[280px] flex flex-col">
+          {/* Search input */}
+          <div className="p-2 border-b border-[#eee]">
+            <input
+              ref={inputRef}
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search perfume..."
+              className="w-full border border-[#ddd] px-3 py-2 text-sm outline-none"
+              onClick={e => e.stopPropagation()}
+            />
+          </div>
+          {/* Options */}
+          <div className="overflow-y-auto flex-1">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-4 text-xs text-[#aaa] text-center tracking-wider">NO MATCH FOUND</div>
+            ) : (
+              filtered.map(p => (
+                <div
+                  key={p._id}
+                  onClick={() => handleSelect(p._id)}
+                  className={`px-3 py-2.5 text-sm cursor-pointer transition-colors hover:bg-[#f5f5f5] ${
+                    p._id === value ? 'bg-[#f0f0f0] font-bold' : ''
+                  }`}
+                >
+                  {p.name} — {p.price.toLocaleString()} TK
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const CostCalculator = () => {
   const [perfumes, setPerfumes]           = useState([]);
@@ -192,13 +288,11 @@ const CostCalculator = () => {
           {/* Perfume selector */}
           <div className="mb-5">
             <label className="text-[10px] font-bold tracking-[2px] text-[#888] block mb-2">SELECT PERFUME</label>
-            <select value={selectedPerfume} onChange={e => setSelectedPerfume(e.target.value)}
-              className="w-full border border-[#ddd] px-3 py-2.5 text-sm outline-none bg-white">
-              <option value="">— Choose a perfume —</option>
-              {perfumes.map(p => (
-                <option key={p._id} value={p._id}>{p.name} — {p.price.toLocaleString()} TK</option>
-              ))}
-            </select>
+            <SearchableSelect
+              perfumes={perfumes}
+              value={selectedPerfume}
+              onChange={setSelectedPerfume}
+            />
           </div>
 
           {/* Bottles */}
