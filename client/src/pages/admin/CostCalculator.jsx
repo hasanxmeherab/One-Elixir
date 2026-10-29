@@ -2,58 +2,61 @@ import React, { useState, useEffect, useRef } from 'react';
 import adminAxios from '../../utils/adminAxios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-
 const UNITS = ['ml', 'g', 'kg', 'L', 'pcs', 'bottle', 'box', ''];
 
-const emptyIngredient  = () => ({ name: '', qty: '', unit: 'ml', cost: '' });
-const emptyPackaging   = () => ({ name: '', qty: '', unit: 'pcs', cost: '' });
+const emptyIngredient = () => ({ name: '', qty: '', unit: 'ml',  cost: '' });
+const emptyPackaging  = () => ({ name: '', qty: '', unit: 'pcs', cost: '' });
 
+const marginColor = (m) => m >= 60 ? '#16a34a' : m >= 30 ? '#d97706' : '#dc2626';
+const fmt = (n) => Number(n).toLocaleString();
+
+/* ─── Row editor (ingredients / packaging) ─────────────────── */
 const RowEditor = ({ rows, onUpdate, onAdd, onRemove, label }) => (
-  <div className="mb-6">
-    <div className="flex items-center justify-between mb-3">
-      <label className="text-[10px] font-bold tracking-[2px] text-[#888]">{label}</label>
+  <div className="mb-5">
+    <div className="flex items-center justify-between mb-2">
+      <span className="text-[10px] font-bold tracking-[2px] text-[#888]">{label}</span>
       <button onClick={onAdd}
-        className="text-[10px] font-bold tracking-wider px-3 py-1.5 border border-black hover:bg-black hover:text-white transition-colors cursor-pointer bg-white">
+        className="text-[9px] font-bold tracking-wider px-2.5 py-1 border border-black hover:bg-black hover:text-white transition-colors cursor-pointer bg-white">
         + ADD ROW
       </button>
     </div>
-    {/* Desktop header */}
-    <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 mb-2">
+    <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 mb-1">
       {['ITEM', 'QTY', 'UNIT', 'COST (TK)', ''].map((h, i) => (
-        <span key={i} className="text-[9px] font-bold tracking-wider text-[#aaa]">{h}</span>
+        <span key={i} className="text-[9px] font-bold tracking-wider text-[#bbb]">{h}</span>
       ))}
     </div>
-    <div className="flex flex-col gap-3 sm:gap-2">
+    <div className="flex flex-col gap-2">
       {rows.map((row, i) => (
-        <div key={i} className="grid grid-cols-2 sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 items-center border border-[#eee] sm:border-0 p-3 sm:p-0">
+        <div key={i} className="grid grid-cols-2 sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 items-center
+          border border-[#eee] p-2 sm:border-0 sm:p-0">
           <div className="col-span-2 sm:col-span-1">
-            <span className="text-[9px] font-bold text-[#aaa] sm:hidden mb-1 block">ITEM</span>
+            <span className="text-[9px] font-bold text-[#bbb] sm:hidden mb-1 block">ITEM</span>
             <input value={row.name} onChange={e => onUpdate(i, 'name', e.target.value)}
               placeholder={label === 'INGREDIENTS / ITEMS' ? 'e.g. Oud Oil' : 'e.g. Glass Bottle'}
-              className="border border-[#ddd] px-2 py-2 text-xs outline-none w-full" />
+              className="border border-[#ddd] px-2 py-1.5 text-xs outline-none w-full focus:border-black transition-colors" />
           </div>
           <div>
-            <span className="text-[9px] font-bold text-[#aaa] sm:hidden mb-1 block">QTY</span>
+            <span className="text-[9px] font-bold text-[#bbb] sm:hidden mb-1 block">QTY</span>
             <input type="number" value={row.qty} onChange={e => onUpdate(i, 'qty', e.target.value)}
-              placeholder="50" className="border border-[#ddd] px-2 py-2 text-xs outline-none w-full" />
+              placeholder="50" className="border border-[#ddd] px-2 py-1.5 text-xs outline-none w-full focus:border-black transition-colors" />
           </div>
-          <div className="flex gap-2 items-end">
-            <div className="flex-1">
-              <span className="text-[9px] font-bold text-[#aaa] sm:hidden mb-1 block">UNIT</span>
-              <select value={row.unit} onChange={e => onUpdate(i, 'unit', e.target.value)}
-                className="border border-[#ddd] px-2 py-2 text-xs outline-none bg-white w-full">
-                {UNITS.map(u => <option key={u} value={u}>{u || '—'}</option>)}
-              </select>
-            </div>
+          <div>
+            <span className="text-[9px] font-bold text-[#bbb] sm:hidden mb-1 block">UNIT</span>
+            <select value={row.unit} onChange={e => onUpdate(i, 'unit', e.target.value)}
+              className="border border-[#ddd] px-2 py-1.5 text-xs outline-none bg-white w-full focus:border-black transition-colors">
+              {UNITS.map(u => <option key={u} value={u}>{u || '—'}</option>)}
+            </select>
           </div>
-          <div className="flex gap-2 items-end">
+          <div className="flex gap-1 items-center">
             <div className="flex-1">
-              <span className="text-[9px] font-bold text-[#aaa] sm:hidden mb-1 block">COST (TK)</span>
+              <span className="text-[9px] font-bold text-[#bbb] sm:hidden mb-1 block">COST</span>
               <input type="number" value={row.cost} onChange={e => onUpdate(i, 'cost', e.target.value)}
-                placeholder="2000" className="border border-[#ddd] px-2 py-2 text-xs outline-none w-full" />
+                placeholder="2000" className="border border-[#ddd] px-2 py-1.5 text-xs outline-none w-full focus:border-black transition-colors" />
             </div>
             <button onClick={() => onRemove(i)} disabled={rows.length === 1}
-              className="text-[#ccc] hover:text-red-500 disabled:opacity-20 text-lg leading-none cursor-pointer bg-transparent border-none px-1 sm:mb-0 mb-1">×</button>
+              className="text-[#ccc] hover:text-red-400 disabled:opacity-20 text-xl leading-none cursor-pointer bg-transparent border-none w-6 text-center flex-shrink-0">
+              ×
+            </button>
           </div>
         </div>
       ))}
@@ -61,95 +64,59 @@ const RowEditor = ({ rows, onUpdate, onAdd, onRemove, label }) => (
   </div>
 );
 
-/* ── Searchable Perfume Selector ──────────────────────────── */
+/* ─── Searchable perfume dropdown ──────────────────────────── */
 const SearchableSelect = ({ perfumes, value, onChange }) => {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen]   = useState(false);
   const [search, setSearch] = useState('');
-  const wrapperRef = useRef(null);
+  const wrapRef  = useRef(null);
   const inputRef = useRef(null);
 
-  // Close on outside click
   useEffect(() => {
-    const handler = (e) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const h = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
   }, []);
 
-  const filtered = perfumes.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase())
-  );
-
+  const filtered = perfumes.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
   const selected = perfumes.find(p => p._id === value);
 
-  const handleSelect = (id) => {
-    onChange(id);
-    setOpen(false);
-    setSearch('');
-  };
-
-  const handleClear = (e) => {
-    e.stopPropagation();
-    onChange('');
-    setSearch('');
-  };
-
   return (
-    <div ref={wrapperRef} className="relative">
-      {/* Trigger */}
+    <div ref={wrapRef} className="relative">
       <div
         onClick={() => { setOpen(!open); setTimeout(() => inputRef.current?.focus(), 50); }}
-        className="w-full border border-[#ddd] px-3 py-2.5 text-sm outline-none bg-white cursor-pointer flex items-center justify-between"
+        className="w-full border border-[#ddd] px-3 py-2.5 text-sm bg-white cursor-pointer flex items-center justify-between hover:border-black transition-colors"
       >
-        <span className={selected ? 'text-black' : 'text-[#999]'}>
-          {selected ? `${selected.name} — ${selected.price.toLocaleString()} TK` : '— Choose a perfume —'}
+        <span className={selected ? 'text-black' : 'text-[#bbb]'}>
+          {selected ? `${selected.name} — ${fmt(selected.price)} TK` : '— Choose a perfume —'}
         </span>
         <div className="flex items-center gap-1">
           {selected && (
-            <button
-              onClick={handleClear}
-              className="text-[#aaa] hover:text-red-500 text-base leading-none bg-transparent border-none cursor-pointer px-1"
-            >
+            <button onClick={e => { e.stopPropagation(); onChange(''); setSearch(''); }}
+              className="text-[#bbb] hover:text-red-400 text-base leading-none bg-transparent border-none cursor-pointer px-1">
               ×
             </button>
           )}
-          <span className="text-[10px] text-[#aaa]">{open ? '▲' : '▼'}</span>
+          <span className="text-[10px] text-[#bbb]">{open ? '▲' : '▼'}</span>
         </div>
       </div>
-
-      {/* Dropdown */}
       {open && (
-        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-[#ddd] shadow-lg max-h-[280px] flex flex-col">
-          {/* Search input */}
+        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-[#ddd] shadow-xl max-h-[260px] flex flex-col">
           <div className="p-2 border-b border-[#eee]">
-            <input
-              ref={inputRef}
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search perfume..."
-              className="w-full border border-[#ddd] px-3 py-2 text-sm outline-none"
-              onClick={e => e.stopPropagation()}
-            />
+            <input ref={inputRef} type="text" value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Search perfume…"
+              className="w-full border border-[#ddd] px-3 py-2 text-sm outline-none focus:border-black transition-colors"
+              onClick={e => e.stopPropagation()} />
           </div>
-          {/* Options */}
           <div className="overflow-y-auto flex-1">
-            {filtered.length === 0 ? (
-              <div className="px-3 py-4 text-xs text-[#aaa] text-center tracking-wider">NO MATCH FOUND</div>
-            ) : (
-              filtered.map(p => (
-                <div
-                  key={p._id}
-                  onClick={() => handleSelect(p._id)}
-                  className={`px-3 py-2.5 text-sm cursor-pointer transition-colors hover:bg-[#f5f5f5] ${
-                    p._id === value ? 'bg-[#f0f0f0] font-bold' : ''
-                  }`}
-                >
-                  {p.name} — {p.price.toLocaleString()} TK
-                </div>
-              ))
-            )}
+            {filtered.length === 0
+              ? <div className="px-3 py-4 text-xs text-[#bbb] text-center tracking-wider">NO MATCH FOUND</div>
+              : filtered.map(p => (
+                  <div key={p._id} onClick={() => { onChange(p._id); setOpen(false); setSearch(''); }}
+                    className={`px-3 py-2.5 text-sm cursor-pointer transition-colors hover:bg-[#f5f5f5] ${p._id === value ? 'bg-[#f0f0f0] font-semibold' : ''}`}>
+                    {p.name} <span className="text-[#aaa]">— {fmt(p.price)} TK</span>
+                  </div>
+                ))
+            }
           </div>
         </div>
       )}
@@ -157,144 +124,110 @@ const SearchableSelect = ({ perfumes, value, onChange }) => {
   );
 };
 
-const CostCalculator = () => {
-  const [perfumes, setPerfumes]           = useState([]);
-  const [records, setRecords]             = useState([]);
-  const [selectedPerfume, setSelectedPerfume] = useState('');
-  const [customSellingPrice, setCustomSellingPrice] = useState('');
-  const [ingredients, setIngredients]     = useState([emptyIngredient()]);
-  const [packaging, setPackaging]         = useState([emptyPackaging()]);
-  const [bottles, setBottles]             = useState('');
-  const [notes, setNotes]                 = useState('');
-  const [saving, setSaving]               = useState(false);
-  const [toast, setToast]                 = useState('');
-  const [filterPerfume, setFilterPerfume] = useState('');
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [wacSummaries, setWacSummaries]   = useState([]);
-  const [stockEdit, setStockEdit]         = useState(null); // { recordId, sold: '' }
-  const [priceEdit, setPriceEdit]         = useState(null); // { recordId, price: '' }
-  const [editingBatch, setEditingBatch]   = useState(null); // Complete batch edit object
-  const [updatingBatch, setUpdatingBatch] = useState(false);
+/* ─── Stat row helper ───────────────────────────────────────── */
+const StatRow = ({ label, value, valueClass = '' }) => (
+  <>
+    <span className="text-[11px] text-[#888]">{label}</span>
+    <span className={`text-[11px] font-bold text-right ${valueClass}`}>{value}</span>
+  </>
+);
 
+/* ═══════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+═══════════════════════════════════════════════════════════════ */
+const CostCalculator = () => {
+  const [perfumes,           setPerfumes]           = useState([]);
+  const [records,            setRecords]             = useState([]);
+  const [selectedPerfume,    setSelectedPerfume]     = useState('');
+  const [customSellingPrice, setCustomSellingPrice]  = useState('');
+  const [ingredients,        setIngredients]         = useState([emptyIngredient()]);
+  const [packaging,          setPackaging]           = useState([emptyPackaging()]);
+  const [bottles,            setBottles]             = useState('');
+  const [notes,              setNotes]               = useState('');
+  const [saving,             setSaving]              = useState(false);
+  const [toast,              setToast]               = useState('');
+  const [filterPerfume,      setFilterPerfume]       = useState('');
+  const [deleteConfirm,      setDeleteConfirm]       = useState(null);
+  const [wacSummaries,       setWacSummaries]        = useState([]);
+  const [stockEdit,          setStockEdit]           = useState(null);   // { recordId, sold }
+  const [priceEdit,          setPriceEdit]           = useState(null);   // { recordId, price }
+  const [editingBatch,       setEditingBatch]        = useState(null);
+  const [updatingBatch,      setUpdatingBatch]       = useState(false);
+  const [expandedRecord,     setExpandedRecord]      = useState(null);   // id of expanded history card
+
+  /* ── fetch ─────────────────────────────────────────────── */
   useEffect(() => {
     adminAxios.get(`${API_URL}/api/perfumes`).then(r => setPerfumes(r.data)).catch(() => {});
-    fetchRecords();
-    fetchWac();
+    fetchRecords(); fetchWac();
   }, []);
 
   const fetchRecords = async (pid = '') => {
     try {
-      const url = pid ? `${API_URL}/api/costs?perfumeId=${pid}` : `${API_URL}/api/costs`;
-      const res = await adminAxios.get(url);
-      setRecords(res.data);
+      const r = await adminAxios.get(`${API_URL}/api/costs${pid ? `?perfumeId=${pid}` : ''}`);
+      setRecords(r.data);
+    } catch {}
+  };
+  const fetchWac = async (pid = '') => {
+    try {
+      const r = await adminAxios.get(`${API_URL}/api/costs/summary/wac${pid ? `?perfumeId=${pid}` : ''}`);
+      setWacSummaries(r.data);
     } catch {}
   };
 
   useEffect(() => { fetchRecords(filterPerfume); fetchWac(filterPerfume); }, [filterPerfume]);
 
-  const fetchWac = async (pid = '') => {
-    try {
-      const url = pid ? `${API_URL}/api/costs/summary/wac?perfumeId=${pid}` : `${API_URL}/api/costs/summary/wac`;
-      const res = await adminAxios.get(url);
-      setWacSummaries(res.data);
-    } catch {}
-  };
+  /* ── live calcs (new record form) ─────────────────────── */
+  const ingCost      = ingredients.reduce((s, i) => s + (Number(i.cost) || 0), 0);
+  const pkgCost      = packaging.reduce((s, p) => s + (Number(p.cost) || 0), 0);
+  const totalCost    = ingCost + pkgCost;
+  const bottleCount  = Number(bottles) || 0;
+  const cpb          = bottleCount > 0 ? totalCost / bottleCount : 0;
+  const perfumeData  = perfumes.find(p => p._id === selectedPerfume);
+  const sp           = customSellingPrice !== '' ? Number(customSellingPrice) : (perfumeData?.price || 0);
+  const profitPB     = sp - cpb;
+  const margin       = sp > 0 ? (profitPB / sp) * 100 : 0;
 
-  // ── Live calculations ─────────────────────────────────────
-  const ingredientCost = ingredients.reduce((s, i) => s + (Number(i.cost) || 0), 0);
-  const packagingCost  = packaging.reduce((s, p) => s + (Number(p.cost) || 0), 0);
-  const totalCost      = ingredientCost + packagingCost;
-  const bottleCount    = Number(bottles) || 0;
-  const costPerBottle  = bottleCount > 0 ? totalCost / bottleCount : 0;
-  const perfumeData    = perfumes.find(p => p._id === selectedPerfume);
-  const sellingPrice   = customSellingPrice !== '' ? Number(customSellingPrice) : (perfumeData?.price || 0);
-  const profit         = sellingPrice - costPerBottle;
-  const margin         = sellingPrice > 0 ? ((profit / sellingPrice) * 100) : 0;
+  /* ── live calcs (edit modal) ───────────────────────────── */
+  const eIngCost = editingBatch?.ingredients?.reduce((s, i) => s + (Number(i.cost) || 0), 0) || 0;
+  const ePkgCost = editingBatch?.packaging?.reduce((s, p) => s + (Number(p.cost) || 0), 0) || 0;
+  const eTotalCost = eIngCost + ePkgCost;
+  const eBotCount  = Number(editingBatch?.bottlesProduced) || 0;
+  const eCPB       = eBotCount > 0 ? eTotalCost / eBotCount : 0;
+  const eSP        = Number(editingBatch?.sellingPrice) || 0;
+  const eProfit    = eSP - eCPB;
+  const eMargin    = eSP > 0 ? (eProfit / eSP) * 100 : 0;
 
-  // ── Modal live calculations for editing batch ─────────────
-  const editIngredientCost = editingBatch?.ingredients?.reduce((s, i) => s + (Number(i.cost) || 0), 0) || 0;
-  const editPackagingCost  = editingBatch?.packaging?.reduce((s, p) => s + (Number(p.cost) || 0), 0) || 0;
-  const editTotalCost      = editIngredientCost + editPackagingCost;
-  const editBottleCount    = Number(editingBatch?.bottlesProduced) || 0;
-  const editCostPerBottle  = editBottleCount > 0 ? editTotalCost / editBottleCount : 0;
-  const editSellingPrice   = Number(editingBatch?.sellingPrice) || 0;
-  const editProfit         = editSellingPrice - editCostPerBottle;
-  const editMargin         = editSellingPrice > 0 ? ((editProfit / editSellingPrice) * 100) : 0;
-  const editMarginColor    = editMargin >= 60 ? '#16a34a' : editMargin >= 30 ? '#d97706' : '#dc2626';
+  /* ── helpers ───────────────────────────────────────────── */
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
-  // ── Ingredient helpers ────────────────────────────────────
-  const updateIngredient = (i, field, value) => {
-    const u = [...ingredients]; u[i] = { ...u[i], [field]: value }; setIngredients(u);
-  };
-  const updatePackaging = (i, field, value) => {
-    const u = [...packaging]; u[i] = { ...u[i], [field]: value }; setPackaging(u);
-  };
-
-  // ── Batch Edit Helpers ────────────────────────────────────
-  const openEditBatchModal = (r) => {
-    setEditingBatch({
-      _id: r._id,
-      perfumeName: r.perfumeName,
-      createdAt: r.createdAt,
-      bottlesProduced: r.bottlesProduced,
-      remainingBottles: r.remainingBottles ?? r.bottlesProduced,
-      sellingPrice: r.sellingPrice,
-      ingredients: r.ingredients && r.ingredients.length > 0
-        ? r.ingredients.map(i => ({ name: i.name, qty: i.qty, unit: i.unit, cost: i.cost }))
-        : [emptyIngredient()],
-      packaging: r.packaging && r.packaging.length > 0
-        ? r.packaging.map(p => ({ name: p.name, qty: p.qty, unit: p.unit, cost: p.cost }))
-        : [emptyPackaging()],
-      notes: r.notes || '',
-    });
-  };
-
-  const updateEditIngredient = (i, field, value) => {
+  const updateIng = (i, f, v) => { const u = [...ingredients]; u[i] = { ...u[i], [f]: v }; setIngredients(u); };
+  const updatePkg = (i, f, v) => { const u = [...packaging];   u[i] = { ...u[i], [f]: v }; setPackaging(u); };
+  const updateEditIng = (i, f, v) => {
     if (!editingBatch) return;
-    const u = [...editingBatch.ingredients];
-    u[i] = { ...u[i], [field]: value };
+    const u = [...editingBatch.ingredients]; u[i] = { ...u[i], [f]: v };
     setEditingBatch({ ...editingBatch, ingredients: u });
   };
-
-  const updateEditPackaging = (i, field, value) => {
+  const updateEditPkg = (i, f, v) => {
     if (!editingBatch) return;
-    const u = [...editingBatch.packaging];
-    u[i] = { ...u[i], [field]: value };
+    const u = [...editingBatch.packaging]; u[i] = { ...u[i], [f]: v };
     setEditingBatch({ ...editingBatch, packaging: u });
   };
 
-  const handleSaveBatchEdit = async () => {
-    if (!editingBatch) return;
-    if (Number(editingBatch.bottlesProduced) <= 0) return showToast('Enter valid bottles produced');
-    if (editingBatch.ingredients.some(i => !i.name || !i.cost)) return showToast('Fill in all ingredient names and costs');
+  const openEditModal = (r) => setEditingBatch({
+    _id: r._id, perfumeName: r.perfumeName, createdAt: r.createdAt,
+    bottlesProduced: r.bottlesProduced,
+    remainingBottles: r.remainingBottles ?? r.bottlesProduced,
+    sellingPrice: r.sellingPrice,
+    ingredients: r.ingredients?.length > 0 ? r.ingredients.map(i => ({ ...i })) : [emptyIngredient()],
+    packaging:   r.packaging?.length   > 0 ? r.packaging.map(p => ({ ...p }))   : [emptyPackaging()],
+    notes: r.notes || '',
+  });
 
-    setUpdatingBatch(true);
-    try {
-      await adminAxios.put(`${API_URL}/api/costs/${editingBatch._id}`, {
-        bottlesProduced: Number(editingBatch.bottlesProduced),
-        remainingBottles: Number(editingBatch.remainingBottles),
-        sellingPrice: Number(editingBatch.sellingPrice),
-        ingredients: editingBatch.ingredients.map(i => ({ ...i, qty: Number(i.qty), cost: Number(i.cost) })),
-        packaging: editingBatch.packaging.filter(p => p.name).map(p => ({ ...p, qty: Number(p.qty), cost: Number(p.cost) })),
-        notes: editingBatch.notes,
-      });
-      showToast('✓ Batch updated successfully');
-      setEditingBatch(null);
-      fetchRecords(filterPerfume);
-      fetchWac(filterPerfume);
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to update batch');
-    } finally {
-      setUpdatingBatch(false);
-    }
-  };
-
-  // ── Save New Cost Record ─────────────────────────────────
+  /* ── actions ───────────────────────────────────────────── */
   const handleSave = async () => {
     if (!selectedPerfume)   return showToast('Please select a perfume');
     if (bottleCount <= 0)   return showToast('Enter number of bottles produced');
     if (ingredients.some(i => !i.name || !i.cost)) return showToast('Fill in all ingredient names and costs');
-
     setSaving(true);
     try {
       await adminAxios.post(`${API_URL}/api/costs`, {
@@ -306,25 +239,17 @@ const CostCalculator = () => {
         notes,
       });
       showToast('✓ Cost record saved');
-      setIngredients([emptyIngredient()]);
-      setPackaging([emptyPackaging()]);
-      setBottles('');
-      setCustomSellingPrice('');
-      setNotes('');
-      setSelectedPerfume('');
-      fetchRecords(filterPerfume);
-      fetchWac(filterPerfume);
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to save');
+      setIngredients([emptyIngredient()]); setPackaging([emptyPackaging()]);
+      setBottles(''); setCustomSellingPrice(''); setNotes(''); setSelectedPerfume('');
+      fetchRecords(filterPerfume); fetchWac(filterPerfume);
+    } catch (err) { showToast(err.response?.data?.message || 'Failed to save');
     } finally { setSaving(false); }
   };
 
   const handleDelete = async (id) => {
     try {
       await adminAxios.delete(`${API_URL}/api/costs/${id}`);
-      showToast('Record deleted');
-      fetchRecords(filterPerfume);
-      fetchWac(filterPerfume);
+      showToast('Record deleted'); fetchRecords(filterPerfume); fetchWac(filterPerfume);
     } catch { showToast('Failed to delete'); }
     setDeleteConfirm(null);
   };
@@ -334,479 +259,552 @@ const CostCalculator = () => {
     if (!sold || sold <= 0) return showToast('Enter bottles sold');
     try {
       await adminAxios.patch(`${API_URL}/api/costs/${recordId}/stock`, { sold });
-      showToast(`✓ ${sold} bottle(s) sold from batch`);
-      setStockEdit(null);
-      fetchRecords(filterPerfume);
-      fetchWac(filterPerfume);
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to update stock');
-    }
+      showToast(`✓ ${sold} bottle(s) sold`);
+      setStockEdit(null); fetchRecords(filterPerfume); fetchWac(filterPerfume);
+    } catch (err) { showToast(err.response?.data?.message || 'Failed'); }
   };
 
   const handlePriceUpdate = async (recordId) => {
-    const newPrice = Number(priceEdit?.price);
-    if (isNaN(newPrice) || newPrice < 0) return showToast('Enter a valid selling price');
+    const p = Number(priceEdit?.price);
+    if (isNaN(p) || p < 0) return showToast('Enter a valid selling price');
     try {
-      await adminAxios.patch(`${API_URL}/api/costs/${recordId}/price`, { sellingPrice: newPrice });
-      showToast('✓ Selling price updated for this batch');
-      setPriceEdit(null);
-      fetchRecords(filterPerfume);
-      fetchWac(filterPerfume);
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to update selling price');
-    }
+      await adminAxios.patch(`${API_URL}/api/costs/${recordId}/price`, { sellingPrice: p });
+      showToast('✓ Selling price updated');
+      setPriceEdit(null); fetchRecords(filterPerfume); fetchWac(filterPerfume);
+    } catch (err) { showToast(err.response?.data?.message || 'Failed'); }
   };
 
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
-  const marginColor = margin >= 60 ? '#16a34a' : margin >= 30 ? '#d97706' : '#dc2626';
+  const handleSaveBatchEdit = async () => {
+    if (!editingBatch) return;
+    if (Number(editingBatch.bottlesProduced) <= 0) return showToast('Enter valid bottles produced');
+    if (editingBatch.ingredients.some(i => !i.name || !i.cost)) return showToast('Fill in all ingredient names and costs');
+    setUpdatingBatch(true);
+    try {
+      await adminAxios.put(`${API_URL}/api/costs/${editingBatch._id}`, {
+        bottlesProduced:  Number(editingBatch.bottlesProduced),
+        remainingBottles: Number(editingBatch.remainingBottles),
+        sellingPrice:     Number(editingBatch.sellingPrice),
+        ingredients: editingBatch.ingredients.map(i => ({ ...i, qty: Number(i.qty), cost: Number(i.cost) })),
+        packaging:   editingBatch.packaging.filter(p => p.name).map(p => ({ ...p, qty: Number(p.qty), cost: Number(p.cost) })),
+        notes: editingBatch.notes,
+      });
+      showToast('✓ Batch updated');
+      setEditingBatch(null); fetchRecords(filterPerfume); fetchWac(filterPerfume);
+    } catch (err) { showToast(err.response?.data?.message || 'Failed');
+    } finally { setUpdatingBatch(false); }
+  };
 
+  /* ════════════════════════════════════════════════════════ */
   return (
-    <div className="p-4 sm:p-6 max-w-[1200px] mx-auto">
+    <div className="p-4 sm:p-6 max-w-[1400px] mx-auto">
+
+      {/* Toast */}
       {toast && (
-        <div className="fixed top-4 right-4 z-50 bg-black text-white px-4 py-2.5 sm:px-5 sm:py-3 text-xs tracking-widest max-w-[90vw]">{toast}</div>
+        <div className="fixed top-4 right-4 z-50 bg-black text-white px-4 py-3 text-xs tracking-widest shadow-lg max-w-[90vw]">
+          {toast}
+        </div>
       )}
 
-      <h1 className="text-xl sm:text-2xl font-light tracking-[5px] sm:tracking-[8px] mb-1">COST CALCULATOR</h1>
-      <p className="text-[11px] text-[#888] tracking-[2px] mb-6 sm:mb-10">Calculate production cost and profit margin per perfume batch.</p>
+      {/* Page header */}
+      <div className="mb-8">
+        <h1 className="text-xl sm:text-2xl font-light tracking-[6px] mb-1">COST CALCULATOR</h1>
+        <p className="text-[11px] text-[#999] tracking-[2px]">
+          Production cost &amp; profit margin tracker per batch.
+        </p>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-6 lg:gap-10">
+      {/* ── 2-col layout ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-[480px_1fr] gap-6 xl:gap-10 items-start">
 
-        {/* ── LEFT: Calculator Form ── */}
-        <div className="border border-[#eee] p-4 sm:p-6">
-          <p className="text-[10px] font-bold tracking-[3px] text-[#888] mb-6">NEW COST RECORD</p>
-
-          {/* Perfume selector */}
-          <div className="mb-5">
-            <label className="text-[10px] font-bold tracking-[2px] text-[#888] block mb-2">SELECT PERFUME</label>
-            <SearchableSelect
-              perfumes={perfumes}
-              value={selectedPerfume}
-              onChange={(id) => {
-                setSelectedPerfume(id);
-                setCustomSellingPrice('');
-              }}
-            />
+        {/* ════════════════════════════════════════════════
+            LEFT — New Batch Form
+        ════════════════════════════════════════════════ */}
+        <div className="border border-[#e8e8e8] bg-white">
+          {/* Form header */}
+          <div className="px-5 py-4 border-b border-[#f0f0f0]">
+            <p className="text-[10px] font-bold tracking-[3px] text-[#666]">NEW COST RECORD</p>
           </div>
 
-          {/* Bottles & Selling Price */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="text-[10px] font-bold tracking-[2px] text-[#888] block mb-2">BOTTLES PRODUCED</label>
-              <input type="number" min="1" value={bottles} onChange={e => setBottles(e.target.value)}
-                placeholder="e.g. 10" className="w-full border border-[#ddd] px-3 py-2.5 text-sm outline-none" />
+          <div className="p-5">
+            {/* Perfume */}
+            <div className="mb-5">
+              <label className="text-[10px] font-bold tracking-[2px] text-[#888] block mb-2">SELECT PERFUME</label>
+              <SearchableSelect perfumes={perfumes} value={selectedPerfume}
+                onChange={(id) => { setSelectedPerfume(id); setCustomSellingPrice(''); }} />
             </div>
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-[10px] font-bold tracking-[2px] text-[#888]">BATCH SELL PRICE (TK)</label>
-                {perfumeData && (
-                  <span className="text-[9px] text-[#aaa]">Default: {perfumeData.price.toLocaleString()} TK</span>
+
+            {/* Bottles + Sell price */}
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              <div>
+                <label className="text-[10px] font-bold tracking-[2px] text-[#888] block mb-2">BOTTLES PRODUCED</label>
+                <input type="number" min="1" value={bottles} onChange={e => setBottles(e.target.value)}
+                  placeholder="e.g. 10"
+                  className="w-full border border-[#ddd] px-3 py-2.5 text-sm outline-none focus:border-black transition-colors" />
+              </div>
+              <div>
+                <div className="flex items-baseline justify-between mb-2">
+                  <label className="text-[10px] font-bold tracking-[2px] text-[#888]">SELL PRICE (TK)</label>
+                  {perfumeData && (
+                    <span className="text-[9px] text-[#bbb]">Default {fmt(perfumeData.price)}</span>
+                  )}
+                </div>
+                <input type="number" min="0" value={customSellingPrice}
+                  onChange={e => setCustomSellingPrice(e.target.value)}
+                  placeholder={perfumeData ? `${perfumeData.price}` : 'e.g. 1500'}
+                  className="w-full border border-[#ddd] px-3 py-2.5 text-sm outline-none focus:border-black transition-colors" />
+              </div>
+            </div>
+
+            {/* Ingredients */}
+            <RowEditor rows={ingredients} label="INGREDIENTS / ITEMS"
+              onUpdate={updateIng}
+              onAdd={() => setIngredients([...ingredients, emptyIngredient()])}
+              onRemove={i => setIngredients(ingredients.filter((_, idx) => idx !== i))} />
+
+            {/* Packaging */}
+            <div className="border-t border-[#f0f0f0] pt-4 mb-5">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-[10px] font-bold tracking-[2px] text-[#888]">📦 PACKAGING</span>
+                {pkgCost > 0 && (
+                  <span className="text-[9px] bg-[#f5f5f5] px-2 py-0.5 font-bold text-[#666]">
+                    {fmt(pkgCost)} TK
+                  </span>
                 )}
               </div>
-              <input type="number" min="0" value={customSellingPrice} onChange={e => setCustomSellingPrice(e.target.value)}
-                placeholder={perfumeData ? `${perfumeData.price}` : "e.g. 1500"} className="w-full border border-[#ddd] px-3 py-2.5 text-sm outline-none" />
+              <RowEditor rows={packaging} label="PACKAGING ITEMS"
+                onUpdate={updatePkg}
+                onAdd={() => setPackaging([...packaging, emptyPackaging()])}
+                onRemove={i => setPackaging(packaging.filter((_, idx) => idx !== i))} />
             </div>
-          </div>
 
-          {/* Ingredients */}
-          <RowEditor
-            rows={ingredients} label="INGREDIENTS / ITEMS"
-            onUpdate={updateIngredient}
-            onAdd={() => setIngredients([...ingredients, emptyIngredient()])}
-            onRemove={i => setIngredients(ingredients.filter((_, idx) => idx !== i))}
-          />
+            {/* Notes */}
+            <div className="mb-5">
+              <label className="text-[10px] font-bold tracking-[2px] text-[#888] block mb-2">NOTES (OPTIONAL)</label>
+              <textarea value={notes} onChange={e => setNotes(e.target.value)}
+                placeholder="e.g. Winter batch, bought from Chawkbazar…" rows={2}
+                className="w-full border border-[#ddd] px-3 py-2.5 text-sm outline-none resize-none focus:border-black transition-colors" />
+            </div>
 
-          {/* ── Packaging Materials ── */}
-          <div className="border-t border-[#eee] pt-5 mb-2">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-[10px] font-bold tracking-[2px] text-[#888]">📦 PACKAGING MATERIALS</span>
-              {packagingCost > 0 && (
-                <span className="text-[9px] bg-[#f0f0f0] px-2 py-0.5 font-bold text-[#555]">
-                  {packagingCost.toLocaleString()} TK total
+            {/* Live Summary */}
+            <div className="bg-[#fafafa] border border-[#ebebeb] p-4 mb-5">
+              <p className="text-[9px] font-bold tracking-[3px] text-[#aaa] mb-3">LIVE SUMMARY</p>
+              <div className="grid grid-cols-2 gap-y-2">
+                <StatRow label="Ingredient Cost"   value={`${fmt(ingCost)} TK`} />
+                <StatRow label="Packaging Cost"    value={pkgCost > 0 ? `${fmt(pkgCost)} TK` : '—'} />
+                <StatRow label="Total Batch Cost"  value={`${fmt(totalCost)} TK`} />
+                <StatRow label="Bottles Produced"  value={bottleCount || '—'} />
+                <StatRow label="Cost Per Bottle"   value={cpb > 0 ? `${cpb.toFixed(0)} TK` : '—'} />
+                <StatRow label="Selling Price"     value={sp > 0 ? `${fmt(sp)} TK` : '—'} />
+                <StatRow label="Profit / Bottle"   value={profitPB > 0 ? `${profitPB.toFixed(0)} TK` : '—'} />
+              </div>
+              <div className="mt-3 pt-3 border-t border-[#e8e8e8] flex items-center justify-between">
+                <span className="text-[11px] text-[#888]">Profit Margin</span>
+                <span className="text-base font-bold" style={{ color: marginColor(margin) }}>
+                  {margin > 0 ? `${margin.toFixed(1)}%` : '—'}
                 </span>
-              )}
+              </div>
             </div>
-            <RowEditor
-              rows={packaging} label="PACKAGING ITEMS"
-              onUpdate={updatePackaging}
-              onAdd={() => setPackaging([...packaging, emptyPackaging()])}
-              onRemove={i => setPackaging(packaging.filter((_, idx) => idx !== i))}
-            />
-          </div>
 
-          {/* Notes */}
-          <div className="mb-6">
-            <label className="text-[10px] font-bold tracking-[2px] text-[#888] block mb-2">NOTES (OPTIONAL)</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)}
-              placeholder="e.g. Winter batch, bought from Chawkbazar..." rows={2}
-              className="w-full border border-[#ddd] px-3 py-2.5 text-sm outline-none resize-none" />
+            <button onClick={handleSave} disabled={saving}
+              className="w-full bg-black text-white py-3.5 text-[10px] font-bold tracking-[3px] hover:bg-[#111] transition-colors disabled:opacity-50 cursor-pointer border-none">
+              {saving ? 'SAVING…' : 'SAVE COST RECORD'}
+            </button>
           </div>
-
-          {/* Live Summary */}
-          <div className="bg-[#fafafa] border border-[#eee] p-4 sm:p-5 mb-6">
-            <p className="text-[10px] font-bold tracking-[3px] text-[#888] mb-4">LIVE SUMMARY</p>
-            <div className="grid grid-cols-2 gap-y-2 sm:gap-y-3">
-              {[
-                ['Ingredient Cost',   `${ingredientCost.toLocaleString()} TK`],
-                ['Packaging Cost',    packagingCost > 0 ? `${packagingCost.toLocaleString()} TK` : '—'],
-                ['Total Batch Cost',  `${totalCost.toLocaleString()} TK`],
-                ['Bottles Produced',  bottleCount || '—'],
-                ['Cost Per Bottle',   costPerBottle > 0 ? `${costPerBottle.toFixed(0)} TK` : '—'],
-                ['Selling Price',     sellingPrice > 0 ? `${sellingPrice.toLocaleString()} TK` : '—'],
-                ['Profit Per Bottle', profit > 0 ? `${profit.toFixed(0)} TK` : '—'],
-              ].map(([label, value]) => (
-                <React.Fragment key={label}>
-                  <span className="text-[11px] text-[#888]">{label}</span>
-                  <span className="text-[11px] font-bold text-right">{value}</span>
-                </React.Fragment>
-              ))}
-              <span className="text-[11px] text-[#888]">Profit Margin</span>
-              <span className="text-sm font-bold text-right" style={{ color: marginColor }}>
-                {margin > 0 ? `${margin.toFixed(1)}%` : '—'}
-              </span>
-            </div>
-          </div>
-
-          <button onClick={handleSave} disabled={saving}
-            className="w-full bg-black text-white py-3.5 text-[10px] font-bold tracking-[3px] hover:bg-gray-800 transition-colors disabled:opacity-50 cursor-pointer border-none">
-            {saving ? 'SAVING...' : 'SAVE COST RECORD'}
-          </button>
         </div>
 
-        {/* ── RIGHT: History ── */}
-        <div>
-          {/* ── WAC Summary ── */}
+        {/* ════════════════════════════════════════════════
+            RIGHT — WAC + History
+        ════════════════════════════════════════════════ */}
+        <div className="min-w-0">
+
+          {/* ── WAC SUMMARY ── */}
           {wacSummaries.length > 0 && (
-            <div className="mb-8">
-              <p className="text-[10px] font-bold tracking-[3px] text-[#888] mb-4">WEIGHTED AVERAGE COST (STOCK)</p>
-              <div className="flex flex-col gap-3">
+            <section className="mb-8">
+              <div className="flex items-center gap-3 mb-4">
+                <p className="text-[10px] font-bold tracking-[3px] text-[#666]">WEIGHTED AVG COST</p>
+                <div className="flex-1 h-px bg-[#eee]" />
+                <span className="text-[9px] text-[#bbb] tracking-wider">{wacSummaries.length} product{wacSummaries.length !== 1 ? 's' : ''}</span>
+              </div>
+
+              {/* WAC cards grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
                 {wacSummaries.map(s => {
-                  const mc = s.profitMargin >= 60 ? '#16a34a' : s.profitMargin >= 30 ? '#d97706' : '#dc2626';
+                  const mc = marginColor(s.profitMargin);
                   return (
-                    <div key={s.perfumeId} className="bg-[#fafafa] border border-[#eee] p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-bold tracking-wider">{s.perfumeName.toUpperCase()}</p>
-                        <span className="text-sm font-bold" style={{ color: mc }}>{s.profitMargin}%</span>
+                    <div key={s.perfumeId} className="border border-[#e8e8e8] bg-white overflow-hidden">
+                      {/* Card header */}
+                      <div className="px-4 py-3 flex items-center justify-between border-b border-[#f0f0f0]"
+                        style={{ borderLeft: `3px solid ${mc}` }}>
+                        <p className="text-[11px] font-bold tracking-wider truncate pr-2">
+                          {s.perfumeName.toUpperCase()}
+                        </p>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-[10px] text-[#aaa]">{s.totalBottles} in stock</span>
+                          <span className="text-sm font-bold" style={{ color: mc }}>{s.profitMargin}%</span>
+                        </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-y-1.5">
-                        <span className="text-[10px] text-[#aaa]">In Stock</span>
-                        <span className="text-[10px] font-bold text-right">{s.totalBottles} bottles</span>
-                        <span className="text-[10px] text-[#aaa]">Avg Cost/Bottle (WAC)</span>
-                        <span className="text-[10px] font-bold text-right">{s.wac.toLocaleString()} TK</span>
-                        <span className="text-[10px] text-[#aaa]">Selling Price</span>
-                        <span className="text-[10px] font-bold text-right">{s.sellingPrice.toLocaleString()} TK</span>
-                        <span className="text-[10px] text-[#aaa]">True Profit/Bottle</span>
-                        <span className="text-[10px] font-bold text-right" style={{ color: mc }}>{s.profitPerBottle.toLocaleString()} TK</span>
-                        <span className="text-[10px] text-[#aaa]">Stock Value</span>
-                        <span className="text-[10px] font-bold text-right">{Math.round(s.wac * s.totalBottles).toLocaleString()} TK</span>
-                      </div>
-                      {s.batches.length > 1 && (
-                        <div className="mt-2 border-t border-[#eee] pt-2">
-                          <p className="text-[9px] text-[#bbb] font-bold tracking-wider mb-1">BATCHES</p>
-                          {s.batches.map((b, i) => (
-                            <div key={i} className="flex justify-between text-[10px] text-[#888]">
-                              <span>{new Date(b.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} — {b.costPerBottle.toFixed(0)} TK/bottle</span>
-                              <span>{b.remaining} left</span>
+
+                      {/* Card stats */}
+                      <div className="px-4 py-3">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                          <span className="text-[10px] text-[#999]">WAC / Bottle</span>
+                          <span className="text-[10px] font-bold text-right">{fmt(s.wac)} TK</span>
+
+                          <span className="text-[10px] text-[#999]">Selling Price</span>
+                          <span className="text-[10px] font-bold text-right">{fmt(s.sellingPrice)} TK</span>
+
+                          <span className="text-[10px] text-[#999]">True Profit / Bottle</span>
+                          <span className="text-[10px] font-bold text-right" style={{ color: mc }}>
+                            {fmt(s.profitPerBottle)} TK
+                          </span>
+
+                          <span className="text-[10px] text-[#999]">Stock Value</span>
+                          <span className="text-[10px] font-bold text-right">
+                            {fmt(Math.round(s.wac * s.totalBottles))} TK
+                          </span>
+                        </div>
+
+                        {/* Multi-batch breakdown */}
+                        {s.batches.length > 1 && (
+                          <div className="mt-3 pt-3 border-t border-[#f0f0f0]">
+                            <p className="text-[9px] text-[#bbb] font-bold tracking-wider mb-2">BATCH BREAKDOWN</p>
+                            <div className="flex flex-col gap-1">
+                              {s.batches.map((b, i) => (
+                                <div key={i} className="flex items-center justify-between text-[10px]">
+                                  <span className="text-[#888]">
+                                    {new Date(b.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                                    <span className="text-[#ccc] mx-1">·</span>
+                                    {b.costPerBottle.toFixed(0)} TK/bottle
+                                  </span>
+                                  <span className="font-bold text-[#555]">{b.remaining} left</span>
+                                </div>
+                              ))}
                             </div>
-                          ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* ── COST HISTORY ── */}
+          <section>
+            <div className="flex items-center gap-3 mb-4">
+              <p className="text-[10px] font-bold tracking-[3px] text-[#666]">COST HISTORY</p>
+              <div className="flex-1 h-px bg-[#eee]" />
+              {/* Filter */}
+              <select value={filterPerfume} onChange={e => setFilterPerfume(e.target.value)}
+                className="border border-[#ddd] px-3 py-1.5 text-[10px] outline-none bg-white hover:border-black transition-colors cursor-pointer tracking-wider">
+                <option value="">ALL PERFUMES</option>
+                {perfumes.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
+              </select>
+            </div>
+
+            {records.length === 0 ? (
+              <div className="border border-[#eee] py-20 text-center text-[#ccc] tracking-[3px] text-[11px]">
+                NO RECORDS YET.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {records.map(r => {
+                  const mc      = marginColor(r.profitMargin);
+                  const totalPkg = r.packaging?.reduce((s, p) => s + (p.cost || 0), 0) || 0;
+                  const remaining = r.remainingBottles ?? r.bottlesProduced;
+                  const isExpanded = expandedRecord === r._id;
+
+                  return (
+                    <div key={r._id} className="border border-[#e8e8e8] bg-white overflow-hidden">
+
+                      {/* ── Record header (always visible, click to expand) ── */}
+                      <div
+                        className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-[#fafafa] transition-colors"
+                        style={{ borderLeft: `3px solid ${mc}` }}
+                        onClick={() => setExpandedRecord(isExpanded ? null : r._id)}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-[12px] font-bold tracking-wider truncate">
+                            {r.perfumeName.toUpperCase()}
+                          </p>
+                          <p className="text-[10px] text-[#aaa] mt-0.5">
+                            {new Date(r.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            <span className="mx-1.5 text-[#ddd]">·</span>
+                            {r.bottlesProduced} produced
+                            <span className="mx-1.5 text-[#ddd]">·</span>
+                            <span className={remaining === 0 ? 'text-red-400' : 'text-[#aaa]'}>
+                              {remaining} remaining
+                            </span>
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                          <div className="text-right hidden sm:block">
+                            <p className="text-[10px] text-[#aaa]">Cost/bottle</p>
+                            <p className="text-[11px] font-bold">{r.costPerBottle.toFixed(0)} TK</p>
+                          </div>
+                          <div className="text-right hidden sm:block">
+                            <p className="text-[10px] text-[#aaa]">Sell price</p>
+                            <p className="text-[11px] font-bold">{fmt(r.sellingPrice)} TK</p>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-base font-bold" style={{ color: mc }}>
+                              {r.profitMargin.toFixed(1)}%
+                            </span>
+                          </div>
+                          <span className="text-[#ccc] text-sm">{isExpanded ? '▲' : '▼'}</span>
+                        </div>
+                      </div>
+
+                      {/* ── Expanded detail ── */}
+                      {isExpanded && (
+                        <div className="border-t border-[#f0f0f0]">
+
+                          {/* Ingredients + Packaging side by side */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 divide-y sm:divide-y-0 sm:divide-x divide-[#f0f0f0]">
+                            {/* Ingredients */}
+                            <div className="px-4 py-3">
+                              <p className="text-[9px] font-bold tracking-[2px] text-[#bbb] mb-2">INGREDIENTS</p>
+                              {r.ingredients.map((ing, i) => (
+                                <div key={i} className="flex justify-between text-[11px] text-[#555] mb-1.5">
+                                  <span className="truncate pr-2">
+                                    {ing.name}
+                                    {ing.qty ? <span className="text-[#aaa] ml-1">({ing.qty}{ing.unit})</span> : ''}
+                                  </span>
+                                  <span className="font-semibold flex-shrink-0">{fmt(ing.cost)} TK</span>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Packaging (if any) */}
+                            {r.packaging?.length > 0 && (
+                              <div className="px-4 py-3">
+                                <p className="text-[9px] font-bold tracking-[2px] text-[#bbb] mb-2">📦 PACKAGING</p>
+                                {r.packaging.map((p, i) => (
+                                  <div key={i} className="flex justify-between text-[11px] text-[#555] mb-1.5">
+                                    <span className="truncate pr-2">
+                                      {p.name}
+                                      {p.qty ? <span className="text-[#aaa] ml-1">({p.qty}{p.unit})</span> : ''}
+                                    </span>
+                                    <span className="font-semibold flex-shrink-0">{fmt(p.cost)} TK</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Key stats bar */}
+                          <div className="border-t border-[#f0f0f0] px-4 py-3 bg-[#fafafa]">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                              {[
+                                { l: 'Batch Cost',    v: `${fmt(r.totalCost)} TK` },
+                                ...(totalPkg > 0 ? [{ l: 'Packaging', v: `${fmt(totalPkg)} TK` }] : []),
+                                { l: 'Cost / Bottle', v: `${r.costPerBottle.toFixed(0)} TK` },
+                                { l: 'Sell Price',    v: `${fmt(r.sellingPrice)} TK` },
+                                { l: 'Profit / Bottle', v: `${r.profitPerBottle.toFixed(0)} TK`, color: mc },
+                              ].map(({ l, v, color }) => (
+                                <div key={l}>
+                                  <p className="text-[9px] text-[#aaa] tracking-wider mb-0.5">{l}</p>
+                                  <p className="text-[12px] font-bold" style={color ? { color } : {}}>
+                                    {v}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Notes */}
+                          {r.notes && (
+                            <div className="px-4 py-2.5 border-t border-[#f0f0f0] bg-[#fafafa]">
+                              <p className="text-[10px] text-[#888] italic">"{r.notes}"</p>
+                            </div>
+                          )}
+
+                          {/* Actions row */}
+                          <div className="border-t border-[#f0f0f0] px-4 py-3 flex flex-wrap items-center gap-3">
+
+                            {/* Quick sell price edit */}
+                            {priceEdit?.recordId === r._id ? (
+                              <div className="flex items-center gap-2 bg-[#f5f5f5] border border-[#e8e8e8] px-3 py-2">
+                                <span className="text-[9px] font-bold text-[#888] tracking-wider whitespace-nowrap">SELL PRICE:</span>
+                                <input type="number" min="0" value={priceEdit.price}
+                                  onChange={e => setPriceEdit({ ...priceEdit, price: e.target.value })}
+                                  className="border border-[#ddd] px-2 py-1 text-xs outline-none w-24 bg-white focus:border-black" />
+                                <button onClick={() => handlePriceUpdate(r._id)}
+                                  className="bg-black text-white text-[9px] font-bold tracking-wider px-3 py-1 cursor-pointer border-none">SAVE</button>
+                                <button onClick={() => setPriceEdit(null)}
+                                  className="text-[10px] text-[#aaa] cursor-pointer bg-transparent border-none">×</button>
+                              </div>
+                            ) : (
+                              <button onClick={() => setPriceEdit({ recordId: r._id, price: r.sellingPrice })}
+                                className="text-[10px] text-[#666] hover:text-black transition-colors cursor-pointer bg-transparent border border-[#e8e8e8] hover:border-black px-3 py-1.5 tracking-wider">
+                                ✏ EDIT PRICE
+                              </button>
+                            )}
+
+                            {/* Mark sold */}
+                            {remaining > 0 && (
+                              stockEdit?.recordId === r._id ? (
+                                <div className="flex items-center gap-2 bg-[#f5f5f5] border border-[#e8e8e8] px-3 py-2">
+                                  <span className="text-[9px] font-bold text-[#888] tracking-wider whitespace-nowrap">SOLD:</span>
+                                  <input type="number" min="1" max={remaining}
+                                    value={stockEdit.sold} onChange={e => setStockEdit({ ...stockEdit, sold: e.target.value })}
+                                    className="border border-[#ddd] px-2 py-1 text-xs outline-none w-16 bg-white focus:border-black" />
+                                  <button onClick={() => handleStockUpdate(r._id)}
+                                    className="bg-black text-white text-[9px] font-bold tracking-wider px-3 py-1 cursor-pointer border-none">CONFIRM</button>
+                                  <button onClick={() => setStockEdit(null)}
+                                    className="text-[10px] text-[#aaa] cursor-pointer bg-transparent border-none">×</button>
+                                </div>
+                              ) : (
+                                <button onClick={() => setStockEdit({ recordId: r._id, sold: '' })}
+                                  className="text-[10px] text-[#666] hover:text-black transition-colors cursor-pointer bg-transparent border border-[#e8e8e8] hover:border-black px-3 py-1.5 tracking-wider">
+                                  MARK SOLD
+                                </button>
+                              )
+                            )}
+
+                            {/* Edit batch */}
+                            <button onClick={() => openEditModal(r)}
+                              className="text-[10px] text-[#666] hover:text-black transition-colors cursor-pointer bg-transparent border border-[#e8e8e8] hover:border-black px-3 py-1.5 tracking-wider">
+                              EDIT BATCH
+                            </button>
+
+                            {/* Spacer */}
+                            <div className="flex-1" />
+
+                            {/* Delete */}
+                            {deleteConfirm === r._id ? (
+                              <div className="flex gap-2">
+                                <button onClick={() => handleDelete(r._id)}
+                                  className="bg-red-600 text-white text-[9px] font-bold tracking-wider px-3 py-1.5 cursor-pointer border-none">
+                                  CONFIRM DELETE
+                                </button>
+                                <button onClick={() => setDeleteConfirm(null)}
+                                  className="border border-[#ddd] text-[9px] font-bold tracking-wider px-3 py-1.5 cursor-pointer bg-white">
+                                  CANCEL
+                                </button>
+                              </div>
+                            ) : (
+                              <button onClick={() => setDeleteConfirm(r._id)}
+                                className="text-[10px] text-[#ccc] hover:text-red-400 transition-colors cursor-pointer bg-transparent border-none tracking-wider">
+                                DELETE
+                              </button>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
                   );
                 })}
               </div>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-            <p className="text-[10px] font-bold tracking-[3px] text-[#888]">COST HISTORY</p>
-            <select value={filterPerfume} onChange={e => setFilterPerfume(e.target.value)}
-              className="border border-[#ddd] px-3 py-2 text-xs outline-none bg-white">
-              <option value="">All Perfumes</option>
-              {perfumes.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
-            </select>
-          </div>
-
-          {records.length === 0 ? (
-            <div className="text-center py-20 text-[#ccc] tracking-[3px] text-xs">NO RECORDS YET.</div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {records.map(r => {
-                const mc = r.profitMargin >= 60 ? '#16a34a' : r.profitMargin >= 30 ? '#d97706' : '#dc2626';
-                const totalPkg = r.packaging?.reduce((s, p) => s + (p.cost || 0), 0) || 0;
-                return (
-                  <div key={r._id} className="border border-[#eee] p-4 sm:p-5">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <p className="text-sm font-bold tracking-wider">{r.perfumeName.toUpperCase()}</p>
-                        <p className="text-[10px] text-[#aaa] mt-0.5">
-                          {new Date(r.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        </p>
-                      </div>
-                      <span className="text-sm font-bold" style={{ color: mc }}>{r.profitMargin.toFixed(1)}%</span>
-                    </div>
-
-                    {/* Ingredients */}
-                    <div className="mb-2 border-t border-[#f5f5f5] pt-3">
-                      <p className="text-[9px] font-bold tracking-wider text-[#bbb] mb-1.5">INGREDIENTS</p>
-                      {r.ingredients.map((ing, i) => (
-                        <div key={i} className="flex justify-between text-[11px] text-[#666] mb-1">
-                          <span>{ing.name} {ing.qty ? `(${ing.qty}${ing.unit})` : ''}</span>
-                          <span>{Number(ing.cost).toLocaleString()} TK</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Packaging */}
-                    {r.packaging?.length > 0 && (
-                      <div className="mb-3 border-t border-[#f5f5f5] pt-3">
-                        <p className="text-[9px] font-bold tracking-wider text-[#bbb] mb-1.5">📦 PACKAGING</p>
-                        {r.packaging.map((p, i) => (
-                          <div key={i} className="flex justify-between text-[11px] text-[#666] mb-1">
-                            <span>{p.name} {p.qty ? `(${p.qty}${p.unit})` : ''}</span>
-                            <span>{Number(p.cost).toLocaleString()} TK</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Stats */}
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 border-t border-[#f5f5f5] pt-3 mb-3">
-                      {[
-                        ['Batch Cost',    `${r.totalCost.toLocaleString()} TK`],
-                        ...(totalPkg > 0 ? [['Packaging', `${totalPkg.toLocaleString()} TK`]] : []),
-                        ['Bottles',       r.bottlesProduced],
-                        ['Remaining',     `${r.remainingBottles ?? r.bottlesProduced} of ${r.bottlesProduced}`],
-                        ['Cost/Bottle',   `${r.costPerBottle.toFixed(0)} TK`],
-                        ['Selling Price', `${r.sellingPrice.toLocaleString()} TK`],
-                        ['Profit/Bottle', `${r.profitPerBottle.toFixed(0)} TK`],
-                      ].map(([label, value]) => (
-                        <React.Fragment key={label}>
-                          <span className="text-[10px] text-[#aaa]">{label}</span>
-                          <span className="text-[10px] font-bold">{value}</span>
-                        </React.Fragment>
-                      ))}
-                    </div>
-
-                    {/* Quick Inline Actions: Edit Sell Price & Stock adjustment */}
-                    <div className="border-t border-[#f5f5f5] pt-2 mb-3 flex flex-col gap-2">
-                      {/* Quick Price Edit */}
-                      {priceEdit?.recordId === r._id ? (
-                        <div className="flex flex-wrap gap-2 items-center bg-[#fafafa] p-2 border border-[#eee]">
-                          <span className="text-[9px] font-bold text-[#888] tracking-wider">NEW SELL PRICE:</span>
-                          <input type="number" min="0"
-                            value={priceEdit.price} onChange={e => setPriceEdit({ ...priceEdit, price: e.target.value })}
-                            placeholder="Price (TK)" className="border border-[#ddd] px-2 py-1.5 text-xs outline-none w-28 bg-white" />
-                          <button onClick={() => handlePriceUpdate(r._id)}
-                            className="bg-black text-white text-[9px] font-bold tracking-wider px-3 py-1.5 cursor-pointer border-none">SAVE</button>
-                          <button onClick={() => setPriceEdit(null)}
-                            className="text-[10px] text-[#aaa] cursor-pointer bg-transparent border-none">Cancel</button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between">
-                          <button onClick={() => setPriceEdit({ recordId: r._id, price: r.sellingPrice })}
-                            className="text-[10px] text-[#888] hover:text-black transition-colors cursor-pointer bg-transparent border-none tracking-wider flex items-center gap-1 font-medium">
-                            ✏️ QUICK EDIT SELL PRICE ({r.sellingPrice.toLocaleString()} TK)
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Stock adjustment */}
-                      {(r.remainingBottles ?? r.bottlesProduced) > 0 && (
-                        <div>
-                          {stockEdit?.recordId === r._id ? (
-                            <div className="flex flex-wrap gap-2 items-center bg-[#fafafa] p-2 border border-[#eee]">
-                              <span className="text-[9px] font-bold text-[#888] tracking-wider">SOLD BOTTLES:</span>
-                              <input type="number" min="1" max={r.remainingBottles ?? r.bottlesProduced}
-                                value={stockEdit.sold} onChange={e => setStockEdit({ ...stockEdit, sold: e.target.value })}
-                                placeholder="Sold qty" className="border border-[#ddd] px-2 py-1.5 text-xs outline-none w-20 bg-white" />
-                              <button onClick={() => handleStockUpdate(r._id)}
-                                className="bg-black text-white text-[9px] font-bold tracking-wider px-3 py-1.5 cursor-pointer border-none">SELL</button>
-                              <button onClick={() => setStockEdit(null)}
-                                className="text-[10px] text-[#aaa] cursor-pointer bg-transparent border-none">Cancel</button>
-                            </div>
-                          ) : (
-                            <button onClick={() => setStockEdit({ recordId: r._id, sold: '' })}
-                              className="text-[10px] text-[#888] hover:text-black transition-colors cursor-pointer bg-transparent border-none tracking-wider">
-                              MARK SOLD FROM BATCH
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {r.notes && (
-                      <p className="text-[10px] text-[#888] italic border-t border-[#f5f5f5] pt-2 mb-3">{r.notes}</p>
-                    )}
-
-                    {/* Footer Actions: Full Batch Edit & Delete */}
-                    <div className="flex items-center justify-between border-t border-[#f5f5f5] pt-3">
-                      <button onClick={() => openEditBatchModal(r)}
-                        className="text-[10px] font-bold tracking-wider text-black hover:underline cursor-pointer bg-transparent border-none flex items-center gap-1">
-                        ✏️ EDIT FULL BATCH
-                      </button>
-
-                      {deleteConfirm === r._id ? (
-                        <div className="flex gap-2">
-                          <button onClick={() => handleDelete(r._id)}
-                            className="bg-red-600 text-white text-[10px] font-bold tracking-wider px-3 py-1.5 cursor-pointer border-none">CONFIRM DELETE</button>
-                          <button onClick={() => setDeleteConfirm(null)}
-                            className="border border-[#ddd] text-[10px] font-bold tracking-wider px-3 py-1.5 cursor-pointer bg-white">CANCEL</button>
-                        </div>
-                      ) : (
-                        <button onClick={() => setDeleteConfirm(r._id)}
-                          className="text-[10px] text-[#ccc] hover:text-red-500 transition-colors cursor-pointer bg-transparent border-none tracking-wider">
-                          DELETE RECORD
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+            )}
+          </section>
         </div>
       </div>
 
-      {/* ── EDIT BATCH MODAL ── */}
+      {/* ══════════════════════════════════════════════════════
+          EDIT BATCH MODAL
+      ══════════════════════════════════════════════════════ */}
       {editingBatch && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white w-full max-w-3xl max-h-[92vh] flex flex-col border border-[#ddd] shadow-2xl my-auto">
-            {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-[#eee] flex items-center justify-between bg-white sticky top-0 z-10">
+
+            {/* Modal header */}
+            <div className="px-5 py-4 border-b border-[#eee] flex items-center justify-between sticky top-0 bg-white z-10">
               <div>
-                <p className="text-xs sm:text-sm font-bold tracking-[2px]">EDIT BATCH: {editingBatch.perfumeName?.toUpperCase()}</p>
-                <p className="text-[10px] text-[#888] tracking-wider mt-0.5">
-                  Batch date: {new Date(editingBatch.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                <p className="text-sm font-bold tracking-[2px]">
+                  EDIT BATCH — {editingBatch.perfumeName?.toUpperCase()}
+                </p>
+                <p className="text-[10px] text-[#aaa] mt-0.5">
+                  {new Date(editingBatch.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                 </p>
               </div>
-              <button
-                onClick={() => setEditingBatch(null)}
-                className="text-[#999] hover:text-black text-2xl leading-none bg-transparent border-none cursor-pointer px-2"
-              >
+              <button onClick={() => setEditingBatch(null)}
+                className="text-[#aaa] hover:text-black text-2xl leading-none bg-transparent border-none cursor-pointer w-8 h-8 flex items-center justify-center">
                 ×
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
-              {/* Batch quantities and price */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                <div>
-                  <label className="text-[10px] font-bold tracking-[2px] text-[#888] block mb-2">BOTTLES PRODUCED</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={editingBatch.bottlesProduced}
-                    onChange={e => setEditingBatch({ ...editingBatch, bottlesProduced: e.target.value })}
-                    className="w-full border border-[#ddd] px-3 py-2 text-sm outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold tracking-[2px] text-[#888] block mb-2">REMAINING IN STOCK</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={editingBatch.remainingBottles}
-                    onChange={e => setEditingBatch({ ...editingBatch, remainingBottles: e.target.value })}
-                    className="w-full border border-[#ddd] px-3 py-2 text-sm outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold tracking-[2px] text-[#888] block mb-2">SELLING PRICE (TK)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={editingBatch.sellingPrice}
-                    onChange={e => setEditingBatch({ ...editingBatch, sellingPrice: e.target.value })}
-                    className="w-full border border-[#ddd] px-3 py-2 text-sm outline-none"
-                  />
-                </div>
+            {/* Modal body */}
+            <div className="p-5 overflow-y-auto flex-1">
+
+              {/* Batch meta */}
+              <div className="grid grid-cols-3 gap-3 mb-6">
+                {[
+                  { label: 'BOTTLES PRODUCED', key: 'bottlesProduced', min: 1 },
+                  { label: 'REMAINING IN STOCK', key: 'remainingBottles', min: 0 },
+                  { label: 'SELLING PRICE (TK)', key: 'sellingPrice', min: 0 },
+                ].map(({ label, key, min }) => (
+                  <div key={key}>
+                    <label className="text-[10px] font-bold tracking-[2px] text-[#888] block mb-2">{label}</label>
+                    <input type="number" min={min} value={editingBatch[key]}
+                      onChange={e => setEditingBatch({ ...editingBatch, [key]: e.target.value })}
+                      className="w-full border border-[#ddd] px-3 py-2 text-sm outline-none focus:border-black transition-colors" />
+                  </div>
+                ))}
               </div>
 
               {/* Ingredients */}
-              <RowEditor
-                rows={editingBatch.ingredients}
-                label="INGREDIENTS / ITEMS"
-                onUpdate={updateEditIngredient}
+              <RowEditor rows={editingBatch.ingredients} label="INGREDIENTS / ITEMS"
+                onUpdate={updateEditIng}
                 onAdd={() => setEditingBatch({ ...editingBatch, ingredients: [...editingBatch.ingredients, emptyIngredient()] })}
-                onRemove={i => setEditingBatch({ ...editingBatch, ingredients: editingBatch.ingredients.filter((_, idx) => idx !== i) })}
-              />
+                onRemove={i => setEditingBatch({ ...editingBatch, ingredients: editingBatch.ingredients.filter((_, idx) => idx !== i) })} />
 
               {/* Packaging */}
-              <div className="border-t border-[#eee] pt-5 mb-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-[10px] font-bold tracking-[2px] text-[#888]">📦 PACKAGING MATERIALS</span>
-                  {editPackagingCost > 0 && (
-                    <span className="text-[9px] bg-[#f0f0f0] px-2 py-0.5 font-bold text-[#555]">
-                      {editPackagingCost.toLocaleString()} TK total
+              <div className="border-t border-[#eee] pt-4 mb-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[10px] font-bold tracking-[2px] text-[#888]">📦 PACKAGING</span>
+                  {ePkgCost > 0 && (
+                    <span className="text-[9px] bg-[#f5f5f5] px-2 py-0.5 font-bold text-[#666]">
+                      {fmt(ePkgCost)} TK
                     </span>
                   )}
                 </div>
-                <RowEditor
-                  rows={editingBatch.packaging}
-                  label="PACKAGING ITEMS"
-                  onUpdate={updateEditPackaging}
+                <RowEditor rows={editingBatch.packaging} label="PACKAGING ITEMS"
+                  onUpdate={updateEditPkg}
                   onAdd={() => setEditingBatch({ ...editingBatch, packaging: [...editingBatch.packaging, emptyPackaging()] })}
-                  onRemove={i => setEditingBatch({ ...editingBatch, packaging: editingBatch.packaging.filter((_, idx) => idx !== i) })}
-                />
+                  onRemove={i => setEditingBatch({ ...editingBatch, packaging: editingBatch.packaging.filter((_, idx) => idx !== i) })} />
               </div>
 
               {/* Notes */}
-              <div className="mb-6">
-                <label className="text-[10px] font-bold tracking-[2px] text-[#888] block mb-2">NOTES (OPTIONAL)</label>
-                <textarea
-                  value={editingBatch.notes}
+              <div className="mb-5">
+                <label className="text-[10px] font-bold tracking-[2px] text-[#888] block mb-2">NOTES</label>
+                <textarea value={editingBatch.notes}
                   onChange={e => setEditingBatch({ ...editingBatch, notes: e.target.value })}
-                  placeholder="Notes about this batch..."
-                  rows={2}
-                  className="w-full border border-[#ddd] px-3 py-2 text-sm outline-none resize-none"
-                />
+                  placeholder="Notes about this batch…" rows={2}
+                  className="w-full border border-[#ddd] px-3 py-2 text-sm outline-none resize-none focus:border-black transition-colors" />
               </div>
 
-              {/* Recalculated live summary in Modal */}
-              <div className="bg-[#fafafa] border border-[#eee] p-4 sm:p-5">
-                <p className="text-[10px] font-bold tracking-[3px] text-[#888] mb-3">UPDATED BATCH SUMMARY</p>
-                <div className="grid grid-cols-2 gap-y-2 text-xs">
-                  <span className="text-[#888]">Ingredient Cost:</span>
-                  <span className="font-bold text-right">{editIngredientCost.toLocaleString()} TK</span>
-
-                  <span className="text-[#888]">Packaging Cost:</span>
-                  <span className="font-bold text-right">{editPackagingCost > 0 ? `${editPackagingCost.toLocaleString()} TK` : '—'}</span>
-
-                  <span className="text-[#888]">Total Batch Cost:</span>
-                  <span className="font-bold text-right">{editTotalCost.toLocaleString()} TK</span>
-
-                  <span className="text-[#888]">Cost Per Bottle:</span>
-                  <span className="font-bold text-right">{editCostPerBottle > 0 ? `${editCostPerBottle.toFixed(0)} TK` : '—'}</span>
-
-                  <span className="text-[#888]">Selling Price:</span>
-                  <span className="font-bold text-right">{editSellingPrice > 0 ? `${editSellingPrice.toLocaleString()} TK` : '—'}</span>
-
-                  <span className="text-[#888]">Profit Per Bottle:</span>
-                  <span className="font-bold text-right">{editProfit > 0 ? `${editProfit.toFixed(0)} TK` : '—'}</span>
-
-                  <span className="text-[#888]">Profit Margin:</span>
-                  <span className="font-bold text-right text-sm" style={{ color: editMarginColor }}>
-                    {editMargin > 0 ? `${editMargin.toFixed(1)}%` : '—'}
-                  </span>
+              {/* Updated summary */}
+              <div className="bg-[#fafafa] border border-[#ebebeb] p-4">
+                <p className="text-[9px] font-bold tracking-[3px] text-[#aaa] mb-3">UPDATED SUMMARY</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { l: 'Total Cost',     v: `${fmt(eTotalCost)} TK` },
+                    { l: 'Cost / Bottle',  v: eCPB > 0 ? `${eCPB.toFixed(0)} TK` : '—' },
+                    { l: 'Sell Price',     v: eSP > 0  ? `${fmt(eSP)} TK` : '—' },
+                    { l: 'Profit Margin',  v: eMargin > 0 ? `${eMargin.toFixed(1)}%` : '—', color: marginColor(eMargin) },
+                  ].map(({ l, v, color }) => (
+                    <div key={l}>
+                      <p className="text-[9px] text-[#aaa] tracking-wider mb-1">{l}</p>
+                      <p className="text-sm font-bold" style={color ? { color } : {}}>
+                        {v}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
 
-            {/* Modal Footer */}
-            <div className="p-4 sm:p-5 border-t border-[#eee] bg-[#fafafa] flex gap-3 justify-end sticky bottom-0">
-              <button
-                onClick={() => setEditingBatch(null)}
-                className="px-5 py-2.5 border border-[#ddd] text-xs font-bold tracking-wider hover:bg-gray-100 transition-colors cursor-pointer bg-white"
-              >
+            {/* Modal footer */}
+            <div className="px-5 py-4 border-t border-[#eee] bg-[#fafafa] flex gap-3 justify-end sticky bottom-0">
+              <button onClick={() => setEditingBatch(null)}
+                className="px-5 py-2.5 border border-[#ddd] text-[10px] font-bold tracking-wider hover:bg-gray-100 transition-colors cursor-pointer bg-white">
                 CANCEL
               </button>
-              <button
-                onClick={handleSaveBatchEdit}
-                disabled={updatingBatch}
-                className="px-6 py-2.5 bg-black text-white text-xs font-bold tracking-wider hover:bg-gray-800 transition-colors disabled:opacity-50 cursor-pointer border-none"
-              >
-                {updatingBatch ? 'SAVING...' : 'SAVE CHANGES'}
+              <button onClick={handleSaveBatchEdit} disabled={updatingBatch}
+                className="px-6 py-2.5 bg-black text-white text-[10px] font-bold tracking-wider hover:bg-[#111] transition-colors disabled:opacity-50 cursor-pointer border-none">
+                {updatingBatch ? 'SAVING…' : 'SAVE CHANGES'}
               </button>
             </div>
           </div>
