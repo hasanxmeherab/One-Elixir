@@ -45,7 +45,7 @@ app.use(cors({
     "https://www.oneelixir.live",
     "https://one-elixir-backend.vercel.app"
   ],
-  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
+  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
   credentials: true
 }));
 
