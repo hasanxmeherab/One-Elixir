@@ -18,6 +18,7 @@ const { priceOrder, PricingError } = require('../utils/pricing');
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const writeLog = require('../utils/writeLog');
+const { deductFifoBatches, restoreFifoBatches } = require('../utils/fifoBatchDeduct');
 
 const escapeRegex = (str) => String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const escapeHtml  = (str) => String(str ?? '')
@@ -195,6 +196,13 @@ router.post('/', validate(createWebOrderSchema), asyncHandler(async (req, res) =
     const newOrder = await order.save({ session });
     await decrementStockAtomic(newOrder.items, session);
 
+    // ✅ FIFO cost-batch deduction — oldest batch consumed first
+    const batchDeductions = await deductFifoBatches(newOrder.items, session);
+    if (batchDeductions.length > 0) {
+      newOrder.batchDeductions = batchDeductions;
+      await newOrder.save({ session });
+    }
+
     // Commit transaction
     await session.commitTransaction();
 
@@ -254,6 +262,13 @@ router.post('/manual', verifyAdmin, validate(createOrderSchema), asyncHandler(as
 
     // ✅ Decrement stock atomically within transaction
     await decrementStockAtomic(newOrder.items, session);
+
+    // ✅ FIFO cost-batch deduction — oldest batch consumed first
+    const manualBatchDeductions = await deductFifoBatches(newOrder.items, session);
+    if (manualBatchDeductions.length > 0) {
+      newOrder.batchDeductions = manualBatchDeductions;
+      await newOrder.save({ session });
+    }
 
     // ── Create ledger entry for paid manual orders ──
     if (req.body.paymentStatus?.toLowerCase() === 'paid' && paymentReceivedBy?.adminId) {
@@ -393,6 +408,9 @@ router.put('/:id/cancel', verifyUser, asyncHandler(async (req, res) => {
     // ✅ Save cancellation and restore stock atomically
     const savedOrder = await order.save({ session });
     await restoreStockAtomic(order.items, session);
+
+    // ✅ Restore FIFO cost-batch deductions (reverse FIFO on cancel)
+    await restoreFifoBatches(order.batchDeductions, session);
     
     await session.commitTransaction();
     
@@ -431,6 +449,7 @@ router.put('/:id', verifyAdmin, asyncHandler(async (req, res) => {
       // Restore stock for OLD items (unless order was already cancelled)
       if (!wasCancelled) {
         await restoreStockAtomic(order.items, session);
+        await restoreFifoBatches(order.batchDeductions, session);
       }
       
       // Decrement stock for NEW items (unless we're keeping it cancelled)
@@ -438,7 +457,12 @@ router.put('/:id', verifyAdmin, asyncHandler(async (req, res) => {
                                (!status && wasCancelled);
       if (!keepingCancelled) {
         await decrementStockAtomic(items, session);
+        const itemChangedDeductions = await deductFifoBatches(items, session);
+        order.batchDeductions = itemChangedDeductions;
+      } else {
+        order.batchDeductions = [];
       }
+      order.markModified('batchDeductions');
 
       order.items = items;
       order.markModified('items');
@@ -446,15 +470,19 @@ router.put('/:id', verifyAdmin, asyncHandler(async (req, res) => {
 
     // ── Handle status change (stock restore/decrement) ─────────
     if (status && !items) {
-      // Cancel → restore stock
+      // Cancel → restore stock + restore FIFO batches
       if ((newStatus === 'canceled' || newStatus === 'cancelled') &&
           oldStatus !== 'canceled' && oldStatus !== 'cancelled') {
         await restoreStockAtomic(order.items, session);
+        await restoreFifoBatches(order.batchDeductions, session);
       }
-      // Un-cancel → decrement stock
+      // Un-cancel → decrement stock + re-deduct FIFO batches
       else if ((oldStatus === 'canceled' || oldStatus === 'cancelled') &&
                newStatus && newStatus !== 'canceled' && newStatus !== 'cancelled') {
         await decrementStockAtomic(order.items, session);
+        const reDeductions = await deductFifoBatches(order.items, session);
+        order.batchDeductions = reDeductions;
+        order.markModified('batchDeductions');
       }
     }
 

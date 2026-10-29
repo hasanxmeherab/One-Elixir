@@ -61,7 +61,15 @@ const orderSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
   }],
   isManual: { type: Boolean, default: false },
-  createdBy: { type: String }, 
+  createdBy: { type: String },
+  // --- FIFO COST-BATCH DEDUCTION LEDGER ---
+  // Populated on order creation; used to restore batches if the order is cancelled.
+  batchDeductions: [{
+    batchId:   { type: mongoose.Schema.Types.ObjectId, ref: 'CostRecord' },
+    perfumeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Perfume' },
+    qty:       { type: Number },
+    _id: false,
+  }],
   createdAt: { type: Date, default: Date.now }
 });
 
