@@ -51,9 +51,15 @@ const ExpenseManagement = () => {
   const totalExpenses = expenses.reduce((acc, exp) => acc + Number(exp.amount), 0);
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
+  const todayStr = getLocalDate();
   const monthlyExpenses = expenses.filter(exp => {
     const expDate = new Date(exp.date);
     return expDate.getMonth() === currentMonth && expDate.getFullYear() === currentYear;
+  }).reduce((acc, exp) => acc + Number(exp.amount), 0);
+  const todayExpenses = expenses.filter(exp => {
+    // exp.date is an ISO string; compare its YYYY-MM-DD portion to today
+    const expDay = exp.date ? exp.date.slice(0, 10) : '';
+    return expDay === todayStr;
   }).reduce((acc, exp) => acc + Number(exp.amount), 0);
 
   const fetchExpenses = async () => {
@@ -112,6 +118,11 @@ const ExpenseManagement = () => {
 
       {/* Summary Boxes */}
       <div className="flex gap-5 mb-10 flex-wrap">
+        <div className="flex-1 min-w-[150px] p-6 bg-white border border-[#eee] border-l-4 border-l-[#f59e0b]">
+          <span className="block text-[10px] text-[#888] font-bold tracking-[2px] mb-2.5">TODAY'S EXPENSE</span>
+          <span className="text-xl font-bold">{todayExpenses.toLocaleString()} TK</span>
+          <span className="block text-[10px] text-[#aaa] mt-1">{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+        </div>
         <div className="flex-1 min-w-[150px] p-6 bg-white border border-[#eee] border-l-4 border-l-black">
           <span className="block text-[10px] text-[#888] font-bold tracking-[2px] mb-2.5">THIS MONTH'S SPEND</span>
           <span className="text-xl font-bold">{monthlyExpenses.toLocaleString()} TK</span>
