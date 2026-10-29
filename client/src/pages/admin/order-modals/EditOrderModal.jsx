@@ -212,18 +212,33 @@ const EditOrderModal = ({
           })}
         </div>
 
-        {/* Shipping + Total */}
+        {/* Shipping + Discount + Total */}
         <div className="flex flex-wrap items-center gap-4 border-t border-[#eee] pt-4">
           <div>
-            <label className="text-[10px] font-bold text-[#888] block mb-1">SHIPPING</label>
+            <label className="text-[10px] font-bold text-[#888] block mb-1">SHIPPING (TK)</label>
             <input
               type="number"
+              min="0"
               value={editForm.shippingCost}
               onChange={e => setEditForm({ ...editForm, shippingCost: Number(e.target.value) })}
               className="w-24 p-2 border border-[#ddd] text-sm outline-none box-border"
             />
           </div>
+          <div>
+            <label className="text-[10px] font-bold text-[#888] block mb-1">DISCOUNT ON TOTAL (TK)</label>
+            <input
+              type="number"
+              min="0"
+              value={editForm.discountApplied}
+              onChange={e => setEditForm({ ...editForm, discountApplied: Number(e.target.value) })}
+              className="w-28 p-2 border border-[#ddd] text-sm outline-none box-border"
+              placeholder="0"
+            />
+          </div>
           <div className="ml-auto text-right">
+            {editForm.discountApplied > 0 && (
+              <p className="text-[11px] text-red-500 m-0 mb-0.5">-{Number(editForm.discountApplied).toLocaleString()} TK discount</p>
+            )}
             <span className="text-[10px] text-[#888] font-bold">GRAND TOTAL</span>
             <p className="text-xl font-bold m-0">{calcEditTotal(editForm).toLocaleString()} TK</p>
           </div>

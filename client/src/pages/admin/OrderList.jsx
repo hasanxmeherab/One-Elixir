@@ -167,6 +167,7 @@ const OrderList = () => {
       customerEmail: order.customerEmail || '',
       paymentMethod: order.paymentMethod,
       shippingCost: order.shippingCost || 0,
+      discountApplied: order.discountApplied || 0,
       orderDate: new Date(order.createdAt).toISOString().slice(0, 16),
       items: order.items.map(item => ({
         perfumeId: item.perfumeId || '',
@@ -189,7 +190,8 @@ const OrderList = () => {
       else if (item.discountType === 'fixed') price = price - (item.discountValue || 0);
       return sum + Math.max(0, price) * item.quantity;
     }, 0);
-    return itemsTotal + (Number(form.shippingCost) || 0);
+    const discount = Number(form.discountApplied) || 0;
+    return Math.max(0, itemsTotal + (Number(form.shippingCost) || 0) - discount);
   };
 
   const saveEditOrder = async () => {
@@ -211,6 +213,7 @@ const OrderList = () => {
         customerEmail: editForm.customerEmail,
         paymentMethod: editForm.paymentMethod,
         shippingCost: Number(editForm.shippingCost) || 0,
+        discountApplied: Number(editForm.discountApplied) || 0,
         totalAmount,
         items,
         createdAt: editForm.orderDate ? new Date(editForm.orderDate).toISOString() : undefined,
