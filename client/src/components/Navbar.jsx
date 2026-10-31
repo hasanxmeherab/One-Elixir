@@ -141,7 +141,7 @@ const Navbar = memo(() => {
           </button>
 
           {/* LOGO — centered on mobile, left-aligned on desktop */}
-          <Link to="/" className="shrink-0 md:mr-2 absolute left-1/2 -translate-x-1/2 md:static md:left-auto md:translate-x-0">
+          <Link to="/" onClick={() => window.scrollTo(0, 0)} className="shrink-0 md:mr-2 absolute left-1/2 -translate-x-1/2 md:static md:left-auto md:translate-x-0">
             <img src="/logos/OneElixir Name(Sg).png" alt="OneElixir Logo" className="h-10 md:h-12" />
           </Link>
 
