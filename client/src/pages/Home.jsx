@@ -666,7 +666,18 @@ const ContactSection = ({ settings }) => {
   const label = s.contactLabel || 'CONNECT WITH US';
   const heading = s.contactHeading || 'Experience OneElixir';
   const desc = s.contactDesc || 'Have questions about finding your bespoke scent profile or placing a custom fragrance order? Our team is welcoming, helpful, and ready to guide your olfactory journey.';
-  const storeUrl = s.contactStoreUrl || 'www.oneelixir.live';
+  // Placeholder display text: strictly controlled from admin panel
+  const pagePlaceholder = (s.contactStoreText && s.contactStoreText.trim()) ||
+    (typeof window !== 'undefined' ? localStorage.getItem('oneelixir_contact_placeholder') || '' : '');
+
+  // Destination URL: strictly controlled from admin panel
+  const rawUrl = (s.contactStoreUrl && s.contactStoreUrl.trim()) ||
+    (typeof window !== 'undefined' ? localStorage.getItem('oneelixir_contact_url') || '' : '');
+  const pageHref = rawUrl
+    ? (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')
+        ? rawUrl
+        : 'https://' + rawUrl.replace(/^https?:\/\//i, '').trim())
+    : '';
   const location = s.contactLocation || 'Crafted & Based in Bangladesh';
   const bullet = s.contactBullet || 'Bespoke 3.5 ml & 30 ml Roller Editions Available';
   const image = s.contactImage || '';
@@ -751,7 +762,17 @@ const ContactSection = ({ settings }) => {
           line-height: 1.5;
         }
         .contact-info-list li .icon { flex-shrink: 0; margin-top: 2px; }
-        .contact-info-list li a { color: #e74c3c; text-decoration: underline; }
+        .contact-store-link {
+          color: #C5C5D0;
+          text-decoration: underline;
+          text-underline-offset: 3px;
+          transition: color 0.2s ease;
+          cursor: pointer;
+        }
+        .contact-store-link:hover {
+          color: #ffffff;
+          text-decoration: underline;
+        }
         .contact-right-img {
           width: 160px;
           height: 160px;
@@ -819,10 +840,19 @@ const ContactSection = ({ settings }) => {
             <ul className="contact-info-list">
               <li>
                 <span className="icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F04A3A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg></span>
-                <span>Official Store:&nbsp;
-                  <a href={`https://${storeUrl.replace(/^https?:\/\//, '')}`} target="_blank" rel="noopener noreferrer">
-                    {storeUrl}
-                  </a>
+                <span>Official Page:&nbsp;
+                  {pageHref ? (
+                    <a
+                      href={pageHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="contact-store-link"
+                    >
+                      {pagePlaceholder}
+                    </a>
+                  ) : (
+                    <span className="contact-store-link">{pagePlaceholder}</span>
+                  )}
                 </span>
               </li>
               <li>

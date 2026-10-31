@@ -33,7 +33,8 @@ const DEFAULT_HERO = {
   contactLabel:          'CONNECT WITH US',
   contactHeading:        'Experience OneElixir',
   contactDesc:           'Have questions about finding your bespoke scent profile or placing a custom fragrance order? Our team is welcoming, helpful, and ready to guide your olfactory journey.',
-  contactStoreUrl:       'www.oneelixir.live',
+  contactStoreText:       '',
+  contactStoreUrl:       '',
   contactLocation:       'Crafted & Based in Bangladesh',
   contactBullet:         'Bespoke 3.5 ml & 30 ml Roller Editions Available',
   contactImage:          '',
@@ -102,7 +103,14 @@ const BannerManagement = ({ isAdmin }) => {
   const fetchHero = async () => {
     try {
       const res = await axios.get(`${API_URL}/api/hero-settings`);
-      setHero({ ...DEFAULT_HERO, ...res.data });
+      const localPlaceholder = localStorage.getItem('oneelixir_contact_placeholder') || '';
+      const localUrl = localStorage.getItem('oneelixir_contact_url') || '';
+      setHero({
+        ...DEFAULT_HERO,
+        ...res.data,
+        contactStoreText: res.data.contactStoreText || localPlaceholder,
+        contactStoreUrl: res.data.contactStoreUrl || localUrl,
+      });
     } catch { /* keep defaults */ }
   };
 
@@ -163,6 +171,16 @@ const BannerManagement = ({ isAdmin }) => {
   const saveHero = async () => {
     setHeroSaving(true);
     try {
+      if (hero.contactStoreText) {
+        localStorage.setItem('oneelixir_contact_placeholder', hero.contactStoreText);
+      } else {
+        localStorage.removeItem('oneelixir_contact_placeholder');
+      }
+      if (hero.contactStoreUrl) {
+        localStorage.setItem('oneelixir_contact_url', hero.contactStoreUrl);
+      } else {
+        localStorage.removeItem('oneelixir_contact_url');
+      }
       await adminAxios.put(`${API_URL}/api/hero-settings`, hero);
       toast.success('Hero content saved!');
     } catch { toast.error('Failed to save hero settings.'); }
@@ -509,26 +527,37 @@ const BannerManagement = ({ isAdmin }) => {
               </div>
 
               {/* Info bullets */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className={labelCls}>🌐 STORE URL</label>
-                  <input className={inputCls} placeholder="www.oneelixir.live"
-                    value={hero.contactStoreUrl || ''}
-                    onChange={e => setHero({ ...hero, contactStoreUrl: e.target.value })} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelCls}>🌐 OFFICIAL PAGE DISPLAY TEXT (PLACEHOLDER)</label>
+                    <input className={inputCls} placeholder="OneElixir"
+                      value={hero.contactStoreText || ''}
+                      onChange={e => setHero({ ...hero, contactStoreText: e.target.value })} />
+                    <p className="text-[11px] text-gray-400 mt-1">Placeholder text displayed on the site</p>
+                  </div>
+                  <div>
+                    <label className={labelCls}>🔗 OFFICIAL PAGE REDIRECT LINK (URL)</label>
+                    <input className={inputCls} placeholder="https://example.com/your-page"
+                      value={hero.contactStoreUrl || ''}
+                      onChange={e => setHero({ ...hero, contactStoreUrl: e.target.value })} />
+                    <p className="text-[11px] text-gray-400 mt-1">Full URL opened when clicking the placeholder</p>
+                  </div>
                 </div>
-                <div>
-                  <label className={labelCls}>📍 LOCATION TEXT</label>
-                  <input className={inputCls} placeholder="Crafted & Based in Bangladesh"
-                    value={hero.contactLocation || ''}
-                    onChange={e => setHero({ ...hero, contactLocation: e.target.value })} />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelCls}>📍 LOCATION TEXT</label>
+                    <input className={inputCls} placeholder="Crafted & Based in Bangladesh"
+                      value={hero.contactLocation || ''}
+                      onChange={e => setHero({ ...hero, contactLocation: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>✦ BULLET POINT</label>
+                    <input className={inputCls} placeholder="Bespoke 3.5 ml & 30 ml Roller Editions"
+                      value={hero.contactBullet || ''}
+                      onChange={e => setHero({ ...hero, contactBullet: e.target.value })} />
+                  </div>
                 </div>
-                <div>
-                  <label className={labelCls}>◆ BULLET POINT</label>
-                  <input className={inputCls} placeholder="Bespoke 3.5 ml & 30 ml Roller Editions"
-                    value={hero.contactBullet || ''}
-                    onChange={e => setHero({ ...hero, contactBullet: e.target.value })} />
-                </div>
-              </div>
 
               {/* Right panel */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
