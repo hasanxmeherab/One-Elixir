@@ -4,6 +4,8 @@ const Expense = require('../models/Expense');
 const { verifyAdmin } = require('../middleware/authMiddleware');
 const { validate, createExpenseSchema } = require('../middleware/validate');
 const writeLog = require('../utils/writeLog');
+const expensePayload = require('../utils/expensePayload');
+const { isValidObjectId } = require('mongoose');
 
 // GET all expenses (admin only)
 router.get('/', verifyAdmin, async (req, res) => {
@@ -27,7 +29,7 @@ router.get('/', verifyAdmin, async (req, res) => {
 // POST new expense (admin only)
 router.post('/', verifyAdmin, validate(createExpenseSchema), async (req, res) => {
     try {
-        const expense = new Expense(req.body);
+        const expense = new Expense(expensePayload(req.body));
         const newExpense = await expense.save();
         const detail = `Added expense: "${newExpense.title}" — ${Number(newExpense.amount).toLocaleString()} TK (${newExpense.category})`;
         await writeLog(req, 'CREATE_EXPENSE', 'Expense', detail);
@@ -35,6 +37,20 @@ router.post('/', verifyAdmin, validate(createExpenseSchema), async (req, res) =>
     } catch (err) {
         res.status(400).json({ message: err.message });
     }
+});
+
+// Replace expense details; unset quantity metadata when changing to a direct total.
+router.put('/:id', verifyAdmin, validate(createExpenseSchema), async (req, res) => {
+    try {
+        if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid expense ID.' });
+        const payload = expensePayload(req.body);
+        const update = { $set: payload };
+        if (payload.quantity === undefined) update.$unset = { quantity: '', unitPrice: '' };
+        const expense = await Expense.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
+        if (!expense) return res.status(404).json({ message: 'Expense not found.' });
+        await writeLog(req, 'UPDATE_EXPENSE', 'Expense', `Updated expense: "${expense.title}" — ${expense.amount} TK (${expense.category})`);
+        res.json(expense);
+    } catch (err) { res.status(400).json({ message: err.message }); }
 });
 
 // DELETE expense (admin only)
