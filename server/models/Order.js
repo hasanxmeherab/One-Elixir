@@ -42,6 +42,11 @@ const orderSchema = new mongoose.Schema({
       adminId:   { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
       adminName: { type: String, default: '' }
     },
+    receivedBy: {
+      adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+      adminName: { type: String, default: '' }
+    },
+    ledgerEntryId: { type: mongoose.Schema.Types.ObjectId, ref: 'PaymentLedger' },
     paidAt:    { type: Date, default: Date.now }
   }],
   amountPaid:   { type: Number, default: 0 }, // running total of partial payments

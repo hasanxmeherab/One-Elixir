@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 
 const METHOD_OPTIONS = ['Cash', 'bKash', 'Nagad', 'Rocket', 'Bank Transfer', 'Card', 'Other'];
 
-const PartialPaymentModal = ({ order, onSave, onDelete, onClose, saving, deleting }) => {
+const PartialPaymentModal = ({ order, onSave, onDelete, onClose, saving, deleting, adminList = [] }) => {
   const [amount, setAmount]         = useState('');
   const [method, setMethod]         = useState('Cash');
   const [note, setNote]             = useState('');
   const [confirmDelete, setConfirmDelete] = useState(null); // paymentId awaiting confirm
+  const [receiverAdminId, setReceiverAdminId] = useState('');
 
   if (!order) return null;
 
@@ -15,13 +16,12 @@ const PartialPaymentModal = ({ order, onSave, onDelete, onClose, saving, deletin
   const due         = order.amountDue != null ? Number(order.amountDue) : Math.max(0, total - alreadyPaid);
   const pct         = total > 0 ? Math.min(100, Math.round((alreadyPaid / total) * 100)) : 0;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const val = Number(amount);
-    if (!val || val <= 0) return;
-    onSave({ amount: val, method, note });
-    setAmount('');
-    setNote('');
+    if (saving || !val || val <= 0 || val > due || !receiverAdminId) return;
+    const saved = await onSave({ amount: val, method, note, receiverAdminId });
+    if (saved) { setAmount(''); setNote(''); setReceiverAdminId(''); }
   };
 
   const handleDeleteClick = (paymentId) => {
@@ -35,12 +35,12 @@ const PartialPaymentModal = ({ order, onSave, onDelete, onClose, saving, deletin
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-[3100] flex items-center justify-center overflow-y-auto p-4"
       style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }}
       onClick={() => { setConfirmDelete(null); onClose(); }}
     >
       <div
-        className="bg-white w-full max-w-md mx-4 shadow-2xl rounded-sm overflow-hidden"
+        className="bg-white w-full max-w-md max-h-[90dvh] mx-4 shadow-2xl rounded-sm overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -116,8 +116,9 @@ const PartialPaymentModal = ({ order, onSave, onDelete, onClose, saving, deletin
                         <span className="text-[10px] text-gray-400">{new Date(p.paidAt).toLocaleDateString()}</span>
                       </div>
                       <div className="text-[10px] text-gray-500 mt-0.5">
-                        {p.method} · {p.recordedBy?.adminName || 'Admin'}
+                        {p.method} · Received by {p.receivedBy?.adminName || p.recordedBy?.adminName || 'Admin'}
                       </div>
+                      {p.receivedBy && <div className="text-[10px] text-gray-400">Recorded by {p.recordedBy?.adminName || 'Admin'}</div>}
                       {p.note && <div className="text-[10px] text-gray-400 italic mt-0.5">"{p.note}"</div>}
                       {isConfirming && (
                         <div className="flex items-center gap-2 mt-1.5">
@@ -164,7 +165,8 @@ const PartialPaymentModal = ({ order, onSave, onDelete, onClose, saving, deletin
                 <label className="block text-[10px] font-bold text-gray-500 mb-1">AMOUNT (TK) *</label>
                 <input
                   type="number"
-                  min="1"
+                  min="0.01"
+                  max={Math.max(0, due)}
                   step="0.01"
                   value={amount}
                   onChange={e => setAmount(e.target.value)}
@@ -185,6 +187,17 @@ const PartialPaymentModal = ({ order, onSave, onDelete, onClose, saving, deletin
               </div>
             </div>
 
+            <label className="block text-[10px] font-bold text-gray-500">
+              WHO RECEIVED THIS PAYMENT? *
+              <select required value={receiverAdminId} disabled={saving || !adminList.length}
+                onChange={e => setReceiverAdminId(e.target.value)}
+                className="w-full mt-1 px-3 py-2 border border-gray-200 text-xs outline-none focus:border-amber-500 rounded-sm bg-white">
+                <option value="">Select receiving admin</option>
+                {adminList.map(admin => <option key={admin._id} value={admin._id}>{admin.name}{admin.role === 'superadmin' ? ' (Super admin)' : ''}</option>)}
+              </select>
+            </label>
+            <p className="text-[10px] text-gray-400 m-0">{adminList.length ? 'This amount is credited to the selected admin’s balance.' : 'Payment receivers are unavailable. Refresh the page to try again.'}</p>
+
             <div>
               <label className="block text-[10px] font-bold text-gray-500 mb-1">NOTE (optional)</label>
               <input
@@ -199,7 +212,7 @@ const PartialPaymentModal = ({ order, onSave, onDelete, onClose, saving, deletin
             {/* Quick amount shortcuts */}
             <div className="flex gap-1.5 flex-wrap">
               {[0.25, 0.5, 0.75, 1].map(frac => {
-                const quick = Math.round(due * frac);
+                const quick = Math.round(due * frac * 100) / 100;
                 if (quick <= 0) return null;
                 return (
                   <button
@@ -217,7 +230,7 @@ const PartialPaymentModal = ({ order, onSave, onDelete, onClose, saving, deletin
             <div className="flex gap-2 pt-1">
               <button
                 type="submit"
-                disabled={saving || !amount || Number(amount) <= 0}
+                disabled={saving || !amount || Number(amount) <= 0 || Number(amount) > due || !receiverAdminId}
                 className="flex-1 py-2.5 text-[11px] font-black tracking-widest uppercase bg-amber-500 hover:bg-amber-600 text-white border-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors rounded-sm"
               >
                 {saving ? 'SAVING…' : '✓ RECORD PAYMENT'}

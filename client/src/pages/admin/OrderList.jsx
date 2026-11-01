@@ -13,6 +13,10 @@ import OrderNotesModal from './order-modals/OrderNotesModal';
 import CustomerHistoryDrawer from './order-modals/CustomerHistoryDrawer';
 import PaymentReceiverModal from './order-modals/PaymentReceiverModal';
 import PartialPaymentModal from './order-modals/PartialPaymentModal';
+import OrderTable from './order-modals/OrderTable';
+import OrderDetailsDrawer from './order-modals/OrderDetailsDrawer';
+import { togglePageSelection, isPageSelected } from '../../utils/orderSelection';
+import './OrderList.css';
 
 const PAGE_SIZE = 15;
 
@@ -29,6 +33,8 @@ const OrderList = () => {
   const [editPaymentForm, setEditPaymentForm] = useState({ senderNumber: '', transactionId: '', screenshot: null, screenshotUrl: '' });
   const [editUploading, setEditUploading] = useState(false);
   const [page, setPage] = useState(1);
+  const [viewOrderId, setViewOrderId] = useState(null);
+  const viewOrder = orders.find(order => order._id === viewOrderId);
 
   // ── NEW: Date range filter ──
   const [dateFrom, setDateFrom] = useState('');
@@ -69,6 +75,7 @@ const OrderList = () => {
 
 
   useEffect(() => { setPage(1); }, [searchTerm, paymentStatusFilter, paymentMethodFilter, orderStatusFilter, showArchived, dateFrom, dateTo]);
+  useEffect(() => { setSelectedIds(new Set()); }, [searchTerm, paymentStatusFilter, paymentMethodFilter, orderStatusFilter, showArchived, dateFrom, dateTo]);
 
   // Fetch admin list for payment receiver selection
   useEffect(() => {
@@ -81,6 +88,13 @@ const OrderList = () => {
 
   // ── Existing handlers (updated for payment receiver) ──
   const updatePaymentStatus = async (id, paymentStatus, receiverInfo) => {
+    if (paymentStatus === 'Partial') {
+      const order = orders.find(order => order._id === id);
+      if (!order) { toast.error('Order not found. Please refresh the order list.'); return; }
+      setViewOrderId(null);
+      setPartialPaymentOrder(order);
+      return;
+    }
     // If marking as Paid and no receiver yet, show the modal
     if (paymentStatus === 'Paid' && !receiverInfo) {
       setReceiverModal({ orderId: id });
@@ -266,11 +280,7 @@ const OrderList = () => {
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === displayedOrders.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(displayedOrders.map(o => o._id)));
-    }
+    setSelectedIds(previous => togglePageSelection(previous, displayedOrders));
   };
 
   const executeBulkAction = async () => {
@@ -315,17 +325,19 @@ const OrderList = () => {
   };
 
   // ── Partial Payment ──
-  const savePartialPayment = async ({ amount, method, note }) => {
-    if (!partialPaymentOrder) return;
+  const savePartialPayment = async ({ amount, method, note, receiverAdminId }) => {
+    if (!partialPaymentOrder || partialSaving) return false;
     setPartialSaving(true);
     try {
-      const res = await adminAxios.post(`${API_URL}/api/orders/${partialPaymentOrder._id}/partial-payment`, { amount, method, note });
+      const res = await adminAxios.post(`${API_URL}/api/orders/${partialPaymentOrder._id}/partial-payment`, { amount, method, note, receiverAdminId });
       toast.success(`${amount.toLocaleString()} TK recorded successfully.`);
       // Update the modal order in-place so history shows immediately
       setPartialPaymentOrder(res.data.order);
       fetchData();
+      return true;
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to record partial payment.');
+      return false;
     } finally {
       setPartialSaving(false);
     }
@@ -469,11 +481,11 @@ const OrderList = () => {
   // ── Filtering (UPDATED: search by Order ID + date range) ──
   const baseFiltered = orders.filter(o => showArchived ? o.status === 'Canceled' : o.status !== 'Canceled');
   const allFiltered = baseFiltered.filter(order => {
-    const s = searchTerm.toLowerCase();
+    const s = searchTerm.trim().toLowerCase();
     const matchesSearch = !s ||
       order.customerName.toLowerCase().includes(s) ||
       order.phone.includes(s) ||
-      order._id.slice(-6).toUpperCase().includes(s.toUpperCase());
+      order._id.toLowerCase().includes(s.replace(/^#/, ''));
     const orderPaymentStatus = order.paymentStatus || 'Unpaid';
     const matchesPaymentStatus = paymentStatusFilter === 'ALL' ||
       orderPaymentStatus.toLowerCase() === paymentStatusFilter.toLowerCase();
@@ -481,15 +493,16 @@ const OrderList = () => {
     const matchesOrderStatus = orderStatusFilter === 'ALL' || order.status === orderStatusFilter;
     // Date range filter
     let matchesDate = true;
-    if (dateFrom) matchesDate = new Date(order.createdAt) >= new Date(dateFrom);
+    if (dateFrom) matchesDate = new Date(order.createdAt) >= new Date(`${dateFrom}T00:00:00+06:00`);
     if (dateTo && matchesDate) {
-      const to = new Date(dateTo); to.setHours(23, 59, 59, 999);
+      const to = new Date(`${dateTo}T23:59:59.999+06:00`);
       matchesDate = new Date(order.createdAt) <= to;
     }
     return matchesSearch && matchesPaymentStatus && matchesPaymentMethod && matchesOrderStatus && matchesDate;
   });
-  const totalPages = Math.ceil(allFiltered.length / PAGE_SIZE);
-  const displayedOrders = allFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(allFiltered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const displayedOrders = allFiltered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const isUnpaidSelected = paymentStatusFilter.toLowerCase() === 'unpaid';
 
@@ -577,78 +590,18 @@ const OrderList = () => {
     return 'bg-amber-100 text-amber-800';
   };
 
-  const hasPaymentDetails = (order) =>
-    !!(order.paymentDetails?.senderNumber || order.paymentDetails?.transactionId);
-
   return (
-    <div className="w-full">
-      {/* ── Header ── */}
-      <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
-        <h3 className="tracking-[2px] font-bold m-0">{showArchived ? 'ARCHIVED ORDERS' : 'ACTIVE ORDERS'}</h3>
-        <div className="flex gap-2.5 flex-wrap items-center">
-          <input type="text" placeholder="Search name / phone / ID..." value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="px-3 py-2 border border-[#ddd] text-xs outline-none w-48" />
-          <select value={orderStatusFilter} onChange={e => setOrderStatusFilter(e.target.value)}
-            className="px-2 py-2 border border-[#ddd] text-[11px] outline-none cursor-pointer font-bold">
-            <option value="ALL">ALL STATUS</option>
-            <option value="Pending">PENDING</option>
-            <option value="Processing">PROCESSING</option>
-            <option value="Shipped">SHIPPED</option>
-            <option value="Delivered">DELIVERED</option>
-            <option value="Canceled">CANCELED</option>
-          </select>
-          <select value={paymentStatusFilter} onChange={e => setPaymentStatusFilter(e.target.value)}
-            className={`px-2 py-2 border text-[11px] outline-none cursor-pointer font-bold transition-colors ${
-              paymentStatusFilter === 'Unpaid'
-                ? 'border-red-500 bg-red-50 text-red-700'
-                : paymentStatusFilter === 'Paid'
-                ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                : 'border-[#ddd] bg-white text-black'
-            }`}>
-            <option value="ALL">ALL PAYMENT</option>
-            <option value="Paid">PAID</option>
-            <option value="Unpaid">UNPAID</option>
-            <option value="Partial">PARTIAL</option>
-            <option value="Pending Verification">PENDING VERIFICATION</option>
-          </select>
-          {isUnpaidSelected && (
-            <div className="px-2.5 py-1.5 bg-red-50 border border-red-300 text-red-800 rounded text-[11px] font-bold tracking-wide flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-red-600"></span>
-              <span>UNPAID: <strong className="text-red-950 font-extrabold">{unpaidStats.totalAmount.toLocaleString()} TK</strong></span>
-            </div>
-          )}
-          <select value={paymentMethodFilter} onChange={e => setPaymentMethodFilter(e.target.value)}
-            className="px-2 py-2 border border-[#ddd] text-[11px] outline-none cursor-pointer font-bold">
-            <option value="ALL">ALL METHODS</option>
-            <option value="Cash on Delivery">COD</option>
-            <option value="Full Payment">FULL PAYMENT</option>
-          </select>
-          <button onClick={() => { setShowArchived(!showArchived); setSearchTerm(''); }}
-            className={`px-3 py-2 text-[10px] font-bold tracking-wider cursor-pointer border transition-colors ${showArchived ? 'bg-black text-white border-black' : 'bg-[#f0f0f0] text-black border-[#ddd]'}`}>
-            {showArchived ? '← BACK' : 'ARCHIVED'}
-          </button>
-          <button onClick={exportToExcel}
-            className="px-3 py-2 text-[10px] font-bold tracking-wider cursor-pointer border border-emerald-600 text-emerald-700 bg-emerald-50 hover:bg-emerald-600 hover:text-white transition-colors">
-            ↓ EXCEL ({allFiltered.length})
-          </button>
-        </div>
-      </div>
-
-      {/* ── NEW: Date Range Filter ── */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <span className="text-[10px] font-bold text-[#888] tracking-wider">DATE RANGE:</span>
-        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-          className="px-2 py-1.5 border border-[#ddd] text-[11px] outline-none" />
-        <span className="text-[#aaa] text-xs">to</span>
-        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-          className="px-2 py-1.5 border border-[#ddd] text-[11px] outline-none" />
-        {(dateFrom || dateTo) && (
-          <button onClick={() => { setDateFrom(''); setDateTo(''); }}
-            className="text-[10px] text-[#888] underline cursor-pointer bg-transparent border-none">CLEAR</button>
-        )}
-      </div>
-
+    <div className="order-list">
+      <header className="ol-header"><div><p className="ol-eyebrow">SALES / ORDERS</p><h1>{showArchived ? 'Archived orders.' : 'Every order, at a glance.'}</h1><p>Track fulfilment, follow up on payments, and keep customers informed.</p></div><div className="ol-header-actions"><button className="ol-button" onClick={() => { setShowArchived(!showArchived); setOrderStatusFilter('ALL'); setSearchTerm(''); }}>{showArchived ? 'Back to active orders' : 'Archived orders'}</button><button className="ol-button ol-export" onClick={exportToExcel}>Export Excel ({allFiltered.length})</button></div></header>
+      <nav className="ol-status-tabs" aria-label="Order status">{['ALL', ...(showArchived ? ['Canceled'] : ['Pending', 'Processing', 'Shipped', 'Delivered'])].map(status => <button key={status} className={orderStatusFilter === status ? 'active' : ''} aria-pressed={orderStatusFilter === status} onClick={() => setOrderStatusFilter(status)}>{status === 'ALL' ? 'All orders' : status}<span>{baseFiltered.filter(order => status === 'ALL' || order.status === status).length}</span></button>)}</nav>
+      <div className="ol-toolbar"><label className="ol-search">Search orders<input type="search" placeholder="Customer name, phone, or order ID…" value={searchTerm} onChange={event => setSearchTerm(event.target.value)} /></label>
+        <details className="ol-filters"><summary>Filters{[paymentStatusFilter !== 'ALL', paymentMethodFilter !== 'ALL', Boolean(dateFrom || dateTo)].filter(Boolean).length > 0 && <span> · Active</span>}</summary><div className="ol-filter-fields">
+          <label>Payment status<select value={paymentStatusFilter} onChange={event => setPaymentStatusFilter(event.target.value)}>{['ALL', 'Paid', 'Unpaid', 'Partial', 'Pending Verification'].map(status => <option key={status} value={status}>{status === 'ALL' ? 'All payments' : status}</option>)}</select></label>
+          <label>Payment method<select value={paymentMethodFilter} onChange={event => setPaymentMethodFilter(event.target.value)}>{['ALL', ...new Set(['Cash on Delivery', 'Full Payment', 'Bkash', 'Nagad', 'Bank Transfer', ...orders.map(order => order.paymentMethod).filter(Boolean)])].map(method => <option key={method} value={method}>{method === 'ALL' ? 'All methods' : method}</option>)}</select></label>
+          <label>From date<input type="date" value={dateFrom} max={dateTo || undefined} onChange={event => setDateFrom(event.target.value)} /></label><label>To date<input type="date" value={dateTo} min={dateFrom || undefined} onChange={event => setDateTo(event.target.value)} /></label>
+          <button className="ol-text-button" onClick={() => { setPaymentStatusFilter('ALL'); setPaymentMethodFilter('ALL'); setDateFrom(''); setDateTo(''); }}>Clear filters</button>
+        </div></details>
+      </div><p className="ol-results">{allFiltered.length} matching {allFiltered.length === 1 ? 'order' : 'orders'} · Page {currentPage} of {totalPages}{selectedIds.size > 0 ? ` · ${selectedIds.size} selected across pages` : ''}</p>
       {/* ── NEW: Bulk Actions Bar ── */}
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 mb-4 p-3 bg-[#f5f5f5] border border-[#ddd]">
@@ -798,188 +751,20 @@ const OrderList = () => {
         </div>
       )}
 
-      {/* ── Table ── */}
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-left text-xs">
-          <thead>
-            <tr className="border-b-2 border-black">
-              <th className="py-2.5 px-2 w-8">
-                <input type="checkbox" checked={selectedIds.size === displayedOrders.length && displayedOrders.length > 0}
-                  onChange={toggleSelectAll} className="cursor-pointer" />
-              </th>
-              {['DATE', 'ID', 'CUSTOMER', 'ADDRESS', 'ITEMS', 'SHIPPING', 'TOTAL', 'PAYMENT', 'INFO', 'NOTES', 'CREATED BY', 'STATUS', 'ACTIONS', 'EDIT', 'PDF'].map(h => (
-                <th key={h} className="py-2.5 px-2 font-bold tracking-wider text-[10px]">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {displayedOrders.length > 0 ? displayedOrders.map(order => (
-              <tr key={order._id} className={`border-b border-[#eee] ${selectedIds.has(order._id) ? 'bg-blue-50' : ''}`}>
-                <td className="py-2.5 px-2">
-                  <input type="checkbox" checked={selectedIds.has(order._id)} onChange={() => toggleSelect(order._id)} className="cursor-pointer" />
-                </td>
-                <td className="py-2.5 px-2 whitespace-nowrap">{new Date(order.createdAt).toLocaleDateString()}</td>
-                <td className="py-2.5 px-2 font-mono text-[10px] text-[#888]">#{order._id.slice(-6).toUpperCase()}</td>
-                <td className="py-2.5 px-2">
-                  <div className="font-bold cursor-pointer hover:underline" onClick={() => showCustomerHistory(order.customerName, order.phone)}>
-                    {order.customerName}
-                  </div>
-                  <div className="text-[11px] text-gray-500">{order.phone}</div>
-                </td>
-                <td className="py-2.5 px-2 max-w-[180px]">
-                  <div className="text-[11px] leading-relaxed">{order.address || '—'}</div>
-                </td>
-                <td className="py-2.5 px-2">
-                  <div className="text-[11px]">
-                    {order.items.map((item, i) => <div key={i}>{item.quantity}x {item.name}</div>)}
-                  </div>
-                </td>
-                <td className="py-2.5 px-2 text-[11px]">{order.shippingCost} TK</td>
-                <td className="py-2.5 px-2 font-bold">{order.totalAmount.toLocaleString()} TK</td>
-                <td className="py-2.5 px-2">
-                  <div className="text-[10px] mb-1 font-bold">{order.paymentMethod}</div>
-                  <select value={order.paymentStatus || 'Unpaid'} onChange={e => updatePaymentStatus(order._id, e.target.value)}
-                    className={`p-1 text-[10px] font-bold border border-[#ddd] cursor-pointer outline-none ${
-                      order.paymentStatus === 'Paid' ? 'bg-emerald-50 text-emerald-800'
-                      : order.paymentStatus === 'Partial' ? 'bg-amber-50 text-amber-800'
-                      : 'bg-red-50 text-red-800'
-                    }`}>
-                    <option value="Unpaid">Unpaid</option>
-                    <option value="Pending Verification">Pending Verification</option>
-                    <option value="Partial">Partial</option>
-                    <option value="Paid">Paid</option>
-                  </select>
-                  {/* Partial payment summary */}
-                  {(order.partialPayments?.length > 0 || order.paymentStatus === 'Partial') && (
-                    <div className="mt-1.5 bg-amber-50 border border-amber-200 rounded px-1.5 py-1">
-                      <div className="text-[9px] font-bold text-amber-700 flex justify-between">
-                        <span>Paid: {(Number(order.amountPaid) || 0).toLocaleString()} TK</span>
-                        <span className="text-red-600">Due: {Math.max(0, order.amountDue != null ? Number(order.amountDue) : (order.totalAmount - (Number(order.amountPaid) || 0))).toLocaleString()} TK</span>
-                      </div>
-                      {/* Mini progress bar */}
-                      <div className="w-full h-1 bg-amber-100 rounded-full mt-1 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-amber-500"
-                          style={{ width: `${Math.min(100, Math.round(((Number(order.amountPaid) || 0) / (Number(order.totalAmount) || 1)) * 100))}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                  {/* Partial pay button */}
-                  {(order.paymentStatus !== 'Paid' || order.partialPayments?.length > 0) && (
-                    <button
-                      onClick={() => setPartialPaymentOrder(order)}
-                      className="mt-1 w-full text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-300 px-1.5 py-0.5 rounded cursor-pointer hover:bg-amber-100 transition-colors text-center"
-                    >
-                      {order.paymentStatus === 'Paid' ? '₿ VIEW PAYMENTS' : '₿ PARTIAL PAY'}
-                    </button>
-                  )}
-                  {order.paymentStatus === 'Paid' && (
-                    order.paymentReceivedBy?.adminName ? (
-                      <div className="mt-1 text-[9px] text-gray-600 flex items-center gap-1">
-                        <span className="inline-block w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-                        <span className="font-semibold">{order.paymentReceivedBy.adminName}</span>
-                        <button onClick={() => { setReceiverModal({ orderId: order._id }); setSelectedReceiver(order.paymentReceivedBy?.adminId || adminData?.id || null); }}
-                          className="text-[8px] text-gray-400 hover:text-black border-none bg-transparent cursor-pointer p-0 underline ml-0.5">
-                          edit
-                        </button>
-                      </div>
-                    ) : (
-                      <button onClick={() => { setReceiverModal({ orderId: order._id }); setSelectedReceiver(adminData?.id || null); }}
-                        className="mt-1 block text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-300 px-1.5 py-0.5 rounded cursor-pointer hover:bg-amber-100 transition-colors">
-                        + Assign Admin
-                      </button>
-                    )
-                  )}
-                </td>
-                <td className="py-2.5 px-2 text-center align-middle">
-                  {hasPaymentDetails(order) ? (
-                    <div className="flex flex-col gap-1 items-center justify-center">
-                      <button onClick={() => setSelectedPayment({
-                        platform: order.paymentDetails?.platform || order.paymentMethod,
-                        senderNumber: order.paymentDetails?.senderNumber || '—',
-                        transactionId: order.paymentDetails?.transactionId || '—',
-                        amountPaid: order.paymentDetails?.amountPaid || null,
-                        screenshot: order.paymentDetails?.screenshot || null,
-                      })}
-                        className="bg-black text-white border-none px-2 py-1 text-[9px] cursor-pointer font-bold">
-                        VIEW
-                      </button>
-                      <button onClick={() => openEditPayment(order)}
-                        className="bg-[#555] text-white border-none px-2 py-1 text-[9px] cursor-pointer font-bold">
-                        EDIT
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="text-[11px] text-gray-300 block text-center">—</span>
-                  )}
-                </td>
-                {/* NOTES column */}
-                <td className="py-2.5 px-2 text-center">
-                  <button onClick={() => setNotesOrder(order)}
-                    className="bg-transparent border border-[#ddd] px-2 py-1 text-[9px] cursor-pointer font-bold hover:border-black transition-colors relative">
-                    📝 {(order.adminNotes?.length || 0) > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-black text-white rounded-full text-[8px] flex items-center justify-center">
-                        {order.adminNotes.length}
-                      </span>
-                    )}
-                  </button>
-                </td>
-                <td className="py-2.5 px-2 text-[11px] text-gray-500">{order.createdBy || (order.isManual ? 'Admin' : 'Customer')}</td>
-                <td className="py-2.5 px-2">
-                  <span className={`px-2 py-0.5 rounded-sm text-[10px] font-bold ${getStatusClass(order.status)}`}>
-                    {order.status.toUpperCase()}
-                  </span>
-                </td>
-                <td className="py-2.5 px-2">
-                  {order.status !== 'Canceled' ? (
-                    <select onChange={e => updateStatus(order._id, e.target.value)} value={order.status}
-                      className="p-1 text-[10px] border border-[#ddd] outline-none">
-                      <option value="Pending">Pending</option>
-                      <option value="Processing">Processing</option>
-                      <option value="Shipped">Shipped</option>
-                      <option value="Delivered">Delivered</option>
-                      <option value="Canceled">Cancel Order</option>
-                    </select>
-                  ) : (
-                    <button onClick={() => updateStatus(order._id, 'Pending')}
-                      className="bg-[#222] text-white border-none px-3 py-1 cursor-pointer text-[10px]">RESTORE</button>
-                  )}
-                </td>
-                {/* EDIT button */}
-                <td className="py-2.5 px-2">
-                  <button onClick={() => openEditOrder(order)}
-                    className="bg-blue-50 border border-blue-300 text-blue-700 px-2 py-1 cursor-pointer text-[10px] font-bold hover:bg-blue-100 transition-colors">
-                    ✏️ EDIT
-                  </button>
-                </td>
-                <td className="py-2.5 px-2">
-                  <button onClick={() => downloadReceipt(order)}
-                    className="bg-white border border-black px-2 py-1 cursor-pointer text-[11px] font-bold">📄</button>
-                </td>
-              </tr>
-            )) : (
-              <tr><td colSpan="16" className="text-center py-12 text-gray-300">No orders found.</td></tr>
-            )}
-          </tbody>
-          {isUnpaidSelected && displayedOrders.length > 0 && (
-            <tfoot>
-              <tr className="bg-red-50/90 font-bold border-t-2 border-red-300 border-b border-red-200 text-red-950">
-                <td colSpan={7} className="py-3 px-2 text-right text-[11px] tracking-wider uppercase font-bold text-red-900">
-                  TOTAL UNPAID ({allFiltered.length} {allFiltered.length === 1 ? 'order' : 'orders'}):
-                </td>
-                <td className="py-3 px-2 text-xs font-black text-red-700 whitespace-nowrap">
-                  {unpaidStats.totalAmount.toLocaleString()} TK
-                </td>
-                <td colSpan={8} className="py-3 px-2 text-[10px] text-red-600 font-normal">
-                  {totalPages > 1 ? `(Page ${page} of ${totalPages} · Total across all ${totalPages} pages)` : ''}
-                </td>
-              </tr>
-            </tfoot>
-          )}
-        </table>
-      </div>
-
+      <OrderTable orders={displayedOrders} selectedIds={selectedIds} allSelected={isPageSelected(selectedIds, displayedOrders)} onSelect={toggleSelect} onSelectAll={toggleSelectAll} onView={setViewOrderId} onEdit={openEditOrder} onReceipt={downloadReceipt} onNotes={setNotesOrder} />
+      <OrderDetailsDrawer order={viewOrder} onClose={() => setViewOrderId(null)} onStatus={updateStatus}
+        onPaymentStatus={(id, status) => { if (status === 'Paid') setViewOrderId(null); updatePaymentStatus(id, status); }}
+        onAction={(action, order) => {
+          setViewOrderId(null);
+          if (action === 'history') showCustomerHistory(order.customerName, order.phone);
+          if (action === 'edit') openEditOrder(order);
+          if (action === 'receipt') downloadReceipt(order);
+          if (action === 'notes') setNotesOrder(order);
+          if (action === 'editPayment') openEditPayment(order);
+          if (action === 'partial') setPartialPaymentOrder(order);
+          if (action === 'receiver') { setReceiverModal({ orderId: order._id }); setSelectedReceiver(order.paymentReceivedBy?.adminId || adminData?.id || null); }
+          if (action === 'payment') setSelectedPayment({ platform: order.paymentDetails?.platform || order.paymentMethod, senderNumber: order.paymentDetails?.senderNumber || '—', transactionId: order.paymentDetails?.transactionId || '—', amountPaid: order.paymentDetails?.amountPaid ?? order.amountPaid ?? null, screenshot: order.paymentDetails?.screenshot || null });
+        }} />
       {/* ── Payment Info Modal ── */}
       <PaymentDetailsModal
         payment={selectedPayment}
@@ -1041,6 +826,8 @@ const OrderList = () => {
 
       {/* ── Partial Payment Modal ── */}
       <PartialPaymentModal
+        adminList={adminList}
+        key={partialPaymentOrder?._id || 'closed'}
         order={partialPaymentOrder}
         saving={partialSaving}
         deleting={partialDeleting}
@@ -1049,7 +836,7 @@ const OrderList = () => {
         onClose={() => setPartialPaymentOrder(null)}
       />
 
-      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+      <Pagination page={currentPage} totalPages={totalPages} onPageChange={setPage} />
     </div>
   );
 };

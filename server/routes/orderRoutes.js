@@ -274,50 +274,19 @@ router.post('/manual', verifyAdmin, validate(createOrderSchema), asyncHandler(as
     if (req.body.paymentStatus?.toLowerCase() === 'paid' && paymentReceivedBy?.adminId) {
       const receiverAdmin = await Admin.findById(paymentReceivedBy.adminId).session(session);
       const receiverIsSuperadmin = receiverAdmin?.role === 'superadmin';
-      const reportingAdmin = req.admin;
-
-      if (receiverIsSuperadmin) {
-        // Receiver is superadmin → collection attributed to reporting admin, auto-create pending settlement
-        await PaymentLedger.create([{
-          orderId: newOrder._id,
-          adminId: reportingAdmin.id,
-          adminName: reportingAdmin.name || '',
-          amount: newOrder.totalAmount,
-          type: 'collection',
-          paymentMethod: newOrder.paymentMethod || 'Cash',
-          note: `Manual order payment collected — #${newOrder._id.toString().slice(-6).toUpperCase()} (pending transfer to superadmin)`
-        }], { session });
-
-        // Auto-create a pending settlement request so it shows in the settlement dashboard
-        await Settlement.create([{
-          adminId: reportingAdmin.id,
-          adminName: reportingAdmin.name || '',
-          amount: newOrder.totalAmount,
-          paymentMethod: newOrder.paymentMethod || 'Cash',
-          note: `Auto-settlement for manual order #${newOrder._id.toString().slice(-6).toUpperCase()} — superadmin selected as receiver`,
-          status: 'pending'
-        }], { session });
-
-        // Order settlement status: pending (awaiting superadmin confirmation)
-        newOrder.settlementStatus = 'pending';
-        await newOrder.save({ session });
-      } else {
-        // Regular admin received payment — normal collection flow
-        await PaymentLedger.create([{
-          orderId: newOrder._id,
-          adminId: paymentReceivedBy.adminId,
-          adminName: paymentReceivedBy.adminName || '',
-          amount: newOrder.totalAmount,
-          type: 'collection',
-          paymentMethod: newOrder.paymentMethod || 'Cash',
-          note: `Manual order payment — #${newOrder._id.toString().slice(-6).toUpperCase()}`
-        }], { session });
-
-        newOrder.settlementStatus = 'unsettled';
-        await newOrder.save({ session });
-      }
+      if (!receiverAdmin) throw new Error('Selected payment receiver not found.');
+      await PaymentLedger.create([{
+        orderId: newOrder._id,
+        adminId: receiverAdmin._id,
+        adminName: receiverAdmin.name,
+        amount: newOrder.totalAmount,
+        type: 'collection',
+        paymentMethod: newOrder.paymentMethod || 'Cash',
+        note: `Manual order payment received by ${receiverAdmin.name} — #${newOrder._id.toString().slice(-6).toUpperCase()}`
+      }], { session });
+      newOrder.settlementStatus = receiverIsSuperadmin ? 'settled' : 'unsettled';
+      await newOrder.save({ session });
     }
-
     // Commit transaction
     await session.commitTransaction();
 
@@ -523,56 +492,29 @@ router.put('/:id', verifyAdmin, asyncHandler(async (req, res) => {
       const receiverAdmin = await Admin.findById(paymentReceivedBy.adminId).session(session);
       const receiverIsSuperadmin = receiverAdmin?.role === 'superadmin';
 
-      if (receiverIsSuperadmin) {
-        // Admin selected superadmin as receiver:
-        // 1. Create a collection entry for the ADMIN (who is reporting the payment)
-        // 2. Auto-create a pending settlement for superadmin to approve
-        const reportingAdmin = req.admin;
+      if (!receiverAdmin) throw new Error('Selected payment receiver not found.');
+      // Installments retain their individual receiver and collection entries.
+      order.paymentReceivedBy = { adminId: receiverAdmin._id, adminName: receiverAdmin.name };
+      // Assigning an order receiver must not move a previous installment.
+      if (!order.partialPayments?.length) {
         const existingLedger = await PaymentLedger.findOne({ orderId: order._id, type: 'collection' }).session(session);
-        if (!existingLedger) {
-          await PaymentLedger.create([{
-            orderId: order._id,
-            adminId: reportingAdmin.id,
-            adminName: reportingAdmin.name || '',
-            amount: order.totalAmount,
-            type: 'collection',
-            paymentMethod: order.paymentMethod || 'Cash',
-            note: `Payment collected for order #${order._id.toString().slice(-6).toUpperCase()} (pending transfer to superadmin)`
-          }], { session });
-        }
-        // Auto-create a pending settlement request
-        await Settlement.create([{
-          adminId: reportingAdmin.id,
-          adminName: reportingAdmin.name || '',
-          amount: order.totalAmount,
-          paymentMethod: order.paymentMethod || 'Cash',
-          note: `Auto-settlement for order #${order._id.toString().slice(-6).toUpperCase()} — superadmin selected as receiver`,
-          status: 'pending'
-        }], { session });
-        order.settlementStatus = 'pending';
-      } else {
-        // Regular admin received payment — normal collection flow
-        const existingLedger = await PaymentLedger.findOne({ orderId: order._id }).session(session);
         if (existingLedger) {
-          existingLedger.adminId = paymentReceivedBy.adminId;
-          existingLedger.adminName = paymentReceivedBy.adminName || receiverAdmin?.name || '';
+          existingLedger.adminId = receiverAdmin._id;
+          existingLedger.adminName = receiverAdmin.name;
           existingLedger.amount = order.totalAmount;
           await existingLedger.save({ session });
         } else {
           await PaymentLedger.create([{
-            orderId: order._id,
-            adminId: paymentReceivedBy.adminId,
-            adminName: paymentReceivedBy.adminName || receiverAdmin?.name || '',
-            amount: order.totalAmount,
-            type: 'collection',
-            paymentMethod: order.paymentMethod || 'Cash',
-            note: `Payment collected for order #${order._id.toString().slice(-6).toUpperCase()}`
+            orderId: order._id, adminId: receiverAdmin._id, adminName: receiverAdmin.name,
+            amount: order.totalAmount, type: 'collection', paymentMethod: order.paymentMethod || 'Cash',
+            note: `Payment received by ${receiverAdmin.name} for order #${order._id.toString().slice(-6).toUpperCase()}`
           }], { session });
         }
-        order.settlementStatus = 'unsettled';
+        order.settlementStatus = receiverIsSuperadmin ? 'settled' : 'unsettled';
+      } else if (oldPaymentStatus !== 'paid') {
+        throw new Error('Use Record partial payment to collect the remaining balance and select its receiver.');
       }
     }
-
     // ── Paid → Unpaid reversal: remove ledger entry ──
     const wasPaid = oldPaymentStatus === 'paid'; // use OLD status captured before field update
     const nowUnpaid = paymentStatus && paymentStatus.toLowerCase() !== 'paid';
@@ -635,9 +577,12 @@ router.put('/:id', verifyAdmin, asyncHandler(async (req, res) => {
 
 // 7a. POST partial payment for an order (Admin)
 router.post('/:id/partial-payment', verifyAdmin, asyncHandler(async (req, res) => {
-  const { amount, method, note } = req.body;
-  if (!amount || isNaN(amount) || Number(amount) <= 0) {
+  const { amount, method, note, receiverAdminId } = req.body;
+  if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
     return res.status(400).json({ message: 'A valid payment amount is required.' });
+  }
+  if (typeof receiverAdminId !== 'string' || !mongoose.isValidObjectId(receiverAdminId)) {
+    return res.status(400).json({ message: 'Select the admin who received this payment.' });
   }
 
   const session = await mongoose.startSession();
@@ -651,8 +596,15 @@ router.post('/:id/partial-payment', verifyAdmin, asyncHandler(async (req, res) =
     }
 
     const paymentAmount = Number(amount);
+    const receiverAdmin = await Admin.findById(receiverAdminId).session(session);
+    if (!receiverAdmin || !['admin', 'superadmin'].includes(receiverAdmin.role)) {
+      throw new Error('The selected payment receiver is unavailable.');
+    }
     const totalAmount   = Number(order.totalAmount) || 0;
     const currentPaid   = Number(order.amountPaid) || 0;
+    if (order.paymentStatus === 'Paid' || paymentAmount > Math.max(0, totalAmount - currentPaid)) {
+      throw new Error('Payment amount cannot exceed the remaining due.');
+    }
     const newPaid       = currentPaid + paymentAmount;
     const newDue        = Math.max(0, totalAmount - newPaid);
 
@@ -665,6 +617,7 @@ router.post('/:id/partial-payment', verifyAdmin, asyncHandler(async (req, res) =
         adminId:   req.admin.id,
         adminName: req.admin.name || '',
       },
+      receivedBy: { adminId: receiverAdmin._id, adminName: receiverAdmin.name },
       paidAt: new Date(),
     };
 
@@ -676,7 +629,7 @@ router.post('/:id/partial-payment', verifyAdmin, asyncHandler(async (req, res) =
     if (newDue <= 0) {
       order.paymentStatus = 'Paid';
       if (!order.paymentReceivedBy?.adminId) {
-        order.paymentReceivedBy = { adminId: req.admin.id, adminName: req.admin.name || '' };
+        order.paymentReceivedBy = { adminId: receiverAdmin._id, adminName: receiverAdmin.name };
         order.paymentReceivedAt = new Date();
       }
     } else {
@@ -686,21 +639,19 @@ router.post('/:id/partial-payment', verifyAdmin, asyncHandler(async (req, res) =
     }
 
     // ── Payment Receiver logic (mirrors regular "mark as Paid") ──
-    // The admin who records this partial payment is the one holding the money.
-    const reportingAdmin   = req.admin;
-    const receiverAdmin    = await Admin.findById(req.admin.id).session(session);
+    // Credit the actual receiver; retain the recording admin in the installment audit trail.
     const receiverIsSuperadmin = receiverAdmin?.role === 'superadmin';
 
-    // Always create a collection ledger entry for the admin recording the payment
-    await PaymentLedger.create([{
+    const [collection] = await PaymentLedger.create([{
       orderId:       order._id,
-      adminId:       reportingAdmin.id,
-      adminName:     reportingAdmin.name || '',
+      adminId:       receiverAdmin._id,
+      adminName:     receiverAdmin.name,
       amount:        paymentAmount,
       type:          'collection',
       paymentMethod: method || order.paymentMethod || 'Cash',
       note: `Partial payment ${paymentAmount} TK — order #${order._id.toString().slice(-6).toUpperCase()}${receiverIsSuperadmin ? ' (superadmin collected)' : ''}`
     }], { session });
+    order.partialPayments[order.partialPayments.length - 1].ledgerEntryId = collection._id;
 
     if (receiverIsSuperadmin) {
       // Superadmin collected directly → money is already in superadmin's holding
@@ -709,16 +660,14 @@ router.post('/:id/partial-payment', verifyAdmin, asyncHandler(async (req, res) =
       }
     } else {
       // Regular admin holds the money → unsettled until settled with superadmin
-      if (order.settlementStatus !== 'settled') {
-        order.settlementStatus = 'unsettled';
-      }
+      order.settlementStatus = 'unsettled';
     }
 
     await order.save({ session });
     await session.commitTransaction();
 
     await writeLog(req, 'PARTIAL_PAYMENT', 'Order',
-      `Partial payment of ${paymentAmount} TK recorded for order #${order._id.toString().slice(-6).toUpperCase()} (paid: ${newPaid}, due: ${newDue})`);
+      `Partial payment of ${paymentAmount} TK received by ${receiverAdmin.name} for order #${order._id.toString().slice(-6).toUpperCase()} (paid: ${newPaid}, due: ${newDue})`);
 
     res.json({ message: 'Partial payment recorded.', order });
   } catch (err) {
@@ -787,22 +736,23 @@ router.delete('/:id/partial-payment/:paymentId', verifyAdmin, asyncHandler(async
 
     // Reverse the matching PaymentLedger entry for this payment.
     // Match by orderId + amount + type='collection' (most recent first) to avoid over-deleting.
-    const ledgerEntry = await PaymentLedger.findOne({
+    const ledgerEntry = await PaymentLedger.findOne(removedPayment.ledgerEntryId ? {
+      _id: removedPayment.ledgerEntryId,
+      orderId: order._id,
+      type: 'collection',
+    } : {
       orderId: order._id,
       type:    'collection',
       amount:  removedAmount,
+      ...((removedPayment.receivedBy?.adminId || removedPayment.recordedBy?.adminId) ? { adminId: removedPayment.receivedBy?.adminId || removedPayment.recordedBy?.adminId } : {}),
     }).sort({ createdAt: -1 }).session(session);
 
     if (ledgerEntry) {
       await PaymentLedger.deleteOne({ _id: ledgerEntry._id }).session(session);
     }
 
-    // Clean up any pending settlement that might have been created
-    await Settlement.deleteOne({
-      adminId: req.admin.id,
-      amount: removedAmount,
-      status: 'pending'
-    }).session(session);
+    // Installments create collection entries, not settlement requests.
+    // Never remove an unrelated settlement just because its amount matches.
 
     // Update settlementStatus: if some payments remain, keep unsettled; if none, null
     if (order.partialPayments.length > 0 && order.settlementStatus !== 'settled') {

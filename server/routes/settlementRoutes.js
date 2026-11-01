@@ -16,132 +16,8 @@ const asyncHandler = (fn) => (req, res, next) => {
 };
 
 // ── Helper: Fast bulk-sync missing PaymentLedger collection entries ──
-const syncMissingLedgerEntries = async () => {
-  try {
-    // 1. Get all orderIds already present in PaymentLedger
-    const existingLedgerOrderIds = await PaymentLedger.distinct('orderId', { orderId: { $ne: null } });
-    const existingSet = new Set(existingLedgerOrderIds.map(id => id.toString()));
-
-    // 1b. Check if a ledger reset has been done — only sync orders AFTER that date
-    const resetConfig = await SystemConfig.findOne({ key: 'ledgerResetAt' });
-    const resetAt = resetConfig?.value ? new Date(resetConfig.value) : null;
-
-    // 2. Query paid orders that are NOT in PaymentLedger (and paid AFTER reset date if applicable)
-    const orderFilter = {
-      paymentStatus: { $regex: /^paid$/i },
-      _id: { $nin: existingLedgerOrderIds }
-    };
-    if (resetAt) {
-      // Only sync orders that were paid/created after the reset
-      orderFilter.createdAt = { $gt: resetAt };
-    }
-    const unsyncedPaidOrders = await Order.find(orderFilter);
-
-    if (unsyncedPaidOrders.length === 0) return; // Fast exit (0 iterations)!
-
-    const admins = await Admin.find().select('_id name role');
-    const adminNameMap = {};
-    admins.forEach(a => {
-      if (a.name) adminNameMap[a.name.trim().toLowerCase()] = a;
-    });
-
-    const newLedgerEntries = [];
-    const orderSavePromises = [];
-
-    for (const order of unsyncedPaidOrders) {
-      let targetAdminId = order.paymentReceivedBy?.adminId;
-      let targetAdminName = order.paymentReceivedBy?.adminName;
-
-      // If paymentReceivedBy is missing, match createdBy to admin
-      if (!targetAdminId && order.createdBy) {
-        const matchedAdmin = adminNameMap[order.createdBy.trim().toLowerCase()];
-        if (matchedAdmin) {
-          targetAdminId = matchedAdmin._id;
-          targetAdminName = matchedAdmin.name;
-
-          order.paymentReceivedBy = {
-            adminId: matchedAdmin._id,
-            adminName: matchedAdmin.name
-          };
-          order.paymentReceivedAt = order.paymentReceivedAt || order.createdAt;
-          order.settlementStatus = matchedAdmin.role === 'superadmin' ? 'settled' : 'unsettled';
-          orderSavePromises.push(order.save());
-        }
-      }
-
-      if (targetAdminId) {
-        const receiverAdmin = admins.find(a => a._id.toString() === targetAdminId.toString());
-        const isSuperadmin = receiverAdmin?.role === 'superadmin';
-
-        newLedgerEntries.push({
-          orderId: order._id,
-          adminId: targetAdminId,
-          adminName: targetAdminName || receiverAdmin?.name || 'Admin',
-          amount: order.totalAmount,
-          type: 'collection',
-          paymentMethod: order.paymentMethod || 'Cash',
-          note: `Auto-synced ledger entry for paid order #${order._id.toString().slice(-6).toUpperCase()}`,
-          createdAt: order.paymentReceivedAt || order.createdAt
-        });
-
-        if (!order.settlementStatus) {
-          order.settlementStatus = isSuperadmin ? 'settled' : 'unsettled';
-          orderSavePromises.push(order.save());
-        }
-      }
-    }
-
-    // 3. Query orders with partial payments that might be missing ledger entries
-    const partialOrdersFilter = {
-      'partialPayments.0': { $exists: true }
-    };
-    if (resetAt) {
-      partialOrdersFilter.createdAt = { $gt: resetAt };
-    }
-    const partialOrders = await Order.find(partialOrdersFilter);
-
-    for (const order of partialOrders) {
-      const existingEntries = await PaymentLedger.find({ orderId: order._id, type: 'collection' });
-      const existingLedgerTotal = existingEntries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-      const orderPaidTotal = Number(order.amountPaid) || 0;
-
-      if (orderPaidTotal > existingLedgerTotal) {
-        const missingAmount = orderPaidTotal - existingLedgerTotal;
-        const lastInstallment = order.partialPayments[order.partialPayments.length - 1];
-        let targetAdminId = lastInstallment?.recordedBy?.adminId || order.paymentReceivedBy?.adminId;
-        let targetAdminName = lastInstallment?.recordedBy?.adminName || order.paymentReceivedBy?.adminName;
-
-        if (!targetAdminId) {
-          const defaultAdmin = admins.find(a => a.role === 'superadmin') || admins[0];
-          targetAdminId = defaultAdmin?._id;
-          targetAdminName = defaultAdmin?.name;
-        }
-
-        if (targetAdminId) {
-          newLedgerEntries.push({
-            orderId: order._id,
-            adminId: targetAdminId,
-            adminName: targetAdminName || 'Admin',
-            amount: missingAmount,
-            type: 'collection',
-            paymentMethod: lastInstallment?.method || order.paymentMethod || 'Cash',
-            note: `Auto-synced ledger entry for partial payment on order #${order._id.toString().slice(-6).toUpperCase()}`,
-            createdAt: lastInstallment?.paidAt || new Date()
-          });
-        }
-      }
-    }
-
-    if (newLedgerEntries.length > 0) {
-      await PaymentLedger.insertMany(newLedgerEntries);
-    }
-    if (orderSavePromises.length > 0) {
-      await Promise.all(orderSavePromises);
-    }
-  } catch (err) {
-    console.error('Error syncing missing ledger entries:', err.message);
-  }
-};
+const syncPaymentLedger = require('../utils/syncPaymentLedger');
+const syncMissingLedgerEntries = () => syncPaymentLedger({ PaymentLedger, SystemConfig, Order, Admin });
 
 // ══════════════════════════════════════════════════════════════
 // 1. GET /balances — outstanding balance per admin
@@ -256,7 +132,8 @@ router.get('/dashboard', verifySuperadmin, asyncHandler(async (req, res) => {
   const dashboard = admins.map(admin => {
     const aid = admin._id.toString();
     const b = balanceMap[aid] || { totalCollected: 0, totalSettled: 0, totalAdjustments: 0, orderCount: 0 };
-    const outstanding = (b.totalCollected + b.totalAdjustments) - b.totalSettled;
+    // Direct superadmin collections are already in holding, not payable to themselves.
+    const outstanding = admin.role === 'superadmin' ? 0 : (b.totalCollected + b.totalAdjustments) - b.totalSettled;
     const pending = pendingMap[aid] || { count: 0, amount: 0 };
 
     return {
@@ -291,7 +168,7 @@ router.get('/dashboard', verifySuperadmin, asyncHandler(async (req, res) => {
   const totalPending = await Settlement.countDocuments({ status: 'pending' });
 
   // Superadmin's own holding balance (received from admins but not yet vaulted)
-  const superadmin = admins.find(a => a.role === 'superadmin');
+  const superadmin = admins.find(a => a._id.toString() === req.admin.id.toString() && a.role === 'superadmin');
   const superadminHoldingAgg = superadmin ? await PaymentLedger.aggregate([
     { $match: { adminId: superadmin._id } },
     {

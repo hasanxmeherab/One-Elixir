@@ -254,8 +254,9 @@ const SettlementDashboard = () => {
       {activeTab === 'dashboard' && isSuperadmin && dashboard && (
         <div>
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
             {[
+              { label: 'MY HOLDING BALANCE', value: `৳${Number(dashboard.superadminHolding || 0).toLocaleString()}`, sub: 'Collected directly or received from admins, less vault transfers', color: 'border-l-teal-500' },
               { label: 'COLLECTED TODAY', value: `৳${dashboard.summary.totalCollectedToday.toLocaleString()}`, sub: `${dashboard.summary.collectionsToday} orders`, color: 'border-l-emerald-500' },
               { label: 'SETTLED TODAY', value: `৳${dashboard.summary.totalSettledToday.toLocaleString()}`, sub: `${dashboard.summary.settlementsToday} settlements`, color: 'border-l-blue-500' },
               { label: 'PENDING SETTLEMENTS', value: dashboard.summary.pendingSettlements, sub: 'awaiting confirmation', color: 'border-l-amber-500' },
