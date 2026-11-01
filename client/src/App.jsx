@@ -119,6 +119,8 @@ const AppContent = () => {
       </div>
 
       {!isHideNavbar && <MobileTabBar />}
+      {!isHideNavbar && <FloatingWhatsapp />}
+      {!isHideNavbar && <Footer />}
     </>
   );
 };
@@ -129,12 +131,10 @@ function App() {
       <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
         <ToastProvider>
           <WishlistProvider>
-            <FloatingWhatsapp />
 
             <Router>
               <ScrollToTop />
               <AppContent />
-              <Footer />
             </Router>
           </WishlistProvider>
         </ToastProvider>

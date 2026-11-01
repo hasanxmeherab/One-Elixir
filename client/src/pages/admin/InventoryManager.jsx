@@ -3,15 +3,20 @@ import axios from 'axios';
 import adminAxios from '../../utils/adminAxios';
 import { useOutletContext } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
-import { Plus, X, ImagePlus } from 'lucide-react';
+import { Plus, X, ImagePlus, Search, Package, Pencil, Trash2, ArrowLeft } from 'lucide-react';
+import './InventoryManager.css';
 
 // ── Stock display cell ────────────────────────────────────────
-const StockCell = ({ p, API_URL, authHeader, fetchData, toast }) => {
+const StockCell = ({ p, API_URL, fetchData, toast }) => {
   const [editing, setEditing] = useState(false);
   const [value, setValue]     = useState(p.stock);
   const [saving, setSaving]   = useState(false);
 
   const save = async () => {
+    if (saving) return;
+    if (value === '' || !Number.isInteger(Number(value)) || Number(value) < 0) {
+      toast.error('Enter a whole quantity of zero or more.'); return;
+    }
     if (Number(value) === p.stock) { setEditing(false); return; }
     try {
       setSaving(true);
@@ -47,22 +52,23 @@ const StockCell = ({ p, API_URL, authHeader, fetchData, toast }) => {
   }
 
   return (
-    <span onClick={() => setEditing(true)}
-      className={`text-sm font-bold cursor-pointer hover:underline ${p.stock < 5 ? 'text-red-500' : 'text-black'}`}>
-      {p.stock}
-    </span>
+    <button type="button" onClick={() => { setValue(p.stock); setEditing(true); }}
+      className="im-stock-edit" aria-label={`Edit stock for ${p.name}`}>
+      {p.stock} units <Pencil size={11} />
+    </button>
   );
 };
 
 // ── Add stock cell ────────────────────────────────────────────
-const AddStockCell = ({ p, API_URL, authHeader, fetchData, toast }) => {
+const AddStockCell = ({ p, API_URL, fetchData, toast }) => {
   const [open, setOpen]     = useState(false);
   const [qty, setQty]       = useState('');
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
-    const add = parseInt(qty);
-    if (!qty || isNaN(add) || add <= 0) { toast.error('Enter a valid quantity.'); return; }
+    if (saving) return;
+    const add = Number(qty);
+    if (!qty || !Number.isInteger(add) || add <= 0) { toast.error('Enter a positive whole quantity.'); return; }
     try {
       setSaving(true);
       const newStock = p.stock + add;
@@ -99,8 +105,8 @@ const AddStockCell = ({ p, API_URL, authHeader, fetchData, toast }) => {
 
   return (
     <button onClick={() => setOpen(true)}
-      className="px-2 py-0.5 bg-emerald-600 text-white text-[9px] font-bold border-none cursor-pointer hover:bg-emerald-700 transition-colors tracking-wider">
-      + ADD STOCK
+      className="im-restock">
+      <Plus size={13} /> Restock
     </button>
   );
 };
@@ -114,6 +120,8 @@ const InventoryManager = () => {
   const [uploading, setUploading] = useState(false);
   const [editId, setEditId]     = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [stockFilter, setStockFilter] = useState('all');
+  const [formOpen, setFormOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '', price: '', description: '', scentProfile: '',
     image: '', images: [], stock: '', featured: false,
@@ -127,7 +135,6 @@ const InventoryManager = () => {
   const [flashForm, setFlashForm]     = useState({ salePrice: '', endsAt: '' });
 
   const API_URL       = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-  const authHeader    = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } });
   const CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
   const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
@@ -136,11 +143,22 @@ const InventoryManager = () => {
     return url.replace('/upload/', `/upload/f_auto,q_auto,w_${width}/`);
   };
 
-  const filteredPerfumes = perfumes.filter(p =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const getStock = p => p.variants?.length
+    ? p.variants.reduce((total, variant) => total + Number(variant.stock || 0), 0)
+    : Number(p.stock || 0);
+  const stockCounts = {
+    all: perfumes.length,
+    low: perfumes.filter(p => getStock(p) > 0 && getStock(p) < 5).length,
+    out: perfumes.filter(p => getStock(p) === 0).length,
+  };
+  const filteredPerfumes = perfumes.filter(p => {
+    const stock = getStock(p);
+    return p.name.toLowerCase().includes(searchTerm.trim().toLowerCase())
+      && (stockFilter === 'all' || (stockFilter === 'low' ? stock > 0 && stock < 5 : stock === 0));
+  });
 
   const handleEditClick = (p) => {
+    setFormOpen(true);
     setEditId(p._id);
     setFormData({
       name: p.name, price: p.price, description: p.description,
@@ -154,6 +172,7 @@ const InventoryManager = () => {
   };
 
   const cancelEdit = () => {
+    setFormOpen(false);
     setEditId(null);
     setFormData({ name: '', price: '', description: '', scentProfile: '', image: '', images: [], stock: '', featured: false, variants: [] });
     setFiles([]);
@@ -220,6 +239,7 @@ const InventoryManager = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (uploading) return;
     // Validate variant fields before upload
     for (const v of formData.variants) {
       if (!v.label || !v.price) {
@@ -275,6 +295,7 @@ const InventoryManager = () => {
       } else {
         await adminAxios.post(`${API_URL}/api/perfumes`, payload);
       }
+      toast.success(editId ? 'Product updated.' : 'Product added.');
       cancelEdit();
       fetchData();
     } catch (err) {
@@ -288,8 +309,11 @@ const InventoryManager = () => {
 
   const deletePerfume = async (id) => {
     if (window.confirm('Remove item from inventory?')) {
-      await adminAxios.delete(`${API_URL}/api/perfumes/${id}`);
-      fetchData();
+      try {
+        await adminAxios.delete(`${API_URL}/api/perfumes/${id}`);
+        fetchData();
+        toast.success('Product removed.');
+      } catch { toast.error('Failed to remove product.'); }
     }
   };
 
@@ -330,45 +354,56 @@ const InventoryManager = () => {
   };
 
   return (
-    <section>
-      <h3 className="tracking-[2px] mb-5 font-bold">INVENTORY MANAGEMENT</h3>
+    <section className="inventory-manager">
+      <header className="im-header">
+        <div><p className="im-eyebrow">STOREFRONT / INVENTORY</p><h1>Your collection, in order.</h1><p>Manage fragrances, keep stock up to date, and get products ready to sell.</p></div>
+        {!formOpen && <button className="im-primary" onClick={() => { cancelEdit(); setFormOpen(true); }}><Plus size={17} /> Add product</button>}
+      </header>
 
       {/* FORM */}
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4 mb-2.5">
+      {formOpen && <div className="im-editor">
+      <div className="im-editor-header"><div><button type="button" className="im-back" onClick={cancelEdit} disabled={uploading}><ArrowLeft size={14} /> Back to inventory</button><h2>{editId ? 'Edit product' : 'Add a new fragrance'}</h2></div></div>
+      <form onSubmit={handleSubmit} className="im-product-form">
+        <fieldset disabled={uploading} className="im-fields">
+        <div className="im-form-section"><h3>Basic details</h3><p>The name, story, and scent notes your customers will see.</p>
+        <label className="im-field-label" htmlFor="im-name">Product name</label>
         <input
-          type="text" placeholder="Name" required
+          id="im-name" type="text" placeholder="e.g. Amber Oud" required autoFocus
           value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
           className="p-3 border border-[#ddd] outline-none text-sm"
         />
-        <div className="flex flex-col sm:flex-row gap-2.5">
+        <label className="im-field-label" htmlFor="im-description">Description</label>
+        <textarea id="im-description" placeholder="Tell the story of this fragrance"
+          value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}
+          className="p-3 border border-[#ddd] outline-none text-sm min-h-[80px]" />
+        <label className="im-field-label" htmlFor="im-notes">Scent notes</label>
+        <input id="im-notes" type="text" placeholder="Bergamot, rose, amber"
+          value={formData.scentProfile} onChange={e => setFormData({...formData, scentProfile: e.target.value})}
+          className="p-3 border border-[#ddd] outline-none text-sm" />
+        <small>Separate notes with commas.</small>
+        </div>
+        <div className="im-form-section"><h3>Pricing & sizes</h3><p>Set a single price and stock quantity, or add individual sizes below.</p>
+        <div className="im-price-fields">
+          <label>Price (TK)
           <input
-            type="number" placeholder="Price (TK)" required={formData.variants.length === 0}
+            type="number" placeholder="Price (TK)" min="1" required={formData.variants.length === 0}
             value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})}
             disabled={formData.variants.length > 0}
             className={`flex-1 p-3 border border-[#ddd] outline-none text-sm ${formData.variants.length > 0 ? 'opacity-40 cursor-not-allowed bg-gray-100' : ''}`}
-          />
+          /></label>
+          <label>Stock quantity
           <input
             type="number" placeholder="Quantity" required={formData.variants.length === 0} min="0"
             value={formData.stock} onChange={e => setFormData({...formData, stock: e.target.value})}
             disabled={formData.variants.length > 0}
             className={`flex-1 p-3 border border-[#ddd] outline-none text-sm ${formData.variants.length > 0 ? 'opacity-40 cursor-not-allowed bg-gray-100' : ''}`}
-          />
+          /></label>
         </div>
         {formData.variants.length > 0 && <p className="text-[10px] text-[#aaa] -mt-2">Price & quantity are set per variant below</p>}
-        <textarea
-          placeholder="Description"
-          value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}
-          className="p-3 border border-[#ddd] outline-none text-sm min-h-[80px]"
-        />
-        <input
-          type="text" placeholder="Scent Notes (comma separated)"
-          value={formData.scentProfile} onChange={e => setFormData({...formData, scentProfile: e.target.value})}
-          className="p-3 border border-[#ddd] outline-none text-sm"
-        />
 
         {/* ── Featured toggle ── */}
-        <label className="flex items-center gap-3 cursor-pointer select-none w-fit"
-          onClick={() => setFormData(f => ({ ...f, featured: !f.featured }))}>
+        <label className="flex items-center gap-3 cursor-pointer select-none w-fit">
+          <input type="checkbox" checked={formData.featured} onChange={e => setFormData(f => ({ ...f, featured: e.target.checked }))} className="im-feature-checkbox" />
           <div className={`w-11 h-6 rounded-full transition-colors relative ${formData.featured ? 'bg-black' : 'bg-[#ddd]'}`}>
             <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${formData.featured ? 'translate-x-5' : 'translate-x-0.5'}`} />
           </div>
@@ -421,6 +456,8 @@ const InventoryManager = () => {
         </div>
 
         {/* Existing images (edit mode) */}
+        </div>
+        <div className="im-form-section"><h3>Product images</h3><p>Add clear photos that help customers explore your fragrance.</p>
         {editId && formData.images?.length > 0 && (
           <div>
             <p className="text-[10px] font-bold tracking-wider text-[#888] mb-2">CURRENT IMAGES</p>
@@ -477,55 +514,63 @@ const InventoryManager = () => {
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2.5">
+        </div>
+        <div className="im-form-actions">
           <button type="submit" disabled={uploading}
             className="px-6 py-4 bg-black text-white border-none cursor-pointer font-bold hover:bg-gray-800 transition-colors disabled:opacity-60">
-            {uploading ? (uploadProgress || 'UPLOADING...') : editId ? 'UPDATE CHANGES' : 'UPLOAD ELIXIR'}
+            {uploading ? (uploadProgress || 'Saving…') : editId ? 'Save changes' : 'Add product'}
           </button>
-          {editId && (
-            <button type="button" onClick={cancelEdit}
+            <button type="button" onClick={cancelEdit} disabled={uploading}
               className="px-6 py-4 bg-white text-black border border-black cursor-pointer font-bold hover:bg-gray-50 transition-colors">
               CANCEL
             </button>
-          )}
         </div>
+        </fieldset>
       </form>
-
-      <hr className="border-none border-t border-[#eee] my-10" />
+      </div>}
 
       {/* SEARCH */}
-      <div className="flex items-center gap-2.5 mb-4 flex-wrap">
-        <span className="text-[11px] font-bold tracking-wider">SEARCH PERFUME:</span>
+      <div hidden={formOpen}>
+      <div className="im-summary">
+        <div><Package size={20} /><span>Total fragrances<strong>{stockCounts.all}</strong></span></div>
+        <div><span className="im-status-dot im-dot-low" /><span>Low stock<strong>{stockCounts.low}</strong></span></div>
+        <div><span className="im-status-dot im-dot-out" /><span>Out of stock<strong>{stockCounts.out}</strong></span></div>
+      </div>
+      <div className="im-toolbar">
+        <div className="im-filters" aria-label="Filter by stock">{[{ id: 'all', label: 'All products' }, { id: 'low', label: 'Low stock' }, { id: 'out', label: 'Out of stock' }].map(({ id, label }) => <button key={id} aria-pressed={stockFilter === id} className={stockFilter === id ? 'im-filter active' : 'im-filter'} onClick={() => setStockFilter(id)}>{label}<span>{stockCounts[id]}</span></button>)}</div>
+        <label className="im-search"><Search size={16} />
         <input
-          type="text" placeholder="Type perfume name to search..."
+          type="search" placeholder="Search fragrances…" aria-label="Search fragrances by name"
           value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
           className="p-2.5 px-4 border border-black outline-none w-[300px] max-w-full text-sm"
-        />
+        /></label>
       </div>
+      <p className="im-results">Showing {filteredPerfumes.length} of {perfumes.length} fragrances · Low stock means fewer than 5 units.</p>
 
       {/* TABLE */}
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-left">
+      <div className="im-table-wrap">
+        <table className="im-table">
           <thead>
             <tr className="border-b-2 border-black">
-              <th className="p-2.5 text-xs tracking-wider">NAME</th>
-              <th className="p-2.5 text-xs tracking-wider">IMAGES</th>
+              <th className="p-2.5 text-xs tracking-wider">PRODUCT</th>
               <th className="p-2.5 text-xs tracking-wider">PRICE</th>
-              <th className="p-2.5 text-xs tracking-wider">STOCK</th>
-              <th className="p-2.5 text-xs tracking-wider">ADD STOCK</th>
-              <th className="p-2.5 text-xs tracking-wider text-center">EXCLUSIVE</th>
-              <th className="p-2.5 text-xs tracking-wider">FLASH SALE</th>
+              <th className="p-2.5 text-xs tracking-wider">AVAILABILITY</th>
+              <th className="p-2.5 text-xs tracking-wider">PROMOTIONS</th>
               <th className="p-2.5 text-xs tracking-wider">ACTIONS</th>
             </tr>
           </thead>
           <tbody>
             {filteredPerfumes.length > 0 ? filteredPerfumes.map(p => {
               const saleActive = p.flashSale?.active && p.flashSale?.endsAt && new Date(p.flashSale.endsAt) > new Date();
+              const stock = getStock(p);
+              const thumbnail = p.images?.[0] || p.image || p.variants?.find(v => v.image)?.image;
               return (
                 <React.Fragment key={p._id}>
-                  <tr className="border-b border-[#eee]">
-                    <td className="p-2.5 text-sm">
-                      {p.name}
+                  <tr className="im-product-row">
+                    <td data-label="Product">
+                      <div className="im-product-identity">
+                      {thumbnail ? <img src={thumbnail} alt="" className="im-thumbnail" loading="lazy" /> : <div className="im-thumbnail im-no-image"><Package size={22} /></div>}
+                      <div className="im-product-name"><strong>{p.name}</strong>
                       {p.variants?.length > 0 && (
                         <div className="flex gap-1 mt-1 flex-wrap">
                           {p.variants.map((v, vi) => (
@@ -535,39 +580,27 @@ const InventoryManager = () => {
                           ))}
                         </div>
                       )}
+                      </div></div>
                     </td>
-                    <td className="p-2.5">
-                      <div className="flex gap-1">
-                        {(p.images?.length > 0 ? p.images : p.variants?.length > 0 ? p.variants.map(v => v.image).filter(Boolean) : [p.image]).filter(Boolean).slice(0, 3).map((img, i) => (
-                          <img key={i} src={img} alt="" className="w-8 h-8 object-cover border border-[#eee]" />
-                        ))}
-                        {(p.images?.length || 0) > 3 && (
-                          <div className="w-8 h-8 bg-[#f5f5f5] border border-[#eee] flex items-center justify-center text-[9px] font-bold text-[#888]">
-                            +{p.images.length - 3}
-                          </div>
-                        )}
+                    <td data-label="Price"><span className="im-price">{p.variants?.length > 0 ? 'From ' : ''}{Number(p.price).toLocaleString()} TK</span></td>
+                    <td data-label="Availability">
+                      <div className="im-stock-cell">
+                      <span className={`im-stock-badge ${stock === 0 ? 'out' : stock < 5 ? 'low' : 'in'}`}>{stock === 0 ? 'Sold out' : stock < 5 ? 'Low stock' : 'In stock'}</span>
+                      {p.variants?.length ? <span className="im-stock-total">{stock} units across sizes</span> : <StockCell p={p} API_URL={API_URL} fetchData={fetchData} toast={toast} />}
                       </div>
-                    </td>
-                    <td className="p-2.5 text-sm">{p.price} TK</td>
-                    <td className="p-2.5">
-                      <StockCell p={p} API_URL={API_URL} authHeader={authHeader} fetchData={fetchData} toast={toast} />
-                    </td>
-                    <td className="p-2.5">
-                      <AddStockCell p={p} API_URL={API_URL} authHeader={authHeader} fetchData={fetchData} toast={toast} />
                     </td>
 
                     {/* ── Featured / Exclusive Column ── */}
-                    <td className="p-2.5 text-center">
+                    <td data-label="Promotions"><div className="im-promotions">
                       <button
                         onClick={() => toggleFeatured(p)}
                         title={p.featured ? 'Remove from Exclusive section' : 'Add to Exclusive section'}
-                        className={`text-xl border-none bg-transparent cursor-pointer transition-all hover:scale-125 ${p.featured ? 'opacity-100' : 'opacity-20 hover:opacity-50'}`}>
-                        ★
+                        aria-pressed={Boolean(p.featured)}
+                        className={`im-featured ${p.featured ? 'selected' : ''}`}>
+                        {p.featured ? '★ Featured' : '☆ Feature'}
                       </button>
-                    </td>
 
                     {/* ── Flash Sale Column ── */}
-                    <td className="p-2.5 text-sm">
                       {saleActive ? (
                         <div className="flex flex-col gap-0.5">
                           <span className="text-[11px] font-bold text-red-600">🔥 {p.flashSale.salePrice} TK</span>
@@ -585,34 +618,35 @@ const InventoryManager = () => {
                           + SET SALE
                         </button>
                       )}
-                    </td>
+                    </div></td>
 
-                    <td className="p-2.5 text-sm">
+                    <td data-label="Actions"><div className="im-row-actions">
                       <button onClick={() => handleEditClick(p)}
-                        className="bg-transparent border-none text-black cursor-pointer font-bold underline mr-2.5 hover:opacity-60 transition-opacity">
-                        EDIT
+                        className="im-edit">
+                        <Pencil size={13} /> Edit
                       </button>
+                      {p.variants?.length ? <button className="im-restock" onClick={() => handleEditClick(p)}><Plus size={13} /> Edit size stock</button> : <AddStockCell p={p} API_URL={API_URL} fetchData={fetchData} toast={toast} />}
                       <button onClick={() => deletePerfume(p._id)}
-                        className="bg-transparent border-none text-red-500 cursor-pointer font-bold underline hover:opacity-60 transition-opacity">
-                        DELETE
+                        className="im-delete" aria-label={`Delete ${p.name}`}>
+                        <Trash2 size={13} /> Delete
                       </button>
-                    </td>
+                    </div></td>
                   </tr>
 
                   {/* ── Inline Flash Sale Form ── */}
                   {flashEditId === p._id && (
-                    <tr className="border-b border-[#eee] bg-amber-50">
-                      <td colSpan="8" className="px-3 py-3">
+                    <tr className="im-sale-editor border-b border-[#eee] bg-amber-50">
+                      <td colSpan="5" className="px-3 py-3">
                         <div className="flex flex-wrap gap-2.5 items-center">
                           <span className="text-[10px] font-bold tracking-wider text-amber-600">🔥 FLASH SALE</span>
                           <input
-                            type="number" placeholder="Sale Price (TK)"
+                            type="number" placeholder="Sale Price (TK)" aria-label="Sale price in TK"
                             value={flashForm.salePrice}
                             onChange={e => setFlashForm({...flashForm, salePrice: e.target.value})}
                             className="p-2 border border-[#ddd] outline-none text-sm w-36"
                           />
                           <input
-                            type="datetime-local"
+                            type="datetime-local" aria-label="Sale end date and time"
                             value={flashForm.endsAt}
                             onChange={e => setFlashForm({...flashForm, endsAt: e.target.value})}
                             className="p-2 border border-[#ddd] outline-none text-sm"
@@ -633,13 +667,16 @@ const InventoryManager = () => {
               );
             }) : (
               <tr>
-                <td colSpan="8" className="p-5 text-center text-[#888]">
-                  No perfumes found matching "{searchTerm}"
+                <td colSpan="5" className="im-empty">
+                  <Package size={28} /><h3>{perfumes.length === 0 ? 'Your collection starts here' : 'No fragrances found'}</h3>
+                  <p>{perfumes.length === 0 ? 'Add your first product to start building your collection.' : 'Try a different search or stock filter.'}</p>
+                  {perfumes.length > 0 && <button onClick={() => { setSearchTerm(''); setStockFilter('all'); }} className="im-edit">Clear filters</button>}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+      </div>
       </div>
     </section>
   );

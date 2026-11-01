@@ -1,5 +1,7 @@
 # OneElixir Fragrances
 
+**Project documentation:** [Audit, architecture, API reference, and operations runbook](docs/README.md) — reviewed November 1, 2026. See the audit for corrections to older setup and security claims below.
+
 A full-stack e-commerce platform for premium perfumes — built with React and Node.js.
 
 **Live:** [oneelixir.live](https://www.oneelixir.live)

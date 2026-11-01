@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import adminAxios from '../../utils/adminAxios';
-import { ImagePlus, Save, ChevronDown, ChevronUp } from 'lucide-react';
+import { ImagePlus, Save, ChevronDown, ChevronUp, ArrowUpRight, Images, Type, BookOpen, MessageCircle, PanelBottom, Trash2 } from 'lucide-react';
+import './BannerManagement.css';
 import { useToast } from '../../context/ToastContext';
 import { Link } from 'react-router-dom';
 
@@ -63,6 +64,8 @@ const BannerManagement = ({ isAdmin }) => {
   const [banners,   setBanners]   = useState([]);
   const [current,   setCurrent]   = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [activeSection, setActiveSection] = useState('images');
   const [bannerForm, setBannerForm] = useState({ imageUrl: '' });
   const timerRef = useRef(null);
 
@@ -151,20 +154,26 @@ const BannerManagement = ({ isAdmin }) => {
   /* ─── Publish banner ─── */
   const handleBannerSubmit = async (e) => {
     e.preventDefault();
+    if (publishing || uploading) return;
     if (!bannerForm.imageUrl) return toast.warning('Please upload an image first.');
+    setPublishing(true);
     try {
       await adminAxios.post(`${API_URL}/api/banners`, bannerForm);
       setBannerForm({ imageUrl: '' });
       fetchBanners();
       toast.success('Banner published!');
     } catch { toast.error('Failed to save banner.'); }
+    finally { setPublishing(false); }
   };
 
   /* ─── Delete banner ─── */
   const deleteBanner = async (id) => {
     if (!window.confirm('Remove this banner?')) return;
-    await adminAxios.delete(`${API_URL}/api/banners/${id}`);
-    fetchBanners();
+    try {
+      await adminAxios.delete(`${API_URL}/api/banners/${id}`);
+      await fetchBanners();
+      toast.success('Banner removed.');
+    } catch { toast.error('Failed to remove banner.'); }
   };
 
   /* ─── Save hero settings ─── */
@@ -182,7 +191,7 @@ const BannerManagement = ({ isAdmin }) => {
         localStorage.removeItem('oneelixir_contact_url');
       }
       await adminAxios.put(`${API_URL}/api/hero-settings`, hero);
-      toast.success('Hero content saved!');
+      toast.success('Homepage content saved!');
     } catch { toast.error('Failed to save hero settings.'); }
     finally { setHeroSaving(false); }
   };
@@ -252,15 +261,41 @@ const BannerManagement = ({ isAdmin }) => {
   ══════════════════════════════════════════════════════ */
   if (isAdmin) {
     return (
-      <div className="p-4 md:p-10 max-w-4xl">
-        <h3 className="tracking-[2px] font-bold mb-8 text-xl">HERO / BANNER MANAGEMENT</h3>
+      <div className="banner-manager">
+        <header className="bm-header">
+          <div>
+            <p className="bm-eyebrow">STOREFRONT / CONTENT</p>
+            <h1>Make a great first impression.</h1>
+            <p>Manage your homepage images, copy, and the details that tell your story.</p>
+          </div>
+          <Link to="/" target="_blank" rel="noopener noreferrer" className="bm-store-link">View storefront <ArrowUpRight size={16} /></Link>
+        </header>
+        <nav className="bm-tabs" aria-label="Homepage content sections">
+          {[
+            { id: 'images', label: 'Banner images', icon: Images },
+            { id: 'hero', label: 'Hero content', icon: Type },
+            { id: 'story', label: 'Our story', icon: BookOpen },
+            { id: 'contact', label: 'Contact', icon: MessageCircle },
+            { id: 'footer', label: 'Footer', icon: PanelBottom },
+          ].map(({ id, label, icon: Icon }) => (
+            <button key={id} type="button" aria-current={activeSection === id ? 'page' : undefined}
+              className={activeSection === id ? 'bm-tab bm-tab-active' : 'bm-tab'}
+              onClick={() => {
+                setActiveSection(id);
+                setHeroOpen(true); setStoryOpen(true); setContactOpen(true); setFooterOpen(true);
+              }}><Icon size={17} />{label}{id === 'images' && <span>{banners.length}</span>}</button>
+          ))}
+        </nav>
+        <div className="bm-workspace">
+        <div className="bm-editor">
 
         {/* ── Section 1: Background Banner Images ── */}
-        <div className="mb-10">
-          <h4 className="font-bold tracking-widest text-sm mb-4 text-[#555]">① BACKGROUND IMAGES</h4>
+        <div className="bm-image-section" hidden={activeSection !== 'images'}>
+          <div className="bm-section-heading"><h2>Banner images</h2><p>Your published images rotate automatically on the homepage.</p></div>
 
-          <form onSubmit={handleBannerSubmit} className="flex flex-col gap-4 bg-[#f9f9f9] p-6 border border-[#eee] rounded-lg mb-6">
-            <label className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded cursor-pointer p-6 transition-colors ${bannerForm.imageUrl ? 'border-black bg-gray-50' : 'border-[#ddd] hover:border-black hover:bg-gray-50'}`}>
+          <form onSubmit={handleBannerSubmit} className="bm-upload-form">
+            <label className="bm-upload-zone">
+              {bannerForm.imageUrl && <img src={bannerForm.imageUrl} alt="New banner ready to publish" className="bm-upload-preview" />}
               <ImagePlus size={22} className="text-[#888]" />
               <span className="text-xs font-bold tracking-wider text-black">
                 {uploading ? 'UPLOADING…' : bannerForm.imageUrl ? 'IMAGE READY' : 'CLICK TO UPLOAD HERO IMAGE'}
@@ -268,39 +303,42 @@ const BannerManagement = ({ isAdmin }) => {
               <span className="text-[10px] text-[#aaa] text-center">
                 {uploading ? 'Please wait…' : bannerForm.imageUrl ? '✓ Uploaded' : 'JPG, PNG, WEBP — recommended 1920×900px (full-screen hero)'}
               </span>
-              <input type="file" onChange={handleFileUpload} accept="image/*" className="hidden" />
+              <input type="file" onChange={handleFileUpload} accept="image/*" disabled={uploading || publishing} aria-label="Upload banner image" className="bm-file-input" />
             </label>
 
             <button
-              type="submit" disabled={uploading || !bannerForm.imageUrl}
-              className="p-3 bg-black text-white font-bold rounded cursor-pointer hover:bg-gray-800 transition-colors disabled:opacity-50"
+              type="submit" disabled={uploading || publishing || !bannerForm.imageUrl}
+              className="bm-primary"
             >
-              PUBLISH IMAGE
+              <ImagePlus size={16} /> {publishing ? 'Publishing…' : 'Publish banner'}
             </button>
           </form>
 
           {/* Existing banners */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-            {banners.map(b => (
-              <div key={b._id} className="border border-[#eee] bg-white rounded overflow-hidden">
-                <img src={b.imageUrl} alt="preview" className="w-full h-[80px] object-cover" />
+          <div className="bm-library-heading"><h3>Published banners</h3><span>{banners.length} {banners.length === 1 ? 'image' : 'images'}</span></div>
+          <div className="bm-banner-grid">
+            {banners.map((b, index) => (
+              <div key={b._id} className="bm-banner-card">
+                <img src={b.imageUrl} alt={`Published banner ${index + 1}`} />
+                <div className="bm-banner-meta"><span>Banner {String(index + 1).padStart(2, '0')}</span>
                 <button onClick={() => deleteBanner(b._id)}
-                  className="w-full text-red-500 border-none bg-transparent cursor-pointer py-1.5 text-xs hover:opacity-70 transition-opacity">
-                  REMOVE
-                </button>
+                  className="bm-remove" aria-label={`Remove banner ${index + 1}`}>
+                  <Trash2 size={14} /> Remove
+                </button></div>
               </div>
             ))}
           </div>
+          {banners.length === 0 && <div className="bm-empty"><Images size={26} /><h3>No banners yet</h3><p>Upload your first image above. Until then, the homepage uses its default background.</p></div>}
         </div>
 
         {/* ── Section 2: Hero Text Content ── */}
-        <div className="bg-[#f9f9f9] border border-[#eee] rounded-lg overflow-hidden mb-4">
+        <div hidden={activeSection !== 'hero'} className="bm-settings-card">
           {/* Accordion header */}
           <button
             onClick={() => setHeroOpen(o => !o)}
             className="w-full flex items-center justify-between p-5 bg-white border-none cursor-pointer text-left"
           >
-            <span className="font-bold tracking-widest text-sm text-[#555]">② HERO TEXT CONTENT</span>
+            <span className="bm-panel-title">Hero content</span>
             {heroOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
           </button>
 
@@ -397,13 +435,13 @@ const BannerManagement = ({ isAdmin }) => {
         </div>
 
         {/* ── Section 3: Story Section ── */}
-        <div className="bg-[#f9f9f9] border border-[#eee] rounded-lg overflow-hidden mb-4">
+        <div hidden={activeSection !== 'story'} className="bm-settings-card">
           {/* Accordion header */}
           <button
             onClick={() => setStoryOpen(o => !o)}
             className="w-full flex items-center justify-between p-5 bg-white border-none cursor-pointer text-left"
           >
-            <span className="font-bold tracking-widest text-sm text-[#555]">📸 STORY SECTION — "Crafted with Purpose"</span>
+            <span className="bm-panel-title">Our story · Crafted with Purpose</span>
             {storyOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
           </button>
 
@@ -492,12 +530,12 @@ const BannerManagement = ({ isAdmin }) => {
         </div>
 
         {/* ── Section 4: Connect With Us ── */}
-        <div className="bg-[#f9f9f9] border border-[#eee] rounded-lg overflow-hidden mb-4">
+        <div hidden={activeSection !== 'contact'} className="bm-settings-card">
           <button
             onClick={() => setContactOpen(o => !o)}
             className="w-full flex items-center justify-between p-5 bg-white border-none cursor-pointer text-left"
           >
-            <span className="font-bold tracking-widest text-sm text-[#555]">📞 CONNECT WITH US SECTION</span>
+            <span className="bm-panel-title">Connect with us</span>
             {contactOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
           </button>
 
@@ -616,12 +654,12 @@ const BannerManagement = ({ isAdmin }) => {
         </div>
 
         {/* ── Section 5: Footer ── */}
-        <div className="bg-[#f9f9f9] border border-[#eee] rounded-lg overflow-hidden mb-4">
+        <div hidden={activeSection !== 'footer'} className="bm-settings-card">
           <button
             onClick={() => setFooterOpen(o => !o)}
             className="w-full flex items-center justify-between p-5 bg-white border-none cursor-pointer text-left"
           >
-            <span className="font-bold tracking-widest text-sm text-[#555]">⑤ FOOTER SECTION</span>
+            <span className="bm-panel-title">Storefront footer</span>
             {footerOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
           </button>
 
@@ -683,6 +721,65 @@ const BannerManagement = ({ isAdmin }) => {
           )}
         </div>
 
+        </div>
+        <aside className="bm-preview-column">
+          <div className="bm-preview-heading"><span>{({ images: 'Banner & hero', hero: 'Banner & hero', story: 'Our story', contact: 'Contact', footer: 'Footer' })[activeSection]} preview</span><span className="bm-draft-badge">Draft</span></div>
+          {(activeSection === 'images' || activeSection === 'hero') && <>
+          <div className="bm-hero-preview" style={{ backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.28), rgba(0,0,0,.8)), url("${bannerForm.imageUrl || banners[0]?.imageUrl || '/hero-bg.jpg'}")` }}>
+            <span className="bm-preview-brand">{hero.brandLine}</span>
+            <h2>{hero.headline1}<br /><em>{hero.headline2}</em></h2>
+            <p>{hero.tagline}</p>
+            {hero.description && <p className="bm-preview-description">{hero.description}</p>}
+            <span className="bm-preview-cta">{hero.ctaText}</span>
+            <div className="bm-preview-features">{hero.features.map((feature, index) => <div key={index}><strong>{feature.title}</strong><span>{feature.subtitle}</span></div>)}</div>
+          </div>
+          <div className="bm-tip"><ImagePlus size={18} /><div><h3>A little room goes a long way</h3><p>Use a wide image, ideally 1920 × 900 px. Keep the center uncluttered so your headline stays readable on every screen.</p></div></div>
+          </>}
+          {activeSection === 'story' && <div className="bm-section-preview bm-story-preview">
+            <span className="bm-section-label">{hero.storyLabel}</span>
+            <h2>{hero.storyHeading}</h2>
+            <p>{hero.storyPara1}</p>
+            <p>{hero.storyPara2}</p>
+            <div className="bm-story-images">
+              {[
+                { key: 'storyImageRight', label: 'Product photo' },
+                { key: 'storyImageLeft', label: 'Ingredient photo' },
+                { key: 'storyImageBot', label: 'Floral photo' },
+              ].map(({ key, label }) => hero[key]
+                ? <img key={key} src={hero[key]} alt={label} />
+                : <div key={key} className="bm-preview-placeholder"><ImagePlus size={20} /><span>{label}</span></div>)}
+            </div>
+            {!hero.storyImageRight && !hero.storyImageLeft && !hero.storyImageBot && <p className="bm-preview-empty-note">Add a story image to make this section visible on the homepage.</p>}
+          </div>}
+          {activeSection === 'contact' && <div className="bm-section-preview bm-contact-preview">
+            <span className="bm-section-label">{hero.contactLabel}</span>
+            <h2>{hero.contactHeading}</h2>
+            <p>{hero.contactDesc}</p>
+            <div className="bm-contact-details">
+              <span>Official page: {hero.contactStoreText || 'Your official page'}</span>
+              {hero.contactStoreUrl && <small>{hero.contactStoreUrl}</small>}
+              <span>{hero.contactLocation}</span>
+              <span>{hero.contactBullet}</span>
+            </div>
+            <div className="bm-contact-inquiry">
+              {hero.contactImage && <img src={hero.contactImage} alt="Contact product" />}
+              <h3>{hero.contactInquiryHeading}</h3>
+              <p>{hero.contactInquiryDesc}</p>
+              <span className="bm-whatsapp-preview"><MessageCircle size={14} />Order via WhatsApp</span>
+              {hero.contactWhatsApp && <small>{hero.contactWhatsApp}</small>}
+            </div>
+          </div>}
+          {activeSection === 'footer' && <div className="bm-section-preview bm-footer-preview">
+            {hero.footerLogoImage
+              ? <img className="bm-footer-logo" src={hero.footerLogoImage} alt="OneElixir footer logo" />
+              : <span className="bm-footer-wordmark">ONE-ELIXIR</span>}
+            <p>{hero.footerTagline}</p>
+            <div className="bm-footer-nav">{['Overview', 'Core values', 'Collections', 'Craftsmanship', 'New arrivals', 'Contact', 'Official page'].map(label => <span key={label}>{label}</span>)}</div>
+            <div className="bm-footer-copyright">{hero.footerCopyright}</div>
+          </div>}
+          <p className="bm-preview-note">A simplified preview of the selected section. Changes appear as you edit; save your content to update the storefront.</p>
+        </aside>
+        </div>
       </div>
     );
   }
