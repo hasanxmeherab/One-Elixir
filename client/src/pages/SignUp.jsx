@@ -1,203 +1,61 @@
-import React, { useState, useMemo } from 'react';
+﻿import { useRef, useState } from 'react';
 import axios from 'axios';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { X } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useWishlist } from '../context/WishlistContext';
-import { Eye, EyeOff, Check, X } from 'lucide-react'; 
-import { useToast } from '../context/ToastContext';
-import { GoogleLogin } from '@react-oauth/google';
 import { usePageMeta } from '../hooks/usePageMeta';
+import CustomerAuthLayout, { AuthField, AuthPassword, AuthSubmit, AuthGoogle } from '../components/CustomerAuthLayout';
 
 const SignUp = () => {
-  usePageMeta('Create Account | OneElixir', 'Join OneElixir to enjoy exclusive bespoke fragrances, personalized recommendations, and seamless checkout.');
-
-  const toast = useToast();
-  const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+  usePageMeta('Create Account | OneElixir', 'Create your OneElixir account to save favourite fragrances, manage your orders, and check out with saved addresses.');
+  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const busy = useRef(false);
   const { login } = useUser();
   const { reloadWishlist } = useWishlist();
   const navigate = useNavigate();
   const location = useLocation();
-  
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const from = location.state?.from || '/';
-
-  const strength = useMemo(() => {
-    const pw = formData.password;
-    if (!pw) return { score: 0, label: '', color: '#ddd' };
-    let score = 0;
-    if (pw.length > 6) score++;
-    if (/[A-Z]/.test(pw)) score++;
-    if (/[0-9]/.test(pw)) score++;
-    if (/[^A-Za-z0-9]/.test(pw)) score++;
-
-    switch (score) {
-      case 1: return { score: 25, label: 'WEAK', color: '#ff4d4d' };
-      case 2: return { score: 50, label: 'FAIR', color: '#ffa500' };
-      case 3: return { score: 75, label: 'GOOD', color: '#2ecc71' };
-      case 4: return { score: 100, label: 'STRONG', color: '#27ae60' };
-      default: return { score: 10, label: 'VERY WEAK', color: '#ff4d4d' };
-    }
-  }, [formData.password]);
-
-  const passwordsMatch = formData.confirmPassword && formData.password === formData.confirmPassword;
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (formData.confirmPassword && !passwordsMatch) {
-      toast.error("Passwords do not match!");
-      return;
-    }
-    setLoading(true);
+  const matches = form.password === form.confirmPassword;
+  const update = key => event => setForm(previous => ({ ...previous, [key]: event.target.value }));
+  const handleSubmit = async event => {
+    event.preventDefault();
+    if (busy.current) return;
+    if (!form.name.trim()) { setError('Please enter your name.'); return; }
+    if (form.password.length < 6) { setError('Choose a password with at least 6 characters.'); return; }
+    if (!matches) { setError('Your passwords do not match.'); return; }
+    busy.current = true; setLoading(true); setError('');
     try {
-      await axios.post(`${API_URL}/api/auth/signup`, {
-        name: formData.name,
-        email: formData.email.toLowerCase(),
-        password: formData.password
-      });
-      toast.success("Account created! Please verify your email to sign in.");
-      navigate('/signin'); 
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Registration failed.");
-    } finally {
-      setLoading(false);
-    }
+      const email = form.email.trim().toLowerCase();
+      await axios.post(`${API_URL}/api/auth/signup`, { name: form.name.trim(), email, password: form.password });
+      navigate('/signin', { replace: true, state: { from, email, accountCreated: true } });
+    } catch (err) { setError(err.response?.data?.message || 'We could not create your account. Please try again.'); }
+    finally { busy.current = false; setLoading(false); }
   };
-
-  const handleGoogleSuccess = async (credentialResponse) => {
+  const handleGoogleSuccess = async credentialResponse => {
+    if (busy.current) return;
+    busy.current = true; setLoading(true); setError('');
     try {
-      const res = await axios.post(`${API_URL}/api/auth/google`, {
-        credential: credentialResponse.credential
-      });
-      login(res.data);
-      reloadWishlist();
-      navigate(from, { replace: true });
-    } catch (err) {
-      toast.error('Google sign up failed. Please try again.');
-    }
+      const response = await axios.post(`${API_URL}/api/auth/google`, { credential: credentialResponse.credential });
+      login(response.data); reloadWishlist(); navigate(from, { replace: true });
+    } catch { setError('Google sign-up could not be completed. Please try again.'); }
+    finally { busy.current = false; setLoading(false); }
   };
-
-  return (
-    <div className="min-h-[90vh] flex justify-center items-center px-4 py-10">
-      <form onSubmit={handleSubmit} className="w-full max-w-[400px] text-center p-10 border border-[#eee] bg-white">
-        
-        <h2 className="tracking-[5px] font-light mb-2.5">CREATE ACCOUNT</h2>
-        <p className="text-[10px] text-[#888] mb-8 tracking-wider">Join the OneElixir inner circle</p>
-
-        {/* Name */}
-        <input
-          type="text" placeholder="FULL NAME" required
-          value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
-          className="w-full p-4 mb-4 border border-[#ddd] outline-none text-sm box-border"
-        />
-
-        {/* Email */}
-        <input
-          type="email" placeholder="EMAIL" required
-          value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
-          className="w-full p-4 mb-4 border border-[#ddd] outline-none text-sm box-border"
-        />
-
-        {/* Password */}
-        <div className="relative w-full mb-4">
-          <input
-            type={showPassword ? "text" : "password"}
-            placeholder="PASSWORD" required
-            value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}
-            className="w-full p-4 border border-[#ddd] outline-none text-sm box-border"
-          />
-          <div
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-[#888] flex items-center"
-          >
-            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-          </div>
-        </div>
-
-        {/* Password Strength Meter */}
-        {formData.password && (
-          <div className="relative w-full h-1 bg-[#eee] mb-4 rounded-sm">
-            <div
-              className="h-full rounded-sm transition-all duration-400"
-              style={{ width: `${strength.score}%`, backgroundColor: strength.color }}
-            />
-            <span
-              className="absolute right-0 top-1.5 text-[9px] font-bold tracking-wider"
-              style={{ color: strength.color }}
-            >
-              {strength.label}
-            </span>
-          </div>
-        )}
-
-        {/* Confirm Password */}
-        <div className="relative w-full mb-4">
-          <input
-            type={showPassword ? "text" : "password"}
-            placeholder="CONFIRM PASSWORD" required
-            value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})}
-            className="w-full p-4 border border-[#ddd] outline-none text-sm box-border"
-          />
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-            {formData.confirmPassword && (
-              <span className={`flex ${passwordsMatch ? 'text-[#27ae60]' : 'text-[#ff4d4d]'}`}>
-                {passwordsMatch ? <Check size={16} /> : <X size={16} />}
-              </span>
-            )}
-            <div
-              onClick={() => setShowPassword(!showPassword)}
-              className="cursor-pointer text-[#888] flex items-center"
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </div>
-          </div>
-        </div>
-
-        {/* Submit Button */}
-        <button
-          type="submit"
-          disabled={(formData.confirmPassword && !passwordsMatch) || loading}
-          className={`w-full p-4 text-white border-none cursor-pointer font-bold tracking-[2px] mt-2.5 transition-colors ${
-            formData.confirmPassword && !passwordsMatch
-              ? 'bg-[#888] cursor-not-allowed'
-              : 'bg-black hover:bg-gray-800'
-          }`}
-        >
-          {loading ? "SENDING EMAIL..." : "REGISTER"}
-        </button>
-
-        {/* Divider */}
-        <div className="flex items-center gap-3 my-5">
-          <div className="flex-1 h-px bg-[#eee]"></div>
-          <span className="text-[10px] text-[#bbb] tracking-wider">OR</span>
-          <div className="flex-1 h-px bg-[#eee]"></div>
-        </div>
-
-        {/* Google Sign Up */}
-        <div className="flex justify-center mb-5">
-          <GoogleLogin
-            onSuccess={handleGoogleSuccess}
-            onError={() => toast.error('Google sign up failed.')}
-            theme="outline"
-            shape="rectangular"
-            width="280"
-            text="signup_with"
-          />
-        </div>
-
-        <p className="text-xs text-[#666]">
-          Already have an account?{' '}
-          <span
-            onClick={() => navigate('/signin', { state: { from } })}
-            className="underline cursor-pointer text-black font-bold hover:opacity-70 transition-opacity"
-          >
-            Sign In
-          </span>
-        </p>
-      </form>
-    </div>
-  );
+  return <CustomerAuthLayout mode="signup">
+    {error && <p role="alert" className="mb-5 rounded-xl border border-[#edcfc6] bg-[#fff5f1] px-4 py-3 text-xs leading-6 text-[#a3543f]">{error}</p>}
+    <form onSubmit={handleSubmit} aria-busy={loading} className="space-y-2.5 sm:space-y-3">
+      <AuthField id="signup-name" name="name" label="Full name" type="text" required maxLength={100} autoComplete="name" placeholder="Your name" disabled={loading} value={form.name} onChange={update('name')} />
+      <AuthField id="signup-email" name="email" label="Email address" type="email" required maxLength={200} autoComplete="email" autoCapitalize="none" spellCheck={false} placeholder="you@example.com" disabled={loading} value={form.email} onChange={update('email')} />
+      <div><AuthPassword id="signup-password" name="password" label="Password (at least 6 characters)" required minLength={6} maxLength={128} autoComplete="new-password" placeholder="Create a password" disabled={loading} visible={showPassword} onToggle={() => setShowPassword(value => !value)} value={form.password} onChange={update('password')} /></div>
+      <div><AuthPassword id="signup-confirm" name="confirmPassword" label="Confirm password" required minLength={6} maxLength={128} autoComplete="new-password" placeholder="Enter your password again" disabled={loading} visible={showPassword} onToggle={() => setShowPassword(value => !value)} value={form.confirmPassword} onChange={update('confirmPassword')} aria-invalid={Boolean(form.confirmPassword && !matches)} aria-describedby={form.confirmPassword && !matches ? 'signup-password-match' : undefined} />{form.confirmPassword && !matches && <p id="signup-password-match" role="status" className={`mb-0 mt-2 flex items-center gap-1.5 text-[10px] ${matches ? 'text-[#7d8f66]' : 'text-[#bd6d57]'}`}><X size={12} />Passwords do not match yet</p>}</div>
+      <div className="pt-1"><AuthSubmit loading={loading} disabled={Boolean(form.confirmPassword && !matches)}>{loading ? 'Creating your account...' : 'Create account'}</AuthSubmit></div>
+    </form>
+    <AuthGoogle signup disabled={loading} onSuccess={handleGoogleSuccess} onError={() => setError('Google sign-up could not be completed. Please try again.')} />
+    <p className="mb-0 mt-3 text-center text-xs leading-5 text-[#a29589]">Already part of OneElixir? <Link to="/signin" state={{ from }} className="font-semibold text-[#78543f] underline underline-offset-4">Sign in</Link></p>
+  </CustomerAuthLayout>;
 };
-
 export default SignUp;
