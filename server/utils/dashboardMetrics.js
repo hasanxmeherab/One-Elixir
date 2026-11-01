@@ -1,4 +1,5 @@
 const round = value => Math.round((Number(value) || 0) * 100) / 100;
+const dashboardCollections = require('./dashboardCollections');
 const dayFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dhaka', year: 'numeric', month: '2-digit', day: '2-digit' });
 const day = value => {
   const date = new Date(value);
@@ -34,7 +35,7 @@ function dashboardMetrics({ orders = [], products = [], expenses = [], investors
   };
   const active = orders.filter(order => !canceled(order));
   const scopedLedger = isSuperadmin ? ledger : ledger.filter(entry => String(entry.adminId) === id);
-  const collections = scopedLedger.filter(entry => entry.type === 'collection');
+  const collections = dashboardCollections({ orders, ledger: scopedLedger, viewer });
   const expensesVisible = isSuperadmin ? expenses : [];
   const metricsFor = (from, to) => {
     const periodOrders = active.filter(order => inRange(order.createdAt, from, to));
@@ -101,14 +102,14 @@ function dashboardMetrics({ orders = [], products = [], expenses = [], investors
       { label: isSuperadmin ? 'Pending settlements' : 'My pending settlements', count: pendingSettlements.length, path: isSuperadmin ? '/admin/settlements?tab=pending' : '/admin/settlements?tab=history' },
     ],
     snapshot: { customers: customers.size, customerDue: sum(due, order => Math.max(0, Number(order.totalAmount) - collected(order))),
-      recordedCustomerPayments: isSuperadmin ? sum(active, collected) : null,
-      currentBalance: isSuperadmin ? round(sum(active, collected) + sum(investors, investor => investor.totalAmount) - sum(expenses)) : null,
+      recordedCustomerPayments: sum(active, collected),
+      currentBalance: round(sum(active, collected) + sum(investors, investor => investor.totalAmount) - sum(expenses)),
       myOutstanding: ownBalance, myCollected: sum(ownLedger.filter(entry => entry.type === 'collection')),
       adminHeld: isSuperadmin ? sum(balances.filter(admin => admin.role !== 'superadmin'), admin => Math.max(0, admin.outstanding)) : null,
       myHolding: isSuperadmin ? balances.find(admin => admin.id === id)?.holding || 0 : null,
       vault: isSuperadmin ? sum(ledger.filter(entry => entry.type === 'vault_transfer')) : null,
-      netCapital: isSuperadmin ? sum(investors, investor => investor.totalAmount) : null,
-      allExpenses: isSuperadmin ? sum(expenses) : null,
+      netCapital: sum(investors, investor => investor.totalAmount),
+      allExpenses: sum(expenses),
       stockUnits: sum(stock, item => item.stock), retailStockValue: sum(stock, item => item.stock * item.price),
       lowStock: low, outOfStock: out,
     },

@@ -170,9 +170,13 @@ const createReviewSchema = z.object({
 
 // ── Coupon ────────────────────────────────────────────────────
 const createCouponSchema = z.object({
-  code: z.string().min(1).max(30),
-  discountValue: z.number().positive(),
+  code: z.string().trim().min(1).max(30),
+  discountValue: z.number().finite().positive(),
   discountType: z.enum(['percentage', 'fixed']),
+  expiryDate: z.string().datetime().nullable().optional(),
+  isActive: z.boolean().optional(),
+}).refine(data => data.discountType !== 'percentage' || data.discountValue <= 100, {
+  message: 'Percentage discount cannot exceed 100%.', path: ['discountValue'],
 });
 
 // ── Banner ────────────────────────────────────────────────────

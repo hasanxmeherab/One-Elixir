@@ -1,144 +1,42 @@
-import React, { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
+import { RefreshCw, Download, Trash2 } from 'lucide-react';
 import adminAxios from '../../utils/adminAxios';
-import { TableSkeleton } from '../../components/Skeleton';
-import { RefreshCw, Trash2, Filter } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
-
-const ACTION_COLORS = {
-  CREATE_PRODUCT: 'bg-green-100 text-green-800',
-  UPDATE_PRODUCT: 'bg-blue-100 text-blue-800',
-  DELETE_PRODUCT: 'bg-red-100 text-red-800',
-  RESTORE_STOCK:  'bg-yellow-100 text-yellow-800',
-  CREATE_ADMIN:   'bg-purple-100 text-purple-800',
-  DELETE_ADMIN:   'bg-red-100 text-red-800',
-  LOGIN:          'bg-gray-100 text-gray-600',
-  CREATE_EXPENSE: 'bg-orange-100 text-orange-800',
-  DELETE_EXPENSE: 'bg-rose-100 text-rose-800',
-};
-
-const ActivityLogs = () => {
+import { downloadCsv } from '../../utils/adminExport';
+import { PageHeading, Empty, ErrorNotice, Modal, Pager } from '../../components/admin/AdminUi';
+import { panel, field, button } from '../../utils/adminPresentation';
+const label = value => String(value || '').toLowerCase().replaceAll('_', ' ');
+const time = value => new Date(value).toLocaleString('en-GB', { timeZone: 'Asia/Dhaka' });
+export default function ActivityLogs() {
   const toast = useToast();
-  const [logs, setLogs] = useState([]);
+  const superadmin = localStorage.getItem('adminRole') === 'superadmin';
+  const [data, setData] = useState({ items: [], total: 0, actions: [] });
+  const [filters, setFilters] = useState({ search: '', action: '', from: '', to: '' });
+  const [draft, setDraft] = useState({ ...filters });
+  const [page, setPage] = useState(1);
+  const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [filterAction, setFilterAction] = useState('ALL');
-  const [filterAdmin, setFilterAdmin] = useState('');
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-
-  const fetchLogs = async () => {
-    try {
-      setLoading(true);
-      const res = await adminAxios.get(`${API_URL}/api/logs?limit=200`);
-      setLogs(res.data);
-    } catch (err) {
-      console.error('Failed to fetch logs', err);
-    } finally {
-      setLoading(false);
-    }
+  const [error, setError] = useState('');
+  const [clear, setClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController(); setLoading(true); setError('');
+    adminAxios.get('/api/logs', { params: { ...filters, page, pageSize: 25 }, signal: controller.signal }).then(res => {
+      if (!Array.isArray(res.data.items)) throw new Error('Deploy the updated backend to enable log pagination.');
+      if (!controller.signal.aborted) setData(res.data);
+    }).catch(err => { if (!controller.signal.aborted) setError(err.response?.data?.message || err.message || 'Could not load activity.'); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [filters, page, revision]);
+  const clearLogs = async () => {
+    setClearing(true);
+    try { await adminAxios.delete('/api/logs'); setClear(false); setPage(1); setRevision(v => v + 1); toast.success('Logs cleared.'); }
+    catch (err) { toast.error(err.response?.data?.message || 'Could not clear logs.'); }
+    finally { setClearing(false); }
   };
-
-  useEffect(() => { fetchLogs(); }, []);
-
-  const handleClear = async () => {
-    if (!window.confirm('Clear all activity logs? This cannot be undone.')) return;
-    try {
-      await adminAxios.delete(`${API_URL}/api/logs`);
-      setLogs([]);
-    } catch { toast.error('Failed to clear logs'); }
-  };
-
-  const actionTypes = ['ALL', ...new Set(logs.map(l => l.action))];
-
-  const filtered = logs.filter(log => {
-    const matchesAction = filterAction === 'ALL' || log.action === filterAction;
-    const matchesAdmin  = !filterAdmin || log.adminName.toLowerCase().includes(filterAdmin.toLowerCase());
-    return matchesAction && matchesAdmin;
-  });
-
-  return (
-    <div className="p-4 md:p-10">
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-        <h3 className="tracking-[2px] font-bold text-lg">ACTIVITY LOGS</h3>
-        <div className="flex gap-2">
-          <button
-            onClick={fetchLogs}
-            className="flex items-center gap-2 px-4 py-2 border border-[#ddd] text-xs tracking-wider hover:bg-gray-50 transition-colors"
-          >
-            <RefreshCw size={13} /> REFRESH
-          </button>
-          <button
-            onClick={handleClear}
-            className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-500 text-xs tracking-wider hover:bg-red-50 transition-colors"
-          >
-            <Trash2 size={13} /> CLEAR ALL
-          </button>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-6 p-4 bg-[#f9f9f9] border border-[#eee]">
-        <div className="flex items-center gap-2">
-          <Filter size={13} className="text-[#888]" />
-          <span className="text-[10px] tracking-wider text-[#888]">FILTER</span>
-        </div>
-        <select
-          value={filterAction}
-          onChange={e => setFilterAction(e.target.value)}
-          className="px-3 py-1.5 border border-[#ddd] text-xs outline-none bg-white"
-        >
-          {actionTypes.map(a => <option key={a} value={a}>{a}</option>)}
-        </select>
-        <input
-          placeholder="Filter by admin name..."
-          value={filterAdmin}
-          onChange={e => setFilterAdmin(e.target.value)}
-          className="px-3 py-1.5 border border-[#ddd] text-xs outline-none"
-        />
-        <span className="text-[10px] text-[#aaa] self-center">{filtered.length} entries</span>
-      </div>
-
-      {/* Logs Table */}
-      {loading ? (
-        <TableSkeleton rows={8} cols={4} />
-      ) : filtered.length === 0 ? (
-        <p className="text-center text-xs text-[#aaa] py-20">No activity logs found.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left">
-            <thead>
-              <tr className="border-b-2 border-[#eee]">
-                <th className="py-3 px-3 text-[10px] text-[#999] font-bold tracking-wider">TIME</th>
-                <th className="py-3 px-3 text-[10px] text-[#999] font-bold tracking-wider">ADMIN</th>
-                <th className="py-3 px-3 text-[10px] text-[#999] font-bold tracking-wider">ACTION</th>
-                <th className="py-3 px-3 text-[10px] text-[#999] font-bold tracking-wider">DETAIL</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(log => (
-                <tr key={log._id} className="border-b border-[#f5f5f5] hover:bg-[#fafafa]">
-                  <td className="py-3 px-3 text-xs text-[#888] whitespace-nowrap">
-                    {new Date(log.createdAt).toLocaleString('en-GB', {
-                      day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
-                    })}
-                  </td>
-                  <td className="py-3 px-3 text-xs font-bold tracking-wider whitespace-nowrap">
-                    {log.adminName}
-                  </td>
-                  <td className="py-3 px-3">
-                    <span className={`px-2 py-1 text-[9px] font-bold tracking-wider rounded ${ACTION_COLORS[log.action] || 'bg-gray-100 text-gray-700'}`}>
-                      {log.action}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-xs text-[#444] max-w-[400px]">
-                    {log.detail}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default ActivityLogs;
+  return <section className="mx-auto max-w-[1400px] pb-12"><PageHeading eyebrow="WORKSPACE / ACTIVITY" title="A clear record of changes." description="Search recorded staff activity across the full history. All times shown in Bangladesh time."><button className={button} disabled={loading} onClick={() => setRevision(v => v + 1)}><RefreshCw size={14} />Refresh</button><button className={button} disabled={loading || !!error || !data.items.length} onClick={() => downloadCsv(`activity-page-${page}.csv`, ['Time (Bangladesh)', 'Admin', 'Action', 'Target', 'Detail'], data.items.map(log => [time(log.createdAt), log.adminName, log.action, log.target, log.detail]))}><Download size={14} />Export this page</button></PageHeading>
+    <ErrorNotice message={error} onRetry={() => setRevision(v => v + 1)} /><div className={panel}><form onSubmit={e => { e.preventDefault(); if (draft.from && draft.to && draft.from > draft.to) return toast.warning('Check your date range.'); setPage(1); setFilters({ ...draft }); }} className="mb-6 flex flex-wrap items-end gap-3"><label className="min-w-48 flex-1 text-xs text-[#888]">Search<input className={`${field} mt-2`} placeholder="Admin, action, or detail…" value={draft.search} onChange={e => setDraft({ ...draft, search: e.target.value })} /></label><label className="text-xs text-[#888]">Action<select className={`${field} mt-2 max-w-52`} value={draft.action} onChange={e => setDraft({ ...draft, action: e.target.value })}><option value="">All actions</option>{data.actions.map(action => <option key={action} value={action}>{label(action)}</option>)}</select></label>{['from', 'to'].map(key => <label key={key} className="text-xs capitalize text-[#888]">{key}<input type="date" className={`${field} mt-2`} value={draft[key]} onChange={e => setDraft({ ...draft, [key]: e.target.value })} /></label>)}<button className={button}>Apply</button><button type="button" className={button} onClick={() => { const blank = { search: '', action: '', from: '', to: '' }; setDraft(blank); setFilters(blank); setPage(1); }}>Reset</button></form><p className="text-xs text-[#999]">{loading ? 'Loading…' : `${data.total} matching records`}</p>
+    {loading ? <p role="status" className="py-12 text-center text-sm text-[#999]">Loading activity…</p> : error ? null : !data.items.length ? <Empty>No activity matches these filters.</Empty> : <div className="space-y-2">{data.items.map(log => <details key={log._id} className="rounded-lg border border-[#eaeae7] p-4 open:bg-[#fafaf8]"><summary className="cursor-pointer text-sm"><span className="ml-2 inline-flex flex-wrap items-center gap-x-4 gap-y-2"><span className="text-[11px] text-[#999]">{time(log.createdAt)}</span><strong className="font-medium">{log.adminName}</strong><span className={`rounded-full px-2 py-1 text-[10px] capitalize ${/DELETE|REJECT|RESET/.test(log.action) ? 'bg-red-50 text-red-700' : 'bg-[#f0f2ed] text-[#64755b]'}`}>{label(log.action)}</span><span className="text-xs text-[#999]">{log.target}</span></span></summary><p className="mb-0 mt-4 border-t border-[#eee] pt-3 text-sm leading-6 whitespace-pre-wrap break-words text-[#666]">{log.detail}</p></details>)}</div>}<Pager page={page} pages={Math.ceil(data.total / 25)} onChange={setPage} busy={loading} /></div>
+    {superadmin && <details className="mt-7 rounded-lg border border-[#eee] p-4"><summary className="cursor-pointer text-xs text-[#999]">Log maintenance</summary><p className="text-xs text-[#888]">Clearing removes the entire recorded history.</p><button className={`${button} text-red-600!`} onClick={() => setClear(true)}><Trash2 size={14} />Clear all logs</button></details>}
+    <Modal open={clear} title="Clear all activity logs?" busy={clearing} onClose={() => setClear(false)}><p className="text-sm leading-6 text-[#777]">This permanently removes all activity records, including records outside the current filters. This cannot be undone.</p><button className={`${button} text-red-600!`} disabled={clearing} onClick={clearLogs}>{clearing ? 'Clearing…' : 'Permanently clear logs'}</button></Modal>
+  </section>;
+}

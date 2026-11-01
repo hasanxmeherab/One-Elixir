@@ -16,11 +16,12 @@ function invoke(viewer, query = { from: '2026-11-01', to: '2026-11-07' }) {
     Promise.resolve(handler({ admin: viewer, query }, res)).catch(reject);
   });
 }
-test('dashboard endpoint scopes money queries to the authenticated admin', async t => {
+test('dashboard shares business summary while keeping ledger and settlements scoped to the viewer', async t => {
   const lean = () => ({ lean: async () => [] });
   t.mock.method(Order, 'find', lean); const productQuery = t.mock.method(Perfume, 'find', lean);
-  const expense = t.mock.method(Expense, 'find', () => { throw new Error('No business expense query for normal admin'); });
-  const investment = t.mock.method(Investment, 'find', () => { throw new Error('No business capital query for normal admin'); });
+  let expenseProjection, investmentProjection;
+  t.mock.method(Expense, 'find', () => ({ select(fields) { expenseProjection = fields; return { lean: async () => [{ amount: 200 }] }; } }));
+  t.mock.method(Investment, 'find', () => ({ select(fields) { investmentProjection = fields; return { lean: async () => [{ totalAmount: 100 }] }; } }));
   const ledger = t.mock.method(Ledger, 'find', lean); const settlement = t.mock.method(Settlement, 'find', lean);
   t.mock.method(SystemConfig, 'findOne', () => ({ lean: async () => null }));
   const response = await invoke({ id: 'admin-a', role: 'admin' });
@@ -28,7 +29,13 @@ test('dashboard endpoint scopes money queries to the authenticated admin', async
   assert.deepEqual(productQuery.mock.calls[0].arguments[0], { isDeleted: { $ne: true } });
   assert.deepEqual(ledger.mock.calls[0].arguments[0], { adminId: 'admin-a' });
   assert.deepEqual(settlement.mock.calls[0].arguments[0], { status: 'pending', adminId: 'admin-a' });
-  assert.equal(expense.mock.callCount(), 0); assert.equal(investment.mock.callCount(), 0);
+  assert.equal(expenseProjection, 'amount'); assert.equal(investmentProjection, 'totalAmount');
+  assert.equal(response.data.snapshot.currentBalance, -100);
+  assert.equal(response.data.snapshot.allExpenses, 200);
+  assert.equal(response.data.snapshot.netCapital, 100);
+  assert.equal(response.data.current.expenses, 0);
+  assert.deepEqual(response.data.adminBalances, []);
+  assert.equal(response.data.snapshot.vault, null);
 });
 test('invalid ranges fail before any database queries', async t => {
   const find = t.mock.method(Order, 'find', () => { throw new Error('Unexpected query'); });

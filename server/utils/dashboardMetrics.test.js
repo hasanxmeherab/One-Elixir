@@ -81,7 +81,7 @@ test('regular admins see their own collection and settlement metrics', () => {
   const result = build({ viewer: { id: 'admin', role: 'admin' }, ledger: [{ adminId: 'admin', type: 'collection', amount: 100, createdAt: '2026-11-01' }, { adminId: 'other', type: 'collection', amount: 500, createdAt: '2026-11-01' }], expenses: [{ amount: 80, date: '2026-11-01' }], investors: [{ totalAmount: 1000 }] });
   assert.equal(result.current.collections, 100);
   assert.equal(result.snapshot.myOutstanding, 100);
-  assert.equal(result.snapshot.netCapital, null);
+  assert.equal(result.snapshot.netCapital, 1000);
   assert.equal(result.current.expenses, 0);
   assert.equal(result.adminBalances.length, 0);
 });
@@ -101,7 +101,51 @@ test('current balance restores all-time payments plus net capital less expenses 
   assert.equal(result.current.collections, 0);
 });
 
-test('current business balance can be negative and is not exposed to regular admins', () => {
+test('all admins see the same business balance and breakdown, including negative balances', () => {
   assert.equal(build({ expenses: [{ amount: 200 }] }).snapshot.currentBalance, -200);
-  assert.equal(build({ viewer: { id: 'admin', role: 'admin' } }).snapshot.currentBalance, null);
+  const data = { orders: [order('paid', { paymentStatus: 'Paid' }), order('partial', { amountPaid: 300 })], investors: [{ totalAmount: 500 }], expenses: [{ amount: 1900 }] };
+  const owner = build(data);
+  const admin = build({ ...data, viewer: { id: 'admin', role: 'admin' } });
+  for (const key of ['currentBalance', 'recordedCustomerPayments', 'netCapital', 'allExpenses']) assert.equal(admin.snapshot[key], owner.snapshot[key]);
+  assert.equal(admin.snapshot.currentBalance, -100);
+  assert.equal(admin.snapshot.recordedCustomerPayments, 1300);
+  assert.equal(admin.snapshot.netCapital, 500);
+  assert.equal(admin.snapshot.allExpenses, 1900);
+  assert.equal(admin.snapshot.adminHeld, null);
+  assert.equal(admin.snapshot.myHolding, null);
+  assert.equal(admin.snapshot.vault, null);
+});
+
+test('superadmin collections include dated receipts when the ledger has no collection entry', () => {
+  const orders = [order('old-paid', { createdAt: '2026-01-01', paymentStatus: 'Paid', paymentReceivedAt: '2026-11-02T09:00:00Z', paymentReceivedBy: { adminId: 'admin', adminName: 'Staff' } }),
+    order('partial', { paymentStatus: 'Partial', amountPaid: 300, partialPayments: [{ amount: 100, paidAt: '2026-11-03T09:00:00Z', receivedBy: { adminId: 'admin' } }, { amount: 200, paidAt: '2026-10-29T09:00:00Z', receivedBy: { adminId: 'other' } }] })];
+  const result = build({ orders, resetAt: '2026-11-01T00:00:00Z' });
+  assert.equal(result.current.collections, 1100);
+  assert.equal(result.previous.collections, 200);
+  assert.equal(result.trend.find(point => point.date === '2026-11-02').collections, 1000);
+  assert.equal(result.snapshot.myCollected, 0);
+  assert.equal(result.snapshot.myOutstanding, 0);
+  assert.equal(result.activity.find(entry => entry.type === 'Collection').path, '/admin/order-list?order=partial');
+});
+
+test('saved receipts never duplicate existing ledger collections, including partially covered orders', () => {
+  const result = build({ orders: [order('a', { paymentStatus: 'Paid', paymentReceivedAt: '2026-11-01', partialPayments: [{ amount: 1000, paidAt: '2026-11-01' }] })],
+    ledger: [{ orderId: 'a', type: 'collection', amount: 300, createdAt: '2026-11-02', adminId: 'admin' }] });
+  assert.equal(result.current.collections, 300);
+});
+
+test('regular admins only receive their own dated receipt fallback', () => {
+  const result = build({ viewer: { id: 'admin', role: 'admin' }, orders: [order('a', { partialPayments: [
+    { amount: 100, paidAt: '2026-11-01', receivedBy: { adminId: 'admin' }, recordedBy: { adminId: 'other' } },
+    { amount: 500, paidAt: '2026-11-01', receivedBy: { adminId: 'other' }, recordedBy: { adminId: 'admin' } },
+  ] })] });
+  assert.equal(result.current.collections, 100);
+  assert.equal(result.snapshot.myOutstanding, 0);
+});
+
+test('undated and canceled receipts cannot inflate dated collections', () => {
+  const result = build({ orders: [order('undated', { paymentStatus: 'Paid' }), order('invalid', { paymentStatus: 'Paid', paymentReceivedAt: 'invalid' }),
+    order('cancel', { status: 'Canceled', paymentStatus: 'Paid', paymentReceivedAt: '2026-11-01' })] });
+  assert.equal(result.current.collections, 0);
+  assert.equal(result.snapshot.recordedCustomerPayments, 2000);
 });

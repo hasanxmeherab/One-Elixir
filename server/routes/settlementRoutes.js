@@ -66,7 +66,12 @@ router.get('/balances', verifyAdmin, asyncHandler(async (req, res) => {
     { $sort: { outstandingBalance: -1 } }
   ]);
 
-  res.json(balances);
+  const pending = await Settlement.aggregate([
+    { $match: { ...matchStage, status: 'pending' } },
+    { $group: { _id: '$adminId', amount: { $sum: '$amount' } } },
+  ]);
+  const pendingByAdmin = new Map(pending.map(row => [String(row._id), row.amount]));
+  res.json(balances.map(row => ({ ...row, pendingAmount: pendingByAdmin.get(String(row._id)) || 0 })));
 }));
 
 // ══════════════════════════════════════════════════════════════
@@ -229,7 +234,7 @@ router.get('/dashboard', verifySuperadmin, asyncHandler(async (req, res) => {
 router.post('/request', verifyAdmin, asyncHandler(async (req, res) => {
   const { amount, paymentMethod, transactionId, note } = req.body;
 
-  if (!amount || amount <= 0) {
+  if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
     return res.status(400).json({ message: 'Amount must be greater than 0' });
   }
   if (!paymentMethod) {
@@ -515,7 +520,7 @@ router.post('/direct-settle', verifySuperadmin, asyncHandler(async (req, res) =>
   if (!adminId) {
     return res.status(400).json({ message: 'adminId is required' });
   }
-  if (!amount || Number(amount) <= 0) {
+  if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
     return res.status(400).json({ message: 'Amount must be greater than 0' });
   }
   if (!paymentMethod) {
@@ -625,7 +630,7 @@ router.post('/direct-settle', verifySuperadmin, asyncHandler(async (req, res) =>
 router.post('/vault-transfer', verifySuperadmin, asyncHandler(async (req, res) => {
   const { amount, note } = req.body;
 
-  if (!amount || Number(amount) <= 0) {
+  if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
     return res.status(400).json({ message: 'Amount must be greater than 0' });
   }
 

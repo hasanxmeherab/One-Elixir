@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import adminAxios from '../../utils/adminAxios';
+import { PageHeading, ErrorNotice, Empty } from '../../components/admin/AdminUi';
+import { panel, field, button } from '../../utils/adminPresentation';
+import { downloadCsv } from '../../utils/adminExport';
+import { validateCostBatch, costPercentages } from '../../utils/costBatch';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const UNITS = ['ml', 'g', 'kg', 'L', 'pcs', 'bottle', 'box', ''];
@@ -21,7 +25,7 @@ const RowEditor = ({ rows, onUpdate, onAdd, onRemove, label }) => (
       </button>
     </div>
     <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 mb-1">
-      {['ITEM', 'QTY', 'UNIT', 'COST (TK)', ''].map((h, i) => (
+      {['ITEM', 'QTY', 'UNIT', 'TOTAL COST (TK)', ''].map((h, i) => (
         <span key={i} className="text-[9px] font-bold tracking-wider text-[#bbb]">{h}</span>
       ))}
     </div>
@@ -31,18 +35,18 @@ const RowEditor = ({ rows, onUpdate, onAdd, onRemove, label }) => (
           border border-[#eee] p-2 sm:border-0 sm:p-0">
           <div className="col-span-2 sm:col-span-1">
             <span className="text-[9px] font-bold text-[#bbb] sm:hidden mb-1 block">ITEM</span>
-            <input value={row.name} onChange={e => onUpdate(i, 'name', e.target.value)}
+            <input aria-label={`Item name for ${label} row ${i + 1}`} value={row.name} onChange={e => onUpdate(i, 'name', e.target.value)}
               placeholder={label === 'INGREDIENTS / ITEMS' ? 'e.g. Oud Oil' : 'e.g. Glass Bottle'}
               className="border border-[#ddd] px-2 py-1.5 text-xs outline-none w-full focus:border-black transition-colors" />
           </div>
           <div>
             <span className="text-[9px] font-bold text-[#bbb] sm:hidden mb-1 block">QTY</span>
-            <input type="number" value={row.qty} onChange={e => onUpdate(i, 'qty', e.target.value)}
+            <input aria-label={`Quantity for ${label} row ${i + 1}`} min="0.01" step="any" type="number" value={row.qty} onChange={e => onUpdate(i, 'qty', e.target.value)}
               placeholder="50" className="border border-[#ddd] px-2 py-1.5 text-xs outline-none w-full focus:border-black transition-colors" />
           </div>
           <div>
             <span className="text-[9px] font-bold text-[#bbb] sm:hidden mb-1 block">UNIT</span>
-            <select value={row.unit} onChange={e => onUpdate(i, 'unit', e.target.value)}
+            <select aria-label={`Unit for ${label} row ${i + 1}`} value={row.unit} onChange={e => onUpdate(i, 'unit', e.target.value)}
               className="border border-[#ddd] px-2 py-1.5 text-xs outline-none bg-white w-full focus:border-black transition-colors">
               {UNITS.map(u => <option key={u} value={u}>{u || '—'}</option>)}
             </select>
@@ -50,7 +54,7 @@ const RowEditor = ({ rows, onUpdate, onAdd, onRemove, label }) => (
           <div className="flex gap-1 items-center">
             <div className="flex-1">
               <span className="text-[9px] font-bold text-[#bbb] sm:hidden mb-1 block">COST</span>
-              <input type="number" value={row.cost} onChange={e => onUpdate(i, 'cost', e.target.value)}
+              <input aria-label={`Total cost for ${label} row ${i + 1}`} min="0" step="0.01" type="number" value={row.cost} onChange={e => onUpdate(i, 'cost', e.target.value)}
                 placeholder="2000" className="border border-[#ddd] px-2 py-1.5 text-xs outline-none w-full focus:border-black transition-colors" />
             </div>
             <button onClick={() => onRemove(i)} disabled={rows.length === 1}
@@ -146,6 +150,12 @@ const CostCalculator = () => {
   const [notes,              setNotes]               = useState('');
   const [saving,             setSaving]              = useState(false);
   const [toast,              setToast]               = useState('');
+  const [view, setView] = useState('history');
+  const [recordsError, setRecordsError] = useState('');
+  const [productsError, setProductsError] = useState('');
+  const [wacError, setWacError] = useState('');
+  const [recordsLoading, setRecordsLoading] = useState(true);
+  const [wacLoading, setWacLoading] = useState(true);
   const [filterPerfume,      setFilterPerfume]       = useState('');
   const [deleteConfirm,      setDeleteConfirm]       = useState(null);
   const [wacSummaries,       setWacSummaries]        = useState([]);
@@ -156,25 +166,29 @@ const CostCalculator = () => {
   const [expandedRecord,     setExpandedRecord]      = useState(null);   // id of expanded history card
 
   /* ── fetch ─────────────────────────────────────────────── */
-  useEffect(() => {
-    adminAxios.get(`${API_URL}/api/perfumes`).then(r => setPerfumes(r.data)).catch(() => {});
-    fetchRecords(); fetchWac();
-  }, []);
-
-  const fetchRecords = async (pid = '') => {
-    try {
-      const r = await adminAxios.get(`${API_URL}/api/costs${pid ? `?perfumeId=${pid}` : ''}`);
-      setRecords(r.data);
-    } catch {}
+  const fetchPerfumes = async () => {
+    setProductsError('');
+    try { setPerfumes((await adminAxios.get(`${API_URL}/api/perfumes`)).data); }
+    catch { setProductsError('Could not load the product selector.'); }
   };
-  const fetchWac = async (pid = '') => {
+  useEffect(() => { fetchPerfumes(); }, []);
+
+  const fetchRecords = async (pid = '', signal) => {
+    setRecordsLoading(true); setRecordsError('');
     try {
-      const r = await adminAxios.get(`${API_URL}/api/costs/summary/wac${pid ? `?perfumeId=${pid}` : ''}`);
-      setWacSummaries(r.data);
-    } catch {}
+      const r = await adminAxios.get(`${API_URL}/api/costs${pid ? `?perfumeId=${pid}` : ''}`, { signal });
+      if (!signal?.aborted) setRecords(r.data);
+    } catch (err) { if (!signal?.aborted) setRecordsError(err.response?.data?.message || 'Could not load batch history.'); } finally { if (!signal?.aborted) setRecordsLoading(false); }
+  };
+  const fetchWac = async (pid = '', signal) => {
+    setWacLoading(true); setWacError('');
+    try {
+      const r = await adminAxios.get(`${API_URL}/api/costs/summary/wac${pid ? `?perfumeId=${pid}` : ''}`, { signal });
+      if (!signal?.aborted) setWacSummaries(r.data);
+    } catch (err) { if (!signal?.aborted) setWacError(err.response?.data?.message || 'Could not load cost summaries.'); } finally { if (!signal?.aborted) setWacLoading(false); }
   };
 
-  useEffect(() => { fetchRecords(filterPerfume); fetchWac(filterPerfume); }, [filterPerfume]);
+  useEffect(() => { const controller = new AbortController(); fetchRecords(filterPerfume, controller.signal); fetchWac(filterPerfume, controller.signal); return () => controller.abort(); }, [filterPerfume]);
 
   /* ── live calcs (new record form) ─────────────────────── */
   const ingCost      = ingredients.reduce((s, i) => s + (Number(i.cost) || 0), 0);
@@ -226,8 +240,8 @@ const CostCalculator = () => {
   /* ── actions ───────────────────────────────────────────── */
   const handleSave = async () => {
     if (!selectedPerfume)   return showToast('Please select a perfume');
-    if (bottleCount <= 0)   return showToast('Enter number of bottles produced');
-    if (ingredients.some(i => !i.name || !i.cost)) return showToast('Fill in all ingredient names and costs');
+    const issue = validateCostBatch({ bottlesProduced: bottleCount, sellingPrice: customSellingPrice, ingredients, packaging });
+    if (issue) return showToast(issue);
     setSaving(true);
     try {
       await adminAxios.post(`${API_URL}/api/costs`, {
@@ -240,7 +254,7 @@ const CostCalculator = () => {
       });
       showToast('✓ Cost record saved');
       setIngredients([emptyIngredient()]); setPackaging([emptyPackaging()]);
-      setBottles(''); setCustomSellingPrice(''); setNotes(''); setSelectedPerfume('');
+      setBottles(''); setCustomSellingPrice(''); setNotes(''); setSelectedPerfume(''); setView('history');
       fetchRecords(filterPerfume); fetchWac(filterPerfume);
     } catch (err) { showToast(err.response?.data?.message || 'Failed to save');
     } finally { setSaving(false); }
@@ -276,8 +290,9 @@ const CostCalculator = () => {
 
   const handleSaveBatchEdit = async () => {
     if (!editingBatch) return;
-    if (Number(editingBatch.bottlesProduced) <= 0) return showToast('Enter valid bottles produced');
-    if (editingBatch.ingredients.some(i => !i.name || !i.cost)) return showToast('Fill in all ingredient names and costs');
+    const issue = validateCostBatch(editingBatch);
+    if (issue) return showToast(issue);
+    if (!Number.isInteger(Number(editingBatch.remainingBottles)) || Number(editingBatch.remainingBottles) < 0 || Number(editingBatch.remainingBottles) > Number(editingBatch.bottlesProduced)) return showToast('Remaining bottles must be a whole number within the batch total.');
     setUpdatingBatch(true);
     try {
       await adminAxios.put(`${API_URL}/api/costs/${editingBatch._id}`, {
@@ -305,21 +320,19 @@ const CostCalculator = () => {
         </div>
       )}
 
-      {/* Page header */}
-      <div className="mb-8">
-        <h1 className="text-xl sm:text-2xl font-light tracking-[6px] mb-1">COST CALCULATOR</h1>
-        <p className="text-[11px] text-[#999] tracking-[2px]">
-          Production cost &amp; profit margin tracker per batch.
-        </p>
-      </div>
+      <PageHeading eyebrow="PRODUCTION / COSTS" title="Know what every bottle costs." description="Record batch inputs, review production history, and compare the cost of remaining batches."><button className={button} onClick={() => { fetchRecords(filterPerfume); fetchWac(filterPerfume); }}>Refresh</button><button className={button} disabled={recordsLoading || !!recordsError || !records.length} onClick={() => downloadCsv('production-costs.csv', ['Perfume', 'Batch date', 'Produced', 'Remaining', 'Batch cost (TK)', 'Cost per bottle (TK)', 'Selling price (TK)', 'Gross margin (%)'], records.map(r => [r.perfumeName, new Date(r.createdAt).toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' }), r.bottlesProduced, r.remainingBottles ?? r.bottlesProduced, r.totalCost, r.costPerBottle, r.sellingPrice, r.profitMargin]))}>Export loaded batches</button></PageHeading>
+      <nav aria-label="Cost calculator views" className="mb-6 flex flex-wrap gap-2">{[{ id: 'new', label: 'New batch' }, { id: 'history', label: 'Batch history' }, { id: 'summary', label: 'Cost summary' }].map(tab => <button className={button + (view === tab.id ? ' bg-[#252525]! text-white! border-[#252525]!' : '')} aria-pressed={view === tab.id} key={tab.id} onClick={() => setView(tab.id)}>{tab.label}</button>)}</nav>
+      {view !== 'new' && <div className={panel + ' mb-6'}><label className="block max-w-sm text-xs text-[#888]">Filter product<select className={field + ' mt-2'} value={filterPerfume} onChange={e => setFilterPerfume(e.target.value)}><option value="">All perfumes</option>{perfumes.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}</select></label><p className="mb-0 mt-3 text-[11px] text-[#999]">Batch quantities track production records and are separate from storefront inventory.</p></div>}
+      <ErrorNotice message={view === 'history' ? recordsError : view === 'summary' ? wacError : ''} />
+      <ErrorNotice message={productsError} onRetry={fetchPerfumes} />
 
       {/* ── 2-col layout ── */}
-      <div className="grid grid-cols-1 xl:grid-cols-[480px_1fr] gap-6 xl:gap-10 items-start">
+      <div className={view === 'new' ? 'grid grid-cols-1 gap-6 items-start xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]' : 'block'}>
 
         {/* ════════════════════════════════════════════════
             LEFT — New Batch Form
         ════════════════════════════════════════════════ */}
-        <div className="border border-[#e8e8e8] bg-white">
+        <div className={view === 'new' ? panel : 'hidden'}>
           {/* Form header */}
           <div className="px-5 py-4 border-b border-[#f0f0f0]">
             <p className="text-[10px] font-bold tracking-[3px] text-[#666]">NEW COST RECORD</p>
@@ -385,26 +398,6 @@ const CostCalculator = () => {
                 className="w-full border border-[#ddd] px-3 py-2.5 text-sm outline-none resize-none focus:border-black transition-colors" />
             </div>
 
-            {/* Live Summary */}
-            <div className="bg-[#fafafa] border border-[#ebebeb] p-4 mb-5">
-              <p className="text-[9px] font-bold tracking-[3px] text-[#aaa] mb-3">LIVE SUMMARY</p>
-              <div className="grid grid-cols-2 gap-y-2">
-                <StatRow label="Ingredient Cost"   value={`${fmt(ingCost)} TK`} />
-                <StatRow label="Packaging Cost"    value={pkgCost > 0 ? `${fmt(pkgCost)} TK` : '—'} />
-                <StatRow label="Total Batch Cost"  value={`${fmt(totalCost)} TK`} />
-                <StatRow label="Bottles Produced"  value={bottleCount || '—'} />
-                <StatRow label="Cost Per Bottle"   value={cpb > 0 ? `${cpb.toFixed(0)} TK` : '—'} />
-                <StatRow label="Selling Price"     value={sp > 0 ? `${fmt(sp)} TK` : '—'} />
-                <StatRow label="Profit / Bottle"   value={profitPB > 0 ? `${profitPB.toFixed(0)} TK` : '—'} />
-              </div>
-              <div className="mt-3 pt-3 border-t border-[#e8e8e8] flex items-center justify-between">
-                <span className="text-[11px] text-[#888]">Profit Margin</span>
-                <span className="text-base font-bold" style={{ color: marginColor(margin) }}>
-                  {margin > 0 ? `${margin.toFixed(1)}%` : '—'}
-                </span>
-              </div>
-            </div>
-
             <button onClick={handleSave} disabled={saving}
               className="w-full bg-black text-white py-3.5 text-[10px] font-bold tracking-[3px] hover:bg-[#111] transition-colors disabled:opacity-50 cursor-pointer border-none">
               {saving ? 'SAVING…' : 'SAVE COST RECORD'}
@@ -415,10 +408,32 @@ const CostCalculator = () => {
         {/* ════════════════════════════════════════════════
             RIGHT — WAC + History
         ════════════════════════════════════════════════ */}
-        <div className="min-w-0">
+        {view === 'new' && <aside className={panel + ' xl:sticky xl:top-6'}><h2 className="mb-5 font-sans! text-base font-semibold">Live batch breakdown</h2>            {/* Live Summary */}
+            <div className="bg-[#fafafa] border border-[#ebebeb] p-4 mb-5">
+              <p className="text-[9px] font-bold tracking-[3px] text-[#aaa] mb-3">LIVE SUMMARY</p>
+              <div className="grid grid-cols-2 gap-y-2">
+                <StatRow label="Ingredient Cost"   value={`${fmt(ingCost)} TK`} />
+                <StatRow label="Packaging Cost"    value={pkgCost > 0 ? `${fmt(pkgCost)} TK` : '—'} />
+                <StatRow label="Total Batch Cost"  value={`${fmt(totalCost)} TK`} />
+                <StatRow label="Bottles Produced"  value={bottleCount || '—'} />
+                <StatRow label="Cost Per Bottle"   value={cpb > 0 ? `${cpb.toFixed(0)} TK` : '—'} />
+                <StatRow label="Selling Price"     value={sp > 0 ? `${fmt(sp)} TK` : '—'} />
+                <StatRow label="Profit / Bottle"   value={bottleCount > 0 ? `${profitPB.toFixed(0)} TK` : '—'} />
+              </div>
+              <div className="mt-3 pt-3 border-t border-[#e8e8e8] flex items-center justify-between">
+                <span className="text-[11px] text-[#888]">Profit Margin</span>
+                <span className="text-base font-bold" style={{ color: marginColor(margin) }}>
+                  {sp > 0 ? `${margin.toFixed(1)}%` : '—'}
+                </span>
+              </div>
+            </div>
+
+<div className="flex justify-between text-sm"><span>Markup on cost</span><strong>{cpb > 0 ? costPercentages(cpb, sp).markup.toFixed(1) + '%' : 'N/A'}</strong></div><p className="mt-5 text-xs leading-6 text-[#888]">Enter the total cost for each quantity used in this batch. Quantities are descriptive; costs are summed once. Gross margin = profit / selling price. Markup = profit / cost.</p><p className="mb-0 text-[11px] leading-6 text-[#999]">These are estimated gross figures, excluding expenses not recorded here.</p></aside>}
+        {view === 'summary' && (wacLoading ? <p role="status" className="py-12 text-center text-sm text-[#999]">Loading cost summary...</p> : !wacError && !wacSummaries.length ? <Empty>No remaining batches for this product.</Empty> : null)}
+        <div className={view === 'new' ? 'hidden' : 'min-w-0'}>
 
           {/* ── WAC SUMMARY ── */}
-          {wacSummaries.length > 0 && (
+          {view === 'summary' && !wacLoading && !wacError && wacSummaries.length > 0 && (
             <section className="mb-8">
               <div className="flex items-center gap-3 mb-4">
                 <p className="text-[10px] font-bold tracking-[3px] text-[#666]">WEIGHTED AVG COST</p>
@@ -426,12 +441,13 @@ const CostCalculator = () => {
                 <span className="text-[9px] text-[#bbb] tracking-wider">{wacSummaries.length} product{wacSummaries.length !== 1 ? 's' : ''}</span>
               </div>
 
+              <p className="mb-5 text-xs leading-6 text-[#888]">Weighted average cost = sum of (batch cost per bottle x remaining bottles) / all remaining bottles. Gross margin uses selling price as the denominator; markup uses cost. Figures exclude costs not entered in the batch.</p>
               {/* WAC cards grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
                 {wacSummaries.map(s => {
                   const mc = marginColor(s.profitMargin);
                   return (
-                    <div key={s.perfumeId} className="border border-[#e8e8e8] bg-white overflow-hidden">
+                    <div key={s.perfumeId} className="rounded-xl border border-[#e8e8e8] bg-white overflow-hidden">
                       {/* Card header */}
                       <div className="px-4 py-3 flex items-center justify-between border-b border-[#f0f0f0]"
                         style={{ borderLeft: `3px solid ${mc}` }}>
@@ -439,7 +455,7 @@ const CostCalculator = () => {
                           {s.perfumeName.toUpperCase()}
                         </p>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-[10px] text-[#aaa]">{s.totalBottles} in stock</span>
+                          <span className="text-[10px] text-[#aaa]">{s.totalBottles} batch bottles left</span>
                           <span className="text-sm font-bold" style={{ color: mc }}>{s.profitMargin}%</span>
                         </div>
                       </div>
@@ -453,7 +469,7 @@ const CostCalculator = () => {
                           <span className="text-[10px] text-[#999]">Selling Price</span>
                           <span className="text-[10px] font-bold text-right">{fmt(s.sellingPrice)} TK</span>
 
-                          <span className="text-[10px] text-[#999]">True Profit / Bottle</span>
+                          <span className="text-[10px] text-[#999]">Gross profit / Bottle</span>
                           <span className="text-[10px] font-bold text-right" style={{ color: mc }}>
                             {fmt(s.profitPerBottle)} TK
                           </span>
@@ -491,7 +507,7 @@ const CostCalculator = () => {
           )}
 
           {/* ── COST HISTORY ── */}
-          <section>
+          <section className={view === 'history' ? 'block' : 'hidden'}>
             <div className="flex items-center gap-3 mb-4">
               <p className="text-[10px] font-bold tracking-[3px] text-[#666]">COST HISTORY</p>
               <div className="flex-1 h-px bg-[#eee]" />
@@ -503,7 +519,7 @@ const CostCalculator = () => {
               </select>
             </div>
 
-            {records.length === 0 ? (
+            {recordsLoading ? <p role="status" className="py-12 text-center text-sm text-[#999]">Loading batch history...</p> : recordsError ? null : records.length === 0 ? (
               <div className="border border-[#eee] py-20 text-center text-[#ccc] tracking-[3px] text-[11px]">
                 NO RECORDS YET.
               </div>
@@ -516,7 +532,7 @@ const CostCalculator = () => {
                   const isExpanded = expandedRecord === r._id;
 
                   return (
-                    <div key={r._id} className="border border-[#e8e8e8] bg-white overflow-hidden">
+                    <div key={r._id} className="rounded-xl border border-[#e8e8e8] bg-white overflow-hidden">
 
                       {/* ── Record header (always visible, click to expand) ── */}
                       <div

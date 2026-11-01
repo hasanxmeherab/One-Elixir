@@ -1,5 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import adminAxios from '../../utils/adminAxios';
+import { PageHeading, Stats, ErrorNotice, Modal } from '../../components/admin/AdminUi';
+import { field, button, primary, money } from '../../utils/adminPresentation';
+import { downloadCsv } from '../../utils/adminExport';
+import { expenseDay } from '../../utils/expenseRecords';
 import { useSearchParams } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
 import {
@@ -38,6 +42,14 @@ const SettlementDashboard = () => {
   const [history, setHistory] = useState([]);
   const [reports, setReports] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [historySearch, setHistorySearch] = useState('');
+  const [adminFilter, setAdminFilter] = useState('');
+  const [review, setReview] = useState(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [vaultOpen, setVaultOpen] = useState(false);
+  const [vaultForm, setVaultForm] = useState({ amount: '', note: '' });
+  const [vaultBusy, setVaultBusy] = useState(false);
 
   // ── Settlement request form ──
   const [showRequestForm, setShowRequestForm] = useState(false);
@@ -67,8 +79,8 @@ const SettlementDashboard = () => {
   const [directSettling, setDirectSettling] = useState(false);
 
   // ── Fetch data ──
-  const fetchAll = async () => {
-    setLoading(true);
+  const fetchAll = useCallback(async () => {
+    setLoading(true); setError('');
     try {
       const promises = [
         adminAxios.get(`${API_URL}/api/settlements/balances`),
@@ -88,24 +100,24 @@ const SettlementDashboard = () => {
         setReports(results[4].data);
       }
     } catch (err) {
-      console.error('Settlement data fetch failed:', err);
+      setError(err.response?.data?.message || 'Could not load settlement data. Please retry.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [isSuperadmin]);
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
   // ── My balance (for normal admin) ──
   const myBalance = useMemo(() => {
-    return balances.find(b => b._id === adminData?.id) || {
+    return balances.find(b => b._id === (adminData?.id || adminData?._id)) || {
       totalCollected: 0, totalSettled: 0, outstandingBalance: 0, transactionCount: 0
     };
-  }, [balances, adminData?.id]);
+  }, [balances, adminData?.id, adminData?._id]);
 
   // ── Submit settlement request ──
   const submitSettlementRequest = async () => {
-    if (!requestForm.amount || Number(requestForm.amount) <= 0) {
+    if (!Number.isFinite(Number(requestForm.amount)) || Number(requestForm.amount) <= 0 || Number(requestForm.amount) > available) {
       return toast.warning('Enter a valid amount.');
     }
     setRequesting(true);
@@ -143,7 +155,7 @@ const SettlementDashboard = () => {
 
   // ── Direct settle (superadmin → admin, no request needed) ──
   const submitDirectSettle = async () => {
-    if (!directSettleForm.amount || Number(directSettleForm.amount) <= 0) {
+    if (!Number.isFinite(Number(directSettleForm.amount)) || Number(directSettleForm.amount) <= 0 || Number(directSettleForm.amount) > directSettleTarget.outstandingBalance) {
       return toast.warning('Enter a valid amount.');
     }
     setDirectSettling(true);
@@ -182,17 +194,38 @@ const SettlementDashboard = () => {
   };
 
   // ── Filtered history ──
-  const filteredHistory = useMemo(() => {
-    let filtered = [...history];
-    if (historyFilter !== 'all') filtered = filtered.filter(s => s.status === historyFilter);
-    if (historyDateFrom) filtered = filtered.filter(s => new Date(s.createdAt) >= new Date(historyDateFrom));
-    if (historyDateTo) {
-      const to = new Date(historyDateTo);
-      to.setHours(23, 59, 59, 999);
-      filtered = filtered.filter(s => new Date(s.createdAt) <= to);
-    }
-    return filtered;
-  }, [history, historyFilter, historyDateFrom, historyDateTo]);
+  const filteredHistory = useMemo(() => history.filter(entry =>
+    (historyFilter === 'all' || entry.status === historyFilter) &&
+    (!adminFilter || String(entry.adminId?._id || entry.adminId) === adminFilter) &&
+    (!historySearch || [entry.adminName, entry._id, entry.transactionId, entry.note, entry.paymentMethod].join(' ').toLowerCase().includes(historySearch.toLowerCase())) &&
+    (!historyDateFrom || expenseDay(entry.createdAt) >= historyDateFrom) &&
+    (!historyDateTo || expenseDay(entry.createdAt) <= historyDateTo)
+  ), [history, historyFilter, adminFilter, historySearch, historyDateFrom, historyDateTo]);
+  const pendingAmount = Number(myBalance.pendingAmount ?? history.filter(s => s.status === 'pending').reduce((total, s) => total + s.amount, 0));
+  const available = Math.max(0, myBalance.outstandingBalance - pendingAmount);
+  const exportHistory = () => downloadCsv('settlement-history.csv', ['ID', 'Admin', 'Amount (TK)', 'Method', 'Reference', 'Submitted (Bangladesh)', 'Status', 'Reviewed by', 'Notes'], filteredHistory.map(s => [s._id, s.adminName, s.amount, s.paymentMethod, s.transactionId, new Date(s.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Dhaka' }), s.status, s.confirmedBy?.adminName, s.note]));
+  const reviewAction = (kind, form, target) => {
+    const amount = Number(form.amount);
+    const max = kind === 'request' ? available : kind === 'vault' ? dashboard?.superadminHolding || 0 : target.outstandingBalance;
+    if (!Number.isFinite(amount) || amount <= 0 || amount > max) return toast.warning('Enter an amount within the available balance.');
+    setReview({ kind, form: { ...form, amount }, target });
+  };
+  const performReviewed = async () => {
+    if (reviewing) return;
+    setReviewing(true);
+    try {
+      if (review.kind === 'confirm') await confirmSettlement(review.target._id);
+      else if (review.kind === 'request') await submitSettlementRequest();
+      else if (review.kind === 'direct') await submitDirectSettle();
+      else {
+        setVaultBusy(true);
+        await adminAxios.post('/api/settlements/vault-transfer', review.form);
+        toast.success('Transfer to vault recorded.'); setVaultOpen(false); setVaultForm({ amount: '', note: '' }); await fetchAll();
+      }
+      setReview(null);
+    } catch (err) { toast.error(err.response?.data?.message || 'Could not record transfer.'); setReview(null); }
+    finally { setReviewing(false); setVaultBusy(false); }
+  };
 
   if (loading) {
     return (
@@ -202,6 +235,8 @@ const SettlementDashboard = () => {
       </div>
     );
   }
+
+  if (error) return <section><PageHeading eyebrow="FINANCE / SETTLEMENTS" title="Settlements" description="Balances could not be refreshed." /><ErrorNotice message={error} onRetry={fetchAll} /></section>;
 
   const getStatusBadge = (status) => {
     const map = {
@@ -226,19 +261,10 @@ const SettlementDashboard = () => {
       ];
 
   return (
-    <div className="w-full">
+    <div className="mx-auto max-w-[1450px] pb-12 [&_table]:min-w-[760px] [&_th]:text-[#888] [&_input]:rounded-lg [&_select]:rounded-lg [&_button]:rounded-lg [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-[#dc4939]">
       {/* ── Header ── */}
-      <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
-        <h3 className="tracking-[2px] font-bold m-0">
-          {isSuperadmin ? 'SETTLEMENT DASHBOARD' : 'MY SETTLEMENTS'}
-        </h3>
-        {!isSuperadmin && (
-          <button onClick={() => setShowRequestForm(true)}
-            className="px-4 py-2.5 bg-black text-white border-none cursor-pointer text-[10px] font-bold tracking-wider hover:bg-gray-800 transition-colors">
-            💸 TRANSFER TO CASHIER
-          </button>
-        )}
-      </div>
+      <PageHeading eyebrow="FINANCE / SETTLEMENTS" title={isSuperadmin ? 'Keep every handover clear.' : 'Your collections. Your balance.'} description={isSuperadmin ? 'Review incoming settlements and track funds held by staff, yourself, and the vault.' : 'Track what you collected, what was confirmed, and what is awaiting review.'}><button className={button} onClick={fetchAll}>Refresh</button>{isSuperadmin ? <button className={primary} disabled={!dashboard?.superadminHolding} onClick={() => setVaultOpen(true)}>Transfer to vault</button> : <button className={primary} disabled={available <= 0} onClick={() => setShowRequestForm(true)}>Request settlement</button>}</PageHeading>
+      {isSuperadmin ? <div className="mb-6 rounded-xl border border-[#e7e7e5] bg-[#fafaf8] p-5 text-xs leading-6 text-[#777]">Staff holding, then confirmed receipt into your holding, then explicit vault transfer. These are separate steps; pending requests do not move money.<strong className="mt-2 block text-[#333]">Recorded transfers to vault: {money(dashboard?.vaultBalance)}</strong></div> : <><Stats items={[{ label: 'Outstanding balance', value: money(myBalance.outstandingBalance), note: 'Collections + adjustments - confirmed settlements' }, { label: 'Awaiting review', value: money(pendingAmount), note: 'Included in outstanding until confirmed' }, { label: 'Available to request', value: money(available), note: 'Outstanding less pending requests' }]} /><p className="mb-6 text-xs leading-6 text-[#888]">Submitting a request does not reduce your outstanding balance until a superadmin confirms receipt. Rejected requests release the amount for a new request.</p></>}
 
       {/* ── Tab Bar ── */}
       <div className="flex gap-0 mb-6 border-b border-[#eee] overflow-x-auto">
@@ -279,7 +305,7 @@ const SettlementDashboard = () => {
                 color: 'border-l-violet-500'
               },
             ].map((card, i) => (
-              <div key={i} className={`p-4 border border-[#eee] border-l-4 ${card.color}`}>
+              <div key={i} className={`rounded-xl bg-white p-5 border border-[#e7e7e5] border-l-4 ${card.color}`}>
                 <p className="text-[9px] font-bold tracking-wider text-[#999] mb-1">{card.label}</p>
                 <p className="text-xl font-bold m-0">{card.value}</p>
                 <p className="text-[10px] text-[#aaa] m-0 mt-0.5">{card.sub}</p>
@@ -336,7 +362,7 @@ const SettlementDashboard = () => {
                         </span>
                       </td>
                       <td className="py-3 px-3">
-                        {admin.outstandingBalance > 0 && (
+                        {admin.role !== 'superadmin' && admin.outstandingBalance > 0 && (
                           <button
                             onClick={() => {
                               setDirectSettleTarget({ adminId: admin.adminId, adminName: admin.adminName, outstandingBalance: admin.outstandingBalance });
@@ -369,7 +395,7 @@ const SettlementDashboard = () => {
           ) : (
             <div className="flex flex-col gap-3">
               {pending.map(s => (
-                <div key={s._id} className="border border-[#eee] p-5 hover:border-[#ddd] transition-colors">
+                <div key={s._id} className="rounded-xl border border-[#e7e7e5] bg-white p-5 hover:border-[#ccc] transition-colors">
                   <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
@@ -378,7 +404,7 @@ const SettlementDashboard = () => {
                       </div>
                       <h4 className="text-lg font-bold m-0">{s.adminName}</h4>
                       <p className="text-[11px] text-[#888] m-0 mt-0.5">
-                        Submitted {new Date(s.createdAt).toLocaleString()}
+                        Submitted {new Date(s.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Dhaka' })} - {Math.max(0, Math.floor((Date.now() - new Date(s.createdAt)) / 86400000))} days ago
                       </p>
                     </div>
                     <div className="text-right">
@@ -405,7 +431,7 @@ const SettlementDashboard = () => {
 
                   {/* Actions */}
                   <div className="flex gap-2 items-center">
-                    <button onClick={() => confirmSettlement(s._id)}
+                    <button onClick={() => setReview({ kind: 'confirm', target: s, form: { amount: s.amount, paymentMethod: s.paymentMethod, transactionId: s.transactionId } })}
                       disabled={confirmingId === s._id}
                       className="px-4 py-2 bg-emerald-600 text-white border-none cursor-pointer text-[10px] font-bold tracking-wider hover:bg-emerald-700 transition-colors disabled:opacity-60">
                       {confirmingId === s._id ? 'CONFIRMING...' : '✅ CONFIRM RECEIVED'}
@@ -464,9 +490,9 @@ const SettlementDashboard = () => {
             </div>
 
             {myBalance.outstandingBalance > 0 && (
-              <button onClick={() => setShowRequestForm(true)}
+              <button disabled={available <= 0} onClick={() => setShowRequestForm(true)}
                 className="w-full mt-4 px-4 py-3 bg-black text-white border-none cursor-pointer text-[11px] font-bold tracking-wider hover:bg-gray-800 transition-colors">
-                💸 TRANSFER TO CASHIER
+                💸 REQUEST SETTLEMENT
               </button>
             )}
           </div>
@@ -498,7 +524,7 @@ const SettlementDashboard = () => {
       {activeTab === 'history' && (
         <div>
           {/* Filters */}
-          <div className="flex flex-wrap items-center gap-3 mb-4">
+          <div className="flex flex-wrap items-center gap-3 mb-4"><input aria-label="Search settlement history" className={field + ' max-w-64'} placeholder="Name, reference, or note..." value={historySearch} onChange={e => setHistorySearch(e.target.value)} />{isSuperadmin && <select aria-label="Filter by admin" className={field + ' max-w-48'} value={adminFilter} onChange={e => setAdminFilter(e.target.value)}><option value="">All admins</option>{dashboard?.admins.map(a => <option key={a.adminId} value={a.adminId}>{a.adminName}</option>)}</select>}<button className={button} disabled={!filteredHistory.length} onClick={exportHistory}>Export filtered history</button>
             <select value={historyFilter} onChange={e => setHistoryFilter(e.target.value)}
               className="px-2 py-2 border border-[#ddd] text-[11px] outline-none cursor-pointer font-bold">
               <option value="all">ALL STATUS</option>
@@ -507,16 +533,16 @@ const SettlementDashboard = () => {
               <option value="rejected">REJECTED</option>
             </select>
             <span className="text-[10px] font-bold text-[#888] tracking-wider">FROM:</span>
-            <input type="date" value={historyDateFrom} onChange={e => setHistoryDateFrom(e.target.value)}
+            <input type="date" max={historyDateTo || undefined} value={historyDateFrom} onChange={e => setHistoryDateFrom(e.target.value)}
               className="px-2 py-1.5 border border-[#ddd] text-[11px] outline-none" />
             <span className="text-[#aaa] text-xs">to</span>
-            <input type="date" value={historyDateTo} onChange={e => setHistoryDateTo(e.target.value)}
+            <input type="date" min={historyDateFrom || undefined} value={historyDateTo} onChange={e => setHistoryDateTo(e.target.value)}
               className="px-2 py-1.5 border border-[#ddd] text-[11px] outline-none" />
-            {(historyDateFrom || historyDateTo || historyFilter !== 'all') && (
-              <button onClick={() => { setHistoryFilter('all'); setHistoryDateFrom(''); setHistoryDateTo(''); }}
+            {(historyDateFrom || historyDateTo || historyFilter !== 'all' || historySearch || adminFilter) && (
+              <button onClick={() => { setHistoryFilter('all'); setHistoryDateFrom(''); setHistoryDateTo(''); setHistorySearch(''); setAdminFilter(''); }}
                 className="text-[10px] text-[#888] underline cursor-pointer bg-transparent border-none">CLEAR</button>
             )}
-            <span className="text-[10px] text-[#888] ml-auto">{filteredHistory.length} records</span>
+            <span className="text-[10px] text-[#888] ml-auto">{filteredHistory.length} records - latest 500 loaded</span>
           </div>
 
           {/* History Table */}
@@ -545,7 +571,7 @@ const SettlementDashboard = () => {
                         {s.status.toUpperCase()}
                       </span>
                     </td>
-                    <td className="py-2.5 px-2 max-w-[200px] text-[11px] text-[#888] truncate">{s.note || '—'}</td>
+                    <td className="py-2.5 px-2 min-w-[160px] max-w-[300px] whitespace-pre-wrap break-words text-[11px] text-[#888]">{s.note || '—'}</td>
                   </tr>
                 )) : (
                   <tr>
@@ -651,22 +677,22 @@ const SettlementDashboard = () => {
       {/* Settlement Request Modal                                 */}
       {/* ════════════════════════════════════════════════════════ */}
       {showRequestForm && (
-        <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-[3000]" onClick={() => setShowRequestForm(false)}>
-          <div className="bg-white p-6 w-[420px] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center p-4 z-[3000]" onClick={() => setShowRequestForm(false)}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-[420px] max-h-[90dvh] overflow-y-auto flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-[13px] tracking-[2px] m-0 font-bold">TRANSFER TO CASHIER</h3>
+              <h3 className="text-[13px] tracking-[2px] m-0 font-bold">REQUEST SETTLEMENT</h3>
               <button onClick={() => setShowRequestForm(false)} className="bg-transparent border-none text-lg cursor-pointer text-gray-400">×</button>
             </div>
 
             <div className="mb-3 p-3 bg-[#f9f9f9] border border-[#eee]">
               <p className="text-[10px] font-bold text-[#888] tracking-wider">YOUR OUTSTANDING BALANCE</p>
-              <p className="text-xl font-bold m-0 mt-1 text-red-600">৳{(myBalance.outstandingBalance || 0).toLocaleString()}</p>
+              <p className="mt-2 text-xs text-[#888]">Available for a new request: {money(available)} (pending: {money(pendingAmount)})</p><p className="text-xl font-bold m-0 mt-1 text-red-600">৳{(myBalance.outstandingBalance || 0).toLocaleString()}</p>
             </div>
 
             <div className="flex flex-col gap-3">
               <div>
                 <label className="block text-[10px] font-bold tracking-wider text-[#888] mb-1">AMOUNT *</label>
-                <input type="number" value={requestForm.amount}
+                <input type="number" min="0.01" step="0.01" max={available} value={requestForm.amount}
                   onChange={e => setRequestForm({ ...requestForm, amount: e.target.value })}
                   placeholder="Enter amount to transfer"
                   className="w-full p-2.5 border border-[#ddd] text-[13px] outline-none box-border" />
@@ -699,7 +725,7 @@ const SettlementDashboard = () => {
               </div>
             </div>
 
-            <button onClick={submitSettlementRequest} disabled={requesting}
+            <button onClick={() => reviewAction('request', requestForm)} disabled={requesting}
               className="w-full bg-black text-white border-none p-3 cursor-pointer font-bold tracking-wider mt-5 hover:bg-gray-800 transition-colors disabled:opacity-60">
               {requesting ? 'SUBMITTING...' : 'SUBMIT SETTLEMENT REQUEST'}
             </button>
@@ -711,8 +737,8 @@ const SettlementDashboard = () => {
       {/* Direct Settle Modal (Superadmin only)                   */}
       {/* ════════════════════════════════════════════════════════ */}
       {directSettleTarget && (
-        <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-[3000]" onClick={() => setDirectSettleTarget(null)}>
-          <div className="bg-white p-6 w-[440px] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center p-4 z-[3000]" onClick={() => setDirectSettleTarget(null)}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-[440px] max-h-[90dvh] overflow-y-auto flex flex-col" onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className="flex justify-between items-center mb-4">
               <div>
@@ -738,7 +764,7 @@ const SettlementDashboard = () => {
             <div className="flex flex-col gap-3">
               <div>
                 <label className="block text-[10px] font-bold tracking-wider text-[#888] mb-1">AMOUNT TO SETTLE *</label>
-                <input type="number" value={directSettleForm.amount}
+                <input type="number" min="0.01" step="0.01" max={directSettleTarget.outstandingBalance} value={directSettleForm.amount}
                   onChange={e => setDirectSettleForm({ ...directSettleForm, amount: e.target.value })}
                   placeholder="Enter amount"
                   className="w-full p-2.5 border border-[#ddd] text-[13px] outline-none box-border" />
@@ -777,13 +803,15 @@ const SettlementDashboard = () => {
               </p>
             </div>
 
-            <button onClick={submitDirectSettle} disabled={directSettling}
+            <button onClick={() => reviewAction('direct', directSettleForm, directSettleTarget)} disabled={directSettling}
               className="w-full bg-black text-white border-none p-3 cursor-pointer font-bold tracking-wider mt-4 hover:bg-gray-800 transition-colors disabled:opacity-60">
               {directSettling ? 'SETTLING...' : '✅ CONFIRM & SETTLE NOW'}
             </button>
           </div>
         </div>
       )}
+      <Modal open={vaultOpen} title="Transfer from my holding to vault" busy={vaultBusy} onClose={() => setVaultOpen(false)}><form className="space-y-4" onSubmit={e => { e.preventDefault(); reviewAction('vault', vaultForm); }}><p className="rounded-lg bg-[#f5f5f2] p-4 text-sm">My holding: <strong>{money(dashboard?.superadminHolding)}</strong></p><label className="block text-xs">Amount (TK)<input required type="number" min="0.01" step="0.01" max={dashboard?.superadminHolding || 0} className={field + ' mt-2'} value={vaultForm.amount} onChange={e => setVaultForm({ ...vaultForm, amount: e.target.value })} /></label><label className="block text-xs">Note<input className={field + ' mt-2'} value={vaultForm.note} onChange={e => setVaultForm({ ...vaultForm, note: e.target.value })} /></label><p className="text-xs leading-6 text-[#888]">Record this only after moving the funds. It reduces your holding and increases the recorded vault transfers.</p><button disabled={vaultBusy} className={primary}>Review transfer</button></form></Modal>
+      <Modal open={!!review} title="Review money movement" busy={reviewing} onClose={() => setReview(null)}><div className="space-y-4 text-sm"><p className="text-xs leading-6 text-[#888]">{review?.kind === 'request' ? 'Submit a request for superadmin review. Your outstanding balance stays unchanged until confirmed.' : review?.kind === 'vault' ? 'Record funds moving from your holding into the vault.' : 'Confirm that you have received these funds. This immediately reduces the sending admin balance and adds to your holding.'}</p><div className="rounded-lg bg-[#fafaf8] p-4"><p className="mt-0">{review?.target?.adminName || adminData.name}</p><strong className="block text-2xl">{money(review?.form?.amount)}</strong><p className="mb-0 text-xs text-[#888]">{review?.form?.paymentMethod || 'Internal transfer'} {review?.form?.transactionId && ' / ' + review.form.transactionId}</p></div><button disabled={reviewing} className={primary} onClick={performReviewed}>{reviewing ? 'Recording...' : review?.kind === 'request' ? 'Submit request' : 'Confirm recorded movement'}</button></div></Modal>
     </div>
   );
 };

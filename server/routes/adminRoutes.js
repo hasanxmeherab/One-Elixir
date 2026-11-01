@@ -10,8 +10,8 @@ const { validate, adminLoginSchema, adminRegisterSchema } = require('../middlewa
 
 
 
-// ── 1. REGISTER new admin (superadmin only, or first-run if no admins exist)
-router.post('/register', verifyAdmin, validate(adminRegisterSchema), async (req, res) => {
+// Register new staff accounts (superadmin only).
+router.post('/register', verifySuperadmin, validate(adminRegisterSchema), async (req, res) => {
   try {
     // Allow superadmin to set role, default to 'admin'
     const { name, email, password, role } = req.body;

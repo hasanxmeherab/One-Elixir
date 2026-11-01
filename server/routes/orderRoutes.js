@@ -19,6 +19,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 const writeLog = require('../utils/writeLog');
 const { deductFifoBatches, restoreFifoBatches } = require('../utils/fifoBatchDeduct');
+const reverseOrderCollection = require('../utils/reverseOrderCollection');
 
 const escapeRegex = (str) => String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const escapeHtml  = (str) => String(str ?? '')
@@ -308,6 +309,28 @@ router.put('/bulk-update', verifyAdmin, asyncHandler(async (req, res) => {
   if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
     return res.status(400).json({ success: false, message: 'orderIds array required' });
   }
+  // Apply reversals transactionally for bulk edits as well as individual edits.
+  if (paymentStatus && paymentStatus.toLowerCase() !== 'paid') {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const orders = await Order.find({ _id: { $in: orderIds } }).session(session);
+      for (const order of orders) {
+        if (order.paymentStatus?.toLowerCase() === 'paid' || paymentStatus.toLowerCase() === 'unpaid') {
+          await reverseOrderCollection(order, { PaymentLedger, Admin, Settlement, session });
+        }
+        order.paymentStatus = paymentStatus;
+        if (status) order.status = status;
+        await order.save({ session });
+      }
+      await session.commitTransaction();
+      await writeLog(req, 'BULK_UPDATE_ORDER', 'Order', `Updated ${orders.length} orders to ${paymentStatus}; reversed incorrect collections where applicable.`);
+      return res.json({ success: true, message: `${orders.length} orders updated` });
+    } catch (err) {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, message: err.message });
+    } finally { session.endSession(); }
+  }
   const update = {};
   if (status) update.status = status;
   if (paymentStatus) update.paymentStatus = paymentStatus;
@@ -511,26 +534,18 @@ router.put('/:id', verifyAdmin, asyncHandler(async (req, res) => {
           }], { session });
         }
         order.settlementStatus = receiverIsSuperadmin ? 'settled' : 'unsettled';
+        order.amountPaid = Number(order.totalAmount) || 0;
+        order.amountDue = 0;
       } else if (oldPaymentStatus !== 'paid') {
         throw new Error('Use Record partial payment to collect the remaining balance and select its receiver.');
       }
     }
-    // ── Paid → Unpaid reversal: remove ledger entry ──
+    // Reverse incorrect full payments, including legacy unpaid orders whose
+    // collection was retained by the old settled-status check.
     const wasPaid = oldPaymentStatus === 'paid'; // use OLD status captured before field update
     const nowUnpaid = paymentStatus && paymentStatus.toLowerCase() !== 'paid';
-    if (wasPaid && nowUnpaid) {
-      const alreadySettled = ['settled', 'Settled'].includes(order.settlementStatus);
-      if (!alreadySettled) {
-        // Admin still holds the money → remove the collection entry (reduces holding)
-        await PaymentLedger.deleteOne({ orderId: order._id, type: 'collection' }).session(session);
-      }
-      // If already settled: money already moved to superadmin — don't touch the ledger.
-      // The collection+settlement entries balance each other out (outstanding stays 0).
-      // Clear payment tracking fields
-      order.settlementStatus = null;
-      order.paymentReceivedAt = null;
-      order.paymentReceivedBy = undefined;
-      order.markModified('paymentReceivedBy');
+    if ((wasPaid && nowUnpaid) || paymentStatus?.toLowerCase() === 'unpaid') {
+      await reverseOrderCollection(order, { PaymentLedger, Admin, Settlement, session });
     }
 
     const updatedOrder = await order.save({ session });

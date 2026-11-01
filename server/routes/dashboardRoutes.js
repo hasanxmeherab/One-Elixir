@@ -17,7 +17,9 @@ router.get('/', verifyAdmin, async (req, res) => {
   try {
     const superadmin = req.admin.role === 'superadmin';
     const [orders, products, expenses, investors, ledger, settlements, admins, reset] = await Promise.all([
-      Order.find().lean(), Perfume.find({ isDeleted: { $ne: true } }).lean(), superadmin ? Expense.find().lean() : [], superadmin ? Investment.find().lean() : [],
+      Order.find().lean(), Perfume.find({ isDeleted: { $ne: true } }).lean(),
+      superadmin ? Expense.find().lean() : Expense.find().select('amount').lean(),
+      superadmin ? Investment.find().lean() : Investment.find().select('totalAmount').lean(),
       PaymentLedger.find(superadmin ? {} : { adminId: req.admin.id }).lean(),
       Settlement.find({ status: 'pending', ...(superadmin ? {} : { adminId: req.admin.id }) }).lean(),
       superadmin ? Admin.find().select('_id name role').lean() : [], SystemConfig.findOne({ key: 'ledgerResetAt' }).lean(),
