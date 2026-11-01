@@ -433,6 +433,7 @@ router.put('/:id', verifyAdmin, asyncHandler(async (req, res) => {
     const oldStatus = order.status?.toLowerCase();
     const newStatus = status?.toLowerCase();
     const oldPaymentStatus = order.paymentStatus?.toLowerCase(); // capture BEFORE any updates
+    let collectionCorrection;
 
     // ── Handle item changes (stock recalculation) ──────────────
     if (items && JSON.stringify(items) !== JSON.stringify(order.items)) {
@@ -545,7 +546,7 @@ router.put('/:id', verifyAdmin, asyncHandler(async (req, res) => {
     const wasPaid = oldPaymentStatus === 'paid'; // use OLD status captured before field update
     const nowUnpaid = paymentStatus && paymentStatus.toLowerCase() !== 'paid';
     if ((wasPaid && nowUnpaid) || paymentStatus?.toLowerCase() === 'unpaid') {
-      await reverseOrderCollection(order, { PaymentLedger, Admin, Settlement, session });
+      collectionCorrection = await reverseOrderCollection(order, { PaymentLedger, Admin, Settlement, session });
     }
 
     const updatedOrder = await order.save({ session });
@@ -581,6 +582,9 @@ router.put('/:id', verifyAdmin, asyncHandler(async (req, res) => {
       } catch (emailErr) { console.error('Status email failed:', emailErr); }
     }
 
+    if (req.body.correctUnpaidCollection) {
+      return res.json({ order: updatedOrder, collectionCorrection });
+    }
     res.json(updatedOrder);
   } catch (err) {
     await session.abortTransaction();

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import adminAxios from '../../utils/adminAxios';
+import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -37,6 +38,7 @@ const OrderList = () => {
   const [editUploading, setEditUploading] = useState(false);
   const [page, setPage] = useState(1);
   const [viewOrderId, setViewOrderId] = useState(null);
+  const [paymentUpdatingId, setPaymentUpdatingId] = useState(null);
   const viewOrder = orders.find(order => order._id === viewOrderId);
   useEffect(() => {
     setOrderStatusFilter(['Pending', 'Processing', 'Shipped', 'Delivered', 'Canceled'].includes(query.get('status')) ? query.get('status') : 'ALL');
@@ -94,10 +96,9 @@ const OrderList = () => {
       .catch(() => {});
   }, [API_URL]);
 
-  if (!orders) return <div className="p-10 text-center">Loading Order Data...</div>;
-
   // ── Existing handlers (updated for payment receiver) ──
-  const updatePaymentStatus = async (id, paymentStatus, receiverInfo) => {
+  const updatePaymentStatus = async (id, paymentStatus, receiverInfo, correction = false) => {
+    if (paymentUpdatingId) return;
     if (paymentStatus === 'Partial') {
       const order = orders.find(order => order._id === id);
       if (!order) { toast.error('Order not found. Please refresh the order list.'); return; }
@@ -111,15 +112,24 @@ const OrderList = () => {
       setSelectedReceiver(adminData?.id || null);
       return;
     }
+    setPaymentUpdatingId(id);
     try {
       const body = { paymentStatus };
+      if (correction) body.correctUnpaidCollection = true;
       if (paymentStatus === 'Paid' && receiverInfo) {
         body.paymentReceivedBy = receiverInfo;
       }
-      await adminAxios.put(`${API_URL}/api/orders/${id}`, body);
-      fetchData();
+      const response = await adminAxios.put(`${API_URL}/api/orders/${id}`, body);
+      await fetchData();
+      if (correction) {
+        const result = response.data.collectionCorrection;
+        if (result?.entryCount === 0) toast.warning('No leftover collection was found for this order. The holding needs review against other payments or settlements.');
+        else if (result) toast.success(`${Number(result.amount).toLocaleString()} TK of incorrect collection removed. Refresh Settlements.`);
+        else toast.warning('Correction submitted. Deploy the latest backend for the exact correction result, then refresh Settlements.');
+      }
     }
-    catch { toast.error('Failed to update payment status'); }
+    catch (err) { toast.error(err.response?.data?.message || 'Failed to update payment status'); }
+    finally { setPaymentUpdatingId(null); }
   };
 
   const confirmPaymentReceiver = () => {
@@ -763,7 +773,7 @@ const OrderList = () => {
 
       {dueOnly && <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800"><span>Showing orders with a remaining customer balance.</span><button className="cursor-pointer border-0 bg-transparent underline" onClick={() => setDueOnly(false)}>Show all balances</button></div>}
       <OrderTable orders={displayedOrders} selectedIds={selectedIds} allSelected={isPageSelected(selectedIds, displayedOrders)} onSelect={toggleSelect} onSelectAll={toggleSelectAll} onView={setViewOrderId} onEdit={openEditOrder} onReceipt={downloadReceipt} onNotes={setNotesOrder} />
-      <OrderDetailsDrawer order={viewOrder} onClose={() => setViewOrderId(null)} onStatus={updateStatus}
+      <OrderDetailsDrawer order={viewOrder} paymentBusy={paymentUpdatingId === viewOrder?._id} onCorrectUnpaid={id => updatePaymentStatus(id, 'Unpaid', undefined, true)} onClose={() => setViewOrderId(null)} onStatus={updateStatus}
         onPaymentStatus={(id, status) => { if (status === 'Paid') setViewOrderId(null); updatePaymentStatus(id, status); }}
         onAction={(action, order) => {
           setViewOrderId(null);

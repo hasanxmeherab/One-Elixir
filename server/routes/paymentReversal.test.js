@@ -121,3 +121,14 @@ test('Paid, Unpaid, then Paid again creates one fresh collection', async t => {
   assert.equal(f.order.amountPaid, 1000);
   assert.equal(f.order.amountDue, 0);
 });
+
+test('explicit legacy correction reports the exact amount removed and zero on retry', async t => {
+  const f = fixture(t); f.order.paymentStatus = 'Unpaid';
+  const body = { paymentStatus: 'Unpaid', correctUnpaidCollection: true };
+  const first = await f.invoke(body);
+  assert.equal(first.code, 200);
+  assert.deepEqual(first.data.collectionCorrection, { entryCount: 1, amount: 1000 });
+  assert.equal(first.data.order.paymentStatus, 'Unpaid');
+  const second = await f.invoke(body);
+  assert.deepEqual(second.data.collectionCorrection, { entryCount: 0, amount: 0 });
+});

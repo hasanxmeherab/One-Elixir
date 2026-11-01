@@ -47,5 +47,6 @@ async function reverseOrderCollection(order, { PaymentLedger, Admin, Settlement,
   order.settlementStatus = null;
   order.settlementRef = null;
   order.markModified('paymentReceivedBy');
+  return { entryCount: entries.length, amount: Math.round([...amounts.values()].reduce((total, amount) => total + amount, 0) * 100) / 100 };
 }
 module.exports = reverseOrderCollection;

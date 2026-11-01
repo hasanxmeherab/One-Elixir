@@ -678,47 +678,46 @@ router.post('/vault-transfer', verifySuperadmin, asyncHandler(async (req, res) =
 //   Clears PaymentLedger + resets order settlement fields
 // ══════════════════════════════════════════════════════════════
 router.post('/reset-ledger', verifySuperadmin, asyncHandler(async (req, res) => {
-  // Snapshot current revenue BEFORE clearing anything (this becomes the new frozen base)
-  const snapshotAgg = await Order.aggregate([
-    { $match: { status: { $regex: /^delivered$/i }, paymentStatus: { $regex: /^paid$/i } } },
-    { $group: { _id: null, total: { $sum: '$totalAmount' } } }
-  ]);
-  const snapshot = snapshotAgg[0]?.total || 0;
-  await SystemConfig.findOneAndUpdate(
-    { key: 'revenueSnapshot' },
-    { key: 'revenueSnapshot', value: snapshot, updatedAt: new Date() },
-    { upsert: true, new: true }
-  );
-
-  // Delete all PaymentLedger entries
-  const deletedLedger = await PaymentLedger.deleteMany({});
-
-  // Save reset timestamp — syncMissingLedgerEntries will skip all orders before this
-  const now = new Date();
-  await SystemConfig.findOneAndUpdate(
-    { key: 'ledgerResetAt' },
-    { key: 'ledgerResetAt', value: now, updatedAt: now },
-    { upsert: true, new: true }
-  );
-
-  // Reset all orders settlement status (optional UX cleanup)
-  await Order.updateMany(
-    {},
-    {
-      $set: { settlementStatus: null, paymentReceivedAt: null },
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const now = new Date();
+    const snapshotAgg = await Order.aggregate([
+      { $match: { status: { $regex: /^delivered$/i }, paymentStatus: { $regex: /^paid$/i } } },
+      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+    ]).session(session);
+    const snapshot = snapshotAgg[0]?.total || 0;
+    await SystemConfig.findOneAndUpdate(
+      { key: 'revenueSnapshot' },
+      { key: 'revenueSnapshot', value: snapshot, updatedAt: now },
+      { upsert: true, new: true, session }
+    );
+    const deletedLedger = await PaymentLedger.deleteMany({}, { session });
+    // Older receipts must not be restored by settlement reconciliation.
+    await SystemConfig.findOneAndUpdate(
+      { key: 'ledgerResetAt' },
+      { key: 'ledgerResetAt', value: now, updatedAt: now },
+      { upsert: true, new: true, session }
+    );
+    const closedRequests = await Settlement.updateMany(
+      { status: 'pending' },
+      { $set: { status: 'rejected', confirmedAt: now,
+        confirmedBy: { adminId: req.admin.id, adminName: req.admin.name } } },
+      { session }
+    );
+    await Order.updateMany({}, {
+      $set: { settlementStatus: null, settlementRef: null, paymentReceivedAt: null },
       $unset: { 'paymentReceivedBy.adminId': '', 'paymentReceivedBy.adminName': '' }
-    }
-  );
-
-  await writeLog(req, 'RESET_LEDGER', 'PaymentLedger',
-    `${req.admin.name} reset all admin balances to 0. ${deletedLedger.deletedCount} ledger entries cleared. Revenue snapshot saved: ৳${snapshot.toLocaleString()}`);
-
-  res.json({
-    message: `Ledger reset successful. ${deletedLedger.deletedCount} entries cleared. Revenue snapshot: ৳${snapshot.toLocaleString()}. Only new vault transfers will update available money.`,
-    deletedCount: deletedLedger.deletedCount,
-    frozenRevenue: snapshot,
-    resetAt: now
-  });
+    }, { session });
+    await session.commitTransaction();
+    await writeLog(req, 'RESET_LEDGER', 'PaymentLedger',
+      `${req.admin.name} reset settlement balances. ${deletedLedger.deletedCount} ledger entries cleared; ${closedRequests.modifiedCount} pending requests closed. Revenue snapshot: ${snapshot} TK.`);
+    res.json({ message: 'Settlement balances reset successfully.', deletedCount: deletedLedger.deletedCount,
+      closedRequests: closedRequests.modifiedCount, frozenRevenue: snapshot, resetAt: now });
+  } catch (err) {
+    await session.abortTransaction();
+    res.status(500).json({ message: 'Could not reset settlement balances. Please retry.' });
+  } finally { session.endSession(); }
 }));
 
 module.exports = router;

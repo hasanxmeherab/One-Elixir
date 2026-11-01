@@ -1,6 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const Admin = require('../models/Admin');
 const Coupon = require('../models/Coupon');
 const Log = require('../models/Log');
@@ -107,4 +108,50 @@ test('normal-admin balance includes all pending amounts and scopes both aggregat
   assert.equal(String(ledger.mock.calls[0].arguments[0][0].$match.adminId), id);
   assert.equal(String(pending.mock.calls[0].arguments[0][0].$match.adminId), id);
   assert.equal(pending.mock.calls[0].arguments[0][0].$match.status, 'pending');
+});
+
+test('normal admins cannot reset settlements even through a direct API request', async t => {
+  const start = t.mock.method(mongoose, 'startSession', () => { throw new Error('Unexpected reset'); });
+  assert.equal((await invoke(settlementRouter, '/reset-ledger', 'post', 'admin')).code, 403);
+  assert.equal(start.mock.callCount(), 0);
+});
+
+test('superadmin reset clears ledger, closes only pending requests, and preserves order payment status atomically', async t => {
+  const session = { startTransaction() {}, commitTransaction: t.mock.fn(async () => {}), abortTransaction: t.mock.fn(async () => {}), endSession() {} };
+  t.mock.method(mongoose, 'startSession', async () => session);
+  t.mock.method(Order, 'aggregate', () => ({ session: async token => { assert.equal(token, session); return [{ total: 1200 }]; } }));
+  const configs = t.mock.method(SystemConfig, 'findOneAndUpdate', async (_, __, options) => { assert.equal(options.session, session); });
+  t.mock.method(Ledger, 'deleteMany', async (filter, options) => { assert.deepEqual(filter, {}); assert.equal(options.session, session); return { deletedCount: 5 }; });
+  const requests = t.mock.method(Settlement, 'updateMany', async (filter, update, options) => {
+    assert.deepEqual(filter, { status: 'pending' });
+    assert.equal(update.$set.status, 'rejected'); assert.equal(options.session, session);
+    return { modifiedCount: 2 };
+  });
+  t.mock.method(Order, 'updateMany', async (_, update, options) => {
+    assert.equal(options.session, session);
+    assert.equal(update.$set.settlementRef, null);
+    assert.equal(update.$set.paymentStatus, undefined);
+    assert.equal(update.$set.amountPaid, undefined);
+  });
+  t.mock.method(Log, 'create', async () => ({}));
+  const result = await invoke(settlementRouter, '/reset-ledger', 'post');
+  assert.equal(result.code, 200);
+  assert.equal(result.data.deletedCount, 5);
+  assert.equal(result.data.closedRequests, 2);
+  assert.equal(configs.mock.calls[1].arguments[0].key, 'ledgerResetAt');
+  assert.equal(requests.mock.callCount(), 1);
+  assert.equal(session.commitTransaction.mock.callCount(), 1);
+  assert.equal(session.abortTransaction.mock.callCount(), 0);
+});
+
+test('a failed reset aborts the transaction instead of reporting success', async t => {
+  const session = { startTransaction() {}, commitTransaction: t.mock.fn(async () => {}), abortTransaction: t.mock.fn(async () => {}), endSession() {} };
+  t.mock.method(mongoose, 'startSession', async () => session);
+  t.mock.method(Order, 'aggregate', () => ({ session: async () => [] }));
+  t.mock.method(SystemConfig, 'findOneAndUpdate', async () => ({}));
+  t.mock.method(Ledger, 'deleteMany', async () => { throw new Error('Write failed'); });
+  const result = await invoke(settlementRouter, '/reset-ledger', 'post');
+  assert.equal(result.code, 500);
+  assert.equal(session.commitTransaction.mock.callCount(), 0);
+  assert.equal(session.abortTransaction.mock.callCount(), 1);
 });

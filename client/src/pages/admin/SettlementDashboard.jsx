@@ -50,6 +50,8 @@ const SettlementDashboard = () => {
   const [vaultOpen, setVaultOpen] = useState(false);
   const [vaultForm, setVaultForm] = useState({ amount: '', note: '' });
   const [vaultBusy, setVaultBusy] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   // ── Settlement request form ──
   const [showRequestForm, setShowRequestForm] = useState(false);
@@ -107,6 +109,19 @@ const SettlementDashboard = () => {
   }, [isSuperadmin]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const resetSettlements = async () => {
+    if (!isSuperadmin || resetting) return;
+    setResetting(true);
+    try {
+      await adminAxios.post('/api/settlements/reset-ledger');
+      setResetOpen(false);
+      toast.success('Settlement balances reset.');
+      await fetchAll();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not reset settlements.');
+    } finally { setResetting(false); }
+  };
 
   // ── My balance (for normal admin) ──
   const myBalance = useMemo(() => {
@@ -263,7 +278,7 @@ const SettlementDashboard = () => {
   return (
     <div className="mx-auto max-w-[1450px] pb-12 [&_table]:min-w-[760px] [&_th]:text-[#888] [&_input]:rounded-lg [&_select]:rounded-lg [&_button]:rounded-lg [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-[#dc4939]">
       {/* ── Header ── */}
-      <PageHeading eyebrow="FINANCE / SETTLEMENTS" title={isSuperadmin ? 'Keep every handover clear.' : 'Your collections. Your balance.'} description={isSuperadmin ? 'Review incoming settlements and track funds held by staff, yourself, and the vault.' : 'Track what you collected, what was confirmed, and what is awaiting review.'}><button className={button} onClick={fetchAll}>Refresh</button>{isSuperadmin ? <button className={primary} disabled={!dashboard?.superadminHolding} onClick={() => setVaultOpen(true)}>Transfer to vault</button> : <button className={primary} disabled={available <= 0} onClick={() => setShowRequestForm(true)}>Request settlement</button>}</PageHeading>
+      <PageHeading eyebrow="FINANCE / SETTLEMENTS" title={isSuperadmin ? 'Keep every handover clear.' : 'Your collections. Your balance.'} description={isSuperadmin ? 'Review incoming settlements and track funds held by staff, yourself, and the vault.' : 'Track what you collected, what was confirmed, and what is awaiting review.'}><button className={button} onClick={fetchAll}>Refresh</button>{isSuperadmin ? <button className={primary} disabled={!dashboard?.superadminHolding} onClick={() => setVaultOpen(true)}>Transfer to vault</button> : <button className={primary} disabled={available <= 0} onClick={() => setShowRequestForm(true)}>Request settlement</button>}{isSuperadmin && <button className={button + ' border-red-200! text-red-700! hover:bg-red-50!'} disabled={resetting} onClick={() => setResetOpen(true)}>Reset settlements</button>}</PageHeading>
       {isSuperadmin ? <div className="mb-6 rounded-xl border border-[#e7e7e5] bg-[#fafaf8] p-5 text-xs leading-6 text-[#777]">Staff holding, then confirmed receipt into your holding, then explicit vault transfer. These are separate steps; pending requests do not move money.<strong className="mt-2 block text-[#333]">Recorded transfers to vault: {money(dashboard?.vaultBalance)}</strong></div> : <><Stats items={[{ label: 'Outstanding balance', value: money(myBalance.outstandingBalance), note: 'Collections + adjustments - confirmed settlements' }, { label: 'Awaiting review', value: money(pendingAmount), note: 'Included in outstanding until confirmed' }, { label: 'Available to request', value: money(available), note: 'Outstanding less pending requests' }]} /><p className="mb-6 text-xs leading-6 text-[#888]">Submitting a request does not reduce your outstanding balance until a superadmin confirms receipt. Rejected requests release the amount for a new request.</p></>}
 
       {/* ── Tab Bar ── */}
@@ -812,6 +827,7 @@ const SettlementDashboard = () => {
       )}
       <Modal open={vaultOpen} title="Transfer from my holding to vault" busy={vaultBusy} onClose={() => setVaultOpen(false)}><form className="space-y-4" onSubmit={e => { e.preventDefault(); reviewAction('vault', vaultForm); }}><p className="rounded-lg bg-[#f5f5f2] p-4 text-sm">My holding: <strong>{money(dashboard?.superadminHolding)}</strong></p><label className="block text-xs">Amount (TK)<input required type="number" min="0.01" step="0.01" max={dashboard?.superadminHolding || 0} className={field + ' mt-2'} value={vaultForm.amount} onChange={e => setVaultForm({ ...vaultForm, amount: e.target.value })} /></label><label className="block text-xs">Note<input className={field + ' mt-2'} value={vaultForm.note} onChange={e => setVaultForm({ ...vaultForm, note: e.target.value })} /></label><p className="text-xs leading-6 text-[#888]">Record this only after moving the funds. It reduces your holding and increases the recorded vault transfers.</p><button disabled={vaultBusy} className={primary}>Review transfer</button></form></Modal>
       <Modal open={!!review} title="Review money movement" busy={reviewing} onClose={() => setReview(null)}><div className="space-y-4 text-sm"><p className="text-xs leading-6 text-[#888]">{review?.kind === 'request' ? 'Submit a request for superadmin review. Your outstanding balance stays unchanged until confirmed.' : review?.kind === 'vault' ? 'Record funds moving from your holding into the vault.' : 'Confirm that you have received these funds. This immediately reduces the sending admin balance and adds to your holding.'}</p><div className="rounded-lg bg-[#fafaf8] p-4"><p className="mt-0">{review?.target?.adminName || adminData.name}</p><strong className="block text-2xl">{money(review?.form?.amount)}</strong><p className="mb-0 text-xs text-[#888]">{review?.form?.paymentMethod || 'Internal transfer'} {review?.form?.transactionId && ' / ' + review.form.transactionId}</p></div><button disabled={reviewing} className={primary} onClick={performReviewed}>{reviewing ? 'Recording...' : review?.kind === 'request' ? 'Submit request' : 'Confirm recorded movement'}</button></div></Modal>
+      {isSuperadmin && <Modal open={resetOpen} title="Reset all settlement balances?" busy={resetting} onClose={() => setResetOpen(false)}><div className="space-y-5"><p className="m-0 text-sm leading-6 text-[#666]">This resets holding and settlement balances for every admin, including superadmins.</p><ul className="list-disc space-y-2 pl-5 text-sm leading-6 text-[#777]"><li>Collection, settlement, and vault-transfer entries will be cleared.</li><li>Pending settlement requests will be closed.</li><li>Order payment statuses and confirmed settlement history are preserved.</li></ul><p className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs leading-6 text-red-800">This action cannot be undone. Use it only when starting fresh settlement balances.</p><button className={button + ' border-red-600! bg-red-600! text-white! hover:bg-red-700!'} disabled={resetting} onClick={resetSettlements}>{resetting ? 'Resetting settlements...' : 'Confirm reset for all admins'}</button></div></Modal>}
     </div>
   );
 };
