@@ -1,19 +1,22 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import axios from 'axios';
 import adminAxios from '../../utils/adminAxios';
-import { useOutletContext } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 import Select from 'react-select';
 import locationData from '../../data/locationData.json';
-import { ImagePlus } from 'lucide-react';
+import { ImagePlus, Plus, X, UserRound, ShoppingBag, Truck, CreditCard, Tag, Package } from 'lucide-react';
+import { itemUnitPrice, manualOrderTotals } from '../../utils/manualOrderTotals';
+import './ManualOrder.css';
 
 const CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
 
-// Returns today's date in local timezone as YYYY-MM-DD
+// Use the store's timezone for the default order date.
 const getLocalDate = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Dhaka', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const get = type => parts.find(part => part.type === type).value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
 };
 
 const ManualOrder = () => {
@@ -35,10 +38,19 @@ const ManualOrder = () => {
   // ── Payment Receiver (required when Paid) ──
   const [adminList, setAdminList] = useState([]);
   const [selectedReceiver, setSelectedReceiver] = useState(null);
-  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponLoading, setCouponLoading] = useState(false);
   const [totalDiscountType, setTotalDiscountType] = useState('none');
   const [totalDiscountValue, setTotalDiscountValue] = useState(0);
+  const [adminError, setAdminError] = useState(false);
+  const [adminsLoading, setAdminsLoading] = useState(true);
+  const [screenshotPreview, setScreenshotPreview] = useState('');
+  useEffect(() => {
+    if (!onlinePayment.screenshot) { setScreenshotPreview(''); return; }
+    const url = URL.createObjectURL(onlinePayment.screenshot);
+    setScreenshotPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [onlinePayment.screenshot]);
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const isOnlinePayment = ['Bkash', 'Nagad', 'Bank Transfer'].includes(paymentMethod);
@@ -48,7 +60,8 @@ const ManualOrder = () => {
   useEffect(() => {
     adminAxios.get(`${API_URL}/api/admins/list`)
       .then(res => setAdminList(res.data))
-      .catch(() => {});
+      .catch(() => setAdminError(true))
+      .finally(() => setAdminsLoading(false));
   }, [API_URL]);
 
   const shippingCost = useMemo(() => {
@@ -95,38 +108,19 @@ const ManualOrder = () => {
     return perfumeOptions.find(opt => opt.value === key) || null;
   };
 
-  if (!perfumes || perfumes.length === 0)
-    return <div className="p-10 text-center">Loading Perfume Data...</div>;
-
-  const calculateSubtotal = () => selectedItems.reduce((sum, item) => {
-    const opt = getSelectedOption(item);
-    if (!opt) return sum;
-    let itemPrice = opt.price;
-    if (item.discountType === 'percentage') itemPrice -= (itemPrice * item.discountValue) / 100;
-    else if (item.discountType === 'fixed')  itemPrice -= item.discountValue;
-    return sum + (itemPrice * item.quantity);
-  }, 0);
-
-  const subtotal   = calculateSubtotal();
-  const afterCoupon = subtotal - couponDiscount;
-  const totalDiscountAmount = totalDiscountType === 'percentage'
-    ? (afterCoupon * totalDiscountValue) / 100
-    : totalDiscountType === 'fixed' ? totalDiscountValue : 0;
-  const grandTotal = afterCoupon - totalDiscountAmount + shippingCost;
+  const lines = selectedItems.filter(item => getSelectedOption(item)).map(item => ({ ...item, price: getSelectedOption(item).price }));
+  const { productsTotal, itemDiscount, couponDiscount, totalDiscountAmount, grandTotal } = manualOrderTotals(lines, appliedCoupon, totalDiscountType, totalDiscountValue, shippingCost);
 
   const handleApplyCoupon = async () => {
-    if (!couponCode) return;
+    if (!couponCode.trim() || couponLoading) return;
     setCouponLoading(true);
     try {
       const res = await adminAxios.post(`${API_URL}/api/coupons/validate`, { code: couponCode });
-      const discountAmount = res.data.discountType === 'percentage'
-        ? (subtotal * res.data.discountValue) / 100
-        : res.data.discountValue;
-      setCouponDiscount(discountAmount);
-      toast.success(`Coupon applied! ৳${discountAmount.toLocaleString()} TK off.`);
+      setAppliedCoupon({ ...res.data, code: couponCode.trim().toUpperCase() });
+      toast.success('Coupon applied.');
     } catch {
       toast.error('Invalid or expired coupon.');
-      setCouponDiscount(0);
+      setAppliedCoupon(null);
     } finally { setCouponLoading(false); }
   };
 
@@ -142,29 +136,31 @@ const ManualOrder = () => {
   const addMoreItems  = () => setSelectedItems([...selectedItems, { perfumeId: '', variantIdx: null, quantity: 1, discountType: 'none', discountValue: 0 }]);
   const removeItemRow = (index) => { if (selectedItems.length > 1) setSelectedItems(selectedItems.filter((_, i) => i !== index)); };
   const updateItemRow = (index, field, value) => {
-    const updated = [...selectedItems]; updated[index][field] = value; setSelectedItems(updated);
+    setSelectedItems(items => items.map((item, i) => i === index ? { ...item, [field]: value } : item));
   };
 
   const handleOrderSubmit = async (e) => {
     e.preventDefault();
+    if (uploading || couponLoading) return;
+    if (!orderData.customerName.trim() || !orderData.address.trim()) { toast.warning('Enter the customer name and delivery address.'); return; }
+    if (!/^01\d{9}$/.test(orderData.phone)) { toast.warning('Enter an 11-digit phone number starting with 01.'); return; }
     if (!division || !district) { toast.warning('Please select Division and District.'); return; }
-    if (isOnlinePayment && (!onlinePayment.senderNumber || !onlinePayment.transactionId)) {
+    if (isOnlinePayment && (!onlinePayment.senderNumber.trim() || !onlinePayment.transactionId.trim())) {
       toast.warning('Please fill sender number and transaction ID.'); return;
     }
-    if (paymentStatus === 'Paid' && !selectedReceiver) {
+    if (paymentStatus === 'Paid' && !adminList.some(admin => admin._id === selectedReceiver)) {
       toast.warning('Please select which admin received the payment.'); return;
     }
     const adminName = adminData.name || 'System Admin';
     const itemsToOrder = [];
 
     for (const item of selectedItems) {
-      if (!item.perfumeId) continue;
+      if (!item.perfumeId) { toast.warning('Select a fragrance for every row, or remove the empty row.'); return; }
+      if (!Number.isInteger(Number(item.quantity)) || Number(item.quantity) < 1) { toast.warning('Quantities must be positive whole numbers.'); return; }
       const opt = getSelectedOption(item);
       if (!opt || opt.stock < item.quantity) { toast.error(`Insufficient stock for ${opt?.fullName || 'selected item'}`); return; }
-      let finalItemPrice = opt.price;
-      if (item.discountType === 'percentage') finalItemPrice -= (opt.price * item.discountValue) / 100;
-      else if (item.discountType === 'fixed')  finalItemPrice -= item.discountValue;
-      itemsToOrder.push({ perfumeId: item.perfumeId, name: opt.fullName, price: opt.price, quantity: item.quantity, discountType: item.discountType, discountValue: item.discountValue, finalItemPrice });
+      const finalItemPrice = itemUnitPrice(opt.price, item.discountType, item.discountValue);
+      itemsToOrder.push({ perfumeId: item.perfumeId, name: opt.fullName, price: opt.price, quantity: Number(item.quantity), discountType: item.discountType, discountValue: Number(item.discountValue) || 0, finalItemPrice });
     }
 
     try {
@@ -172,7 +168,7 @@ const ManualOrder = () => {
       let screenshotUrl = onlinePayment.screenshotUrl;
       if (isOnlinePayment && onlinePayment.screenshot) {
         try { screenshotUrl = await uploadScreenshot(onlinePayment.screenshot); }
-        catch { console.warn('Screenshot upload failed, continuing without it.'); }
+        catch { throw new Error('Payment screenshot upload failed. Please try again; the order has not been created.'); }
       }
       const authHeader = { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } };
       // Build payment receiver info if Paid
@@ -194,19 +190,12 @@ const ManualOrder = () => {
         ...(isOnlinePayment && { paymentDetails: { platform: paymentMethod, senderNumber: onlinePayment.senderNumber, transactionId: onlinePayment.transactionId, screenshot: screenshotUrl } }),
         ...(paymentReceiverPayload && { paymentReceivedBy: paymentReceiverPayload })
       };
-      console.log('=== Order Submission Debug ===');
-      console.log('Full payload:', JSON.stringify(orderPayload, null, 2));
-      console.log('Items array:', itemsToOrder);
-      console.log('Items count:', itemsToOrder.length);
-      if (itemsToOrder.length > 0) {
-        console.log('First item:', itemsToOrder[0]);
-      }
       await adminAxios.post(`${API_URL}/api/orders/manual`, orderPayload, authHeader);
 
       setOrderData({ customerName: '', phone: '', address: '', orderDate: getLocalDate() });
       setDivision(null); setDistrict(null);
       setSelectedItems([{ perfumeId: '', variantIdx: null, quantity: 1, discountType: 'none', discountValue: 0 }]);
-      setCouponDiscount(0); setCouponCode('');
+      setAppliedCoupon(null); setCouponCode('');
       setTotalDiscountType('none'); setTotalDiscountValue(0);
       setPaymentMethod('Cash on Delivery'); setPaymentStatus('Unpaid');
       setFreeDelivery(false);
@@ -214,20 +203,7 @@ const ManualOrder = () => {
       setSelectedReceiver(null);
       fetchData();
       toast.success('✓ Manual Order Recorded Successfully!');
-    } catch (err) { 
-      console.error('=== Order Submission Error ===');
-      console.error('Full error object:', err);
-      console.error('Response status:', err.response?.status);
-      console.log('🔍 Response data details:');
-      console.log('  - data:', err.response?.data);
-      console.log('  - message:', err.response?.data?.message);
-      console.log('  - errors:', err.response?.data?.errors);
-      console.log('  - full response:', JSON.stringify(err.response?.data, null, 2));
-      
-      if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
-        console.table(err.response.data.errors);
-      }
-      
+    } catch (err) {
       let errorMessage = 'Failed to record order.';
       if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
         errorMessage = err.response.data.errors.join('\n');
@@ -242,266 +218,79 @@ const ManualOrder = () => {
   };
 
   const customSelectStyles = {
-    control: (p) => ({ ...p, padding: '5px', border: '1px solid #ddd', borderRadius: 0, fontSize: '13px', boxShadow: 'none', '&:hover': { border: '1px solid #000' } })
+    control: (base, state) => ({ ...base, minHeight: 43, borderColor: state.isFocused ? '#dc4939' : '#e2e2df', borderRadius: 8, fontSize: 13, boxShadow: state.isFocused ? '0 0 0 3px #dc493914' : 'none' }),
+    menu: base => ({ ...base, zIndex: 30, fontSize: 13 }),
   };
+  const formatMoney = value => `${Number(value).toLocaleString('en-BD', { maximumFractionDigits: 2 })} TK`;
+  const deliveryText = !district ? 'Select a district to calculate delivery' : shippingCost === 0 ? 'Free delivery' : formatMoney(shippingCost);
 
   return (
-    <div className="w-full">
-      <h3 className="tracking-[2px] mb-8 font-bold">CREATE MANUAL ORDER</h3>
-
-      <form onSubmit={handleOrderSubmit} className="flex flex-col gap-4 bg-[#fcfcfc] p-4 sm:p-8 border border-[#eee]">
-
-        {/* ── Customer Info ── */}
-        <div className="flex flex-col sm:flex-row gap-2.5">
-          <input type="text" placeholder="Customer Name" value={orderData.customerName}
-            onChange={e => setOrderData({...orderData, customerName: e.target.value})} required
-            className="flex-1 p-3 border border-[#ddd] outline-none text-[13px]" />
-          <input type="tel" placeholder="Phone Number" value={orderData.phone}
-            inputMode="numeric" maxLength={11}
-            onChange={e => setOrderData({...orderData, phone: e.target.value.replace(/\D/g, '')})} required
-            className="flex-1 p-3 border border-[#ddd] outline-none text-[13px]" />
-        </div>
-
-        {/* ── Order Date ── */}
-        <div className="flex flex-col sm:flex-row gap-2.5">
-          <div className="flex-1 flex flex-col gap-1">
-            <label className="text-[10px] font-bold text-gray-400 tracking-wider">ORDER DATE</label>
-            <input type="date" value={orderData.orderDate}
-              onChange={e => setOrderData({...orderData, orderDate: e.target.value})} required
-              className="p-3 border border-[#ddd] outline-none text-[13px] w-full" />
-          </div>
-          <div className="flex-1" />
-        </div>
-
-        {/* ── Items ── */}
-        <p className="text-[10px] font-bold text-gray-400 tracking-wider mt-2">SELECT ITEMS & DISCOUNTS</p>
-        {selectedItems.map((item, index) => {
-          const currentOption = getSelectedOption(item);
-          let linePrice = currentOption ? currentOption.price : 0;
-          if (item.discountType === 'percentage') linePrice -= (linePrice * item.discountValue) / 100;
-          else if (item.discountType === 'fixed')  linePrice -= item.discountValue;
-          const lineTotal = linePrice * item.quantity;
-          const otherValues = selectedItems.filter((_, i) => i !== index).map(si => si.variantIdx != null ? `${si.perfumeId}__${si.variantIdx}` : si.perfumeId);
-          return (
-            <div key={index} className="border-b border-[#f0f0f0] pb-4 mb-1">
-              <div className="flex flex-wrap gap-2.5 items-center">
-                <div className="flex-[3] min-w-[200px]">
-                  <Select
-                    options={perfumeOptions.filter(opt => !otherValues.includes(opt.value))}
-                    isOptionDisabled={(opt) => opt.stock <= 0}
-                    value={currentOption}
-                    onChange={(opt) => {
-                      const updated = [...selectedItems];
-                      if (opt) {
-                        updated[index] = { ...updated[index], perfumeId: opt.perfumeId, variantIdx: opt.variantIdx };
-                      } else {
-                        updated[index] = { ...updated[index], perfumeId: '', variantIdx: null };
-                      }
-                      setSelectedItems(updated);
-                    }}
-                    placeholder="Search & pick perfume..."
-                    isClearable
-                    styles={customSelectStyles}
-                  />
+    <section className="manual-order">
+      <header className="mo-header"><p className="mo-eyebrow">SALES / MANUAL ORDER</p><h1>A personal order, made simple.</h1><p>Record a phone, Facebook, or in-person order with every detail in one place.</p></header>
+      {perfumes.length === 0 && <div className="mo-empty"><Package size={24} /><div><strong>No products available yet</strong><p>Add products in inventory, or refresh if your product list has not loaded.</p><Link to="/admin/inventory">Open inventory</Link> · <button type="button" onClick={fetchData}>Refresh products</button></div></div>}
+      <form onSubmit={handleOrderSubmit}>
+      <fieldset disabled={uploading} className="mo-workspace">
+        <div className="mo-main">
+          <section className="mo-card"><div className="mo-card-heading"><UserRound size={18} /><div><h2>Customer details</h2><p>Who are we preparing this order for?</p></div><span>01</span></div>
+            <div className="mo-two-columns">
+              <label>Customer name<input required value={orderData.customerName} onChange={e => setOrderData({ ...orderData, customerName: e.target.value })} placeholder="Full name" autoComplete="name" /></label>
+              <label>Phone number<input type="tel" required inputMode="numeric" pattern="01[0-9]{9}" maxLength={11} value={orderData.phone} onChange={e => setOrderData({ ...orderData, phone: e.target.value.replace(/\D/g, '') })} placeholder="01XXXXXXXXX" autoComplete="tel-national" /></label>
+              <label>Order date<input type="date" required value={orderData.orderDate} onChange={e => setOrderData({ ...orderData, orderDate: e.target.value })} /></label>
+            </div>
+          </section>
+          <section className="mo-card"><div className="mo-card-heading"><ShoppingBag size={18} /><div><h2>Products</h2><p>Choose a fragrance and size, then set the quantity.</p></div><span>02</span></div>
+            {selectedItems.map((item, index) => {
+              const option = getSelectedOption(item);
+              const unitPrice = itemUnitPrice(option?.price || 0, item.discountType, item.discountValue);
+              const otherValues = selectedItems.filter((_, i) => i !== index).map(si => si.variantIdx != null ? `${si.perfumeId}__${si.variantIdx}` : si.perfumeId);
+              return <div className="mo-item" key={index}>
+                <div className="mo-item-top"><span>Item {String(index + 1).padStart(2, '0')}</span>{selectedItems.length > 1 && <button type="button" className="mo-remove" onClick={() => removeItemRow(index)} aria-label={`Remove item ${index + 1}`}><X size={15} /> Remove</button>}</div>
+                <div className="mo-item-fields">
+                  <div><label htmlFor={`mo-product-${index}`}>Fragrance & size</label><Select inputId={`mo-product-${index}`} options={perfumeOptions.filter(opt => !otherValues.includes(opt.value))} isOptionDisabled={opt => opt.stock <= 0} value={option} isDisabled={uploading} isClearable styles={customSelectStyles} placeholder="Search fragrances…" onChange={opt => setSelectedItems(items => items.map((row, i) => i === index ? { ...row, perfumeId: opt?.perfumeId || '', variantIdx: opt?.variantIdx ?? null, quantity: 1 } : row))} />{option && <small className={option.stock < item.quantity ? 'mo-error' : ''}>{option.stock} available · {formatMoney(option.price)} each</small>}</div>
+                  <label>Quantity<input type="number" min="1" max={option?.stock || undefined} step="1" required value={item.quantity} onChange={e => updateItemRow(index, 'quantity', e.target.value)} /></label>
+                  <div className="mo-line-total"><span>Line total</span><strong>{formatMoney(unitPrice * (Number(item.quantity) || 0))}</strong></div>
                 </div>
-                <input type="number" placeholder="Qty" min="1" value={item.quantity}
-                  onChange={e => updateItemRow(index, 'quantity', parseInt(e.target.value))} required
-                  className="flex-1 p-3 border border-[#ddd] outline-none text-[13px]" />
-                {selectedItems.length > 1 && (
-                  <button type="button" onClick={() => removeItemRow(index)}
-                    className="text-red-500 border-none bg-transparent cursor-pointer text-xl font-bold">×</button>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2.5 mt-2.5 items-center">
-                <select value={item.discountType} onChange={e => updateItemRow(index, 'discountType', e.target.value)}
-                  className="flex-1 p-3 border border-[#ddd] outline-none text-[13px] bg-[#f9f9f9]">
-                  <option value="none">No Discount</option>
-                  <option value="fixed">Fixed (TK)</option>
-                  <option value="percentage">Percentage (%)</option>
-                </select>
-                <input type="number" placeholder="Disc. Val" disabled={item.discountType === 'none'}
-                  value={item.discountValue || ''} onChange={e => updateItemRow(index, 'discountValue', parseFloat(e.target.value) || 0)}
-                  className="flex-1 p-3 border border-[#ddd] outline-none text-[13px] disabled:opacity-40" />
-                <div className="min-w-[100px] text-right font-bold text-sm">{lineTotal.toLocaleString()} TK</div>
-              </div>
-            </div>
-          );
-        })}
-        <button type="button" onClick={addMoreItems}
-          className="bg-transparent border-none text-black cursor-pointer font-bold text-[11px] underline self-start">
-          + ADD ANOTHER ITEM
-        </button>
-
-        {/* ── Location ── */}
-        <p className="text-[10px] font-bold text-gray-400 tracking-wider mt-2">SHIPPING LOCATION</p>
-        <div className="flex flex-col sm:flex-row gap-2.5">
-          <div className="flex-1">
-            <Select options={locationData.divisions} styles={customSelectStyles} placeholder="Select Division"
-              value={division} onChange={opt => { setDivision(opt); setDistrict(null); }} />
-          </div>
-          <div className="flex-1">
-            <Select options={division ? locationData.districtsByDivision[division.value] : []}
-              styles={customSelectStyles} placeholder="Select District"
-              isDisabled={!division} value={district} onChange={opt => setDistrict(opt)} />
-          </div>
+                <details className="mo-item-discount"><summary>{item.discountType === 'none' ? 'Add item discount' : 'Item discount applied'}</summary><div className="mo-two-columns">
+                  <label>Discount type<select value={item.discountType} onChange={e => { updateItemRow(index, 'discountType', e.target.value); updateItemRow(index, 'discountValue', 0); }}><option value="none">No discount</option><option value="fixed">Fixed (TK per unit)</option><option value="percentage">Percentage (%)</option></select></label>
+                  <label>Discount value<input type="number" min="0" max={item.discountType === 'percentage' ? 100 : option?.price} step="0.01" disabled={item.discountType === 'none'} value={item.discountValue} onChange={e => updateItemRow(index, 'discountValue', e.target.value)} /></label>
+                </div></details>
+              </div>;
+            })}
+            <button type="button" className="mo-secondary" onClick={addMoreItems} disabled={!perfumeOptions.length}><Plus size={15} /> Add another item</button>
+          </section>
+          <section className="mo-card"><div className="mo-card-heading"><Truck size={18} /><div><h2>Delivery</h2><p>Set the destination and confirm the shipping charge.</p></div><span>03</span></div>
+            <div className="mo-two-columns"><div><label htmlFor="mo-division">Division</label><Select inputId="mo-division" options={locationData.divisions} styles={customSelectStyles} value={division} isDisabled={uploading} placeholder="Select division" onChange={opt => { setDivision(opt); setDistrict(null); }} /></div>
+              <div><label htmlFor="mo-district">District / area</label><Select inputId="mo-district" options={division ? locationData.districtsByDivision[division.value] : []} styles={customSelectStyles} value={district} isDisabled={!division || uploading} placeholder="Select district" onChange={setDistrict} /></div></div>
+            <label className="mo-full-field">Delivery address<textarea required rows={2} value={orderData.address} onChange={e => setOrderData({ ...orderData, address: e.target.value })} placeholder="House, road, and area details" autoComplete="street-address" /></label>
+            <div className="mo-delivery-note"><Truck size={16} /><span>{deliveryText}</span></div>
+            <label className="mo-check"><input type="checkbox" checked={freeDelivery} onChange={e => setFreeDelivery(e.target.checked)} /><span>Waive delivery charge<small>Offer free delivery for this order.</small></span></label>
+          </section>
+          <section className="mo-card"><div className="mo-card-heading"><CreditCard size={18} /><div><h2>Payment</h2><p>Record the payment method and collection status.</p></div><span>04</span></div>
+            <div className="mo-two-columns"><label>Payment method<select value={paymentMethod} onChange={e => { setPaymentMethod(e.target.value); setOnlinePayment({ senderNumber: '', transactionId: '', screenshot: null, screenshotUrl: '' }); }}>{['Cash on Delivery', 'Bkash', 'Nagad', 'Bank Transfer'].map(method => <option key={method}>{method}</option>)}</select></label>
+              <label>Payment status<select value={paymentStatus} onChange={e => { setPaymentStatus(e.target.value); setSelectedReceiver(null); }}><option>Unpaid</option><option>Paid</option></select></label></div>
+            {paymentStatus === 'Paid' && <div className="mo-payment-extra"><h3>Who received the payment?</h3>{adminsLoading ? <p>Loading admins…</p> : adminError ? <p className="mo-error">Could not load payment receivers. Refresh the page to try again.</p> : adminList.length === 0 ? <p>No payment receivers available.</p> : <div className="mo-receivers">{adminList.map(admin => <label className="mo-check" key={admin._id}><input type="radio" name="paymentReceiver" required checked={selectedReceiver === admin._id} onChange={() => setSelectedReceiver(admin._id)} /><span>{admin.name}<small>{admin.role === 'superadmin' ? 'Super admin' : 'Admin'}{admin._id === adminData.id ? ' · You' : ''}</small></span></label>)}</div>}</div>}
+            {isOnlinePayment && <div className="mo-payment-extra"><h3>{paymentMethod} transaction</h3><div className="mo-two-columns">
+              <label>Sender {paymentMethod === 'Bank Transfer' ? 'account number' : 'phone number'}<input required inputMode="numeric" maxLength={paymentMethod === 'Bank Transfer' ? 20 : 11} value={onlinePayment.senderNumber} onChange={e => setOnlinePayment({ ...onlinePayment, senderNumber: e.target.value.replace(/\D/g, '') })} /></label>
+              <label>Transaction ID / reference<input required value={onlinePayment.transactionId} onChange={e => setOnlinePayment({ ...onlinePayment, transactionId: e.target.value })} /></label></div>
+              <label className="mo-upload"><ImagePlus size={22} /><span>{onlinePayment.screenshot ? 'Replace payment screenshot' : 'Add payment screenshot'}<small>Optional · JPG, PNG, or WebP</small></span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => setOnlinePayment({ ...onlinePayment, screenshot: e.target.files[0] || null, screenshotUrl: '' })} /></label>
+              {screenshotPreview && <div className="mo-proof"><img src={screenshotPreview} alt="Selected payment proof" /><span>{onlinePayment.screenshot?.name}</span><button type="button" className="mo-remove" onClick={() => setOnlinePayment({ ...onlinePayment, screenshot: null })}>Remove</button></div>}
+            </div>}
+          </section>
+          <details className="mo-card mo-discounts"><summary><Tag size={17} /> Coupons & order discount <span>Optional</span></summary><div className="mo-discount-content">
+            <label htmlFor="mo-coupon">Coupon code</label><div className="mo-coupon"><input id="mo-coupon" value={couponCode} disabled={couponLoading} placeholder="Enter code" onChange={e => { setCouponCode(e.target.value.toUpperCase()); setAppliedCoupon(null); }} /><button type="button" className="mo-secondary" disabled={couponLoading || !couponCode.trim()} onClick={handleApplyCoupon}>{couponLoading ? 'Checking…' : 'Apply'}</button></div>
+            {appliedCoupon && <div className="mo-applied"><span>{appliedCoupon.code} applied · −{formatMoney(couponDiscount)}</span><button type="button" className="mo-remove" onClick={() => { setAppliedCoupon(null); setCouponCode(''); }}>Remove</button></div>}
+            <div className="mo-two-columns"><label>Order discount<select value={totalDiscountType} onChange={e => { setTotalDiscountType(e.target.value); setTotalDiscountValue(0); }}><option value="none">No discount</option><option value="fixed">Fixed (TK)</option><option value="percentage">Percentage (%)</option></select></label><label>Discount value<input type="number" min="0" max={totalDiscountType === 'percentage' ? 100 : undefined} step="0.01" disabled={totalDiscountType === 'none'} value={totalDiscountValue} onChange={e => setTotalDiscountValue(e.target.value)} /></label></div><small>Item discounts apply first, then the coupon, then the order discount. Delivery is added last.</small>
+          </div></details>
         </div>
-        <input type="text" placeholder="House Number, Road, Area Details"
-          value={orderData.address} onChange={e => setOrderData({...orderData, address: e.target.value})} required
-          className="p-3 border border-[#ddd] outline-none text-[13px]" />
-
-        {/* ── Free Delivery Toggle ── */}
-        <div
-          onClick={() => setFreeDelivery(f => !f)}
-          className={`flex items-center gap-3 px-4 py-3.5 border rounded cursor-pointer transition-colors ${freeDelivery ? 'bg-green-50 border-green-300' : 'bg-[#f9f9f9] border-[#eee]'}`}>
-          <div className={`relative w-[42px] h-6 rounded-full transition-colors flex-shrink-0 ${freeDelivery ? 'bg-green-500' : 'bg-gray-300'}`}>
-            <div className={`absolute top-[3px] w-[18px] h-[18px] rounded-full bg-white shadow transition-all ${freeDelivery ? 'left-[21px]' : 'left-[3px]'}`} />
-          </div>
-          <div>
-            <p className="text-[11px] font-bold tracking-wider m-0">FREE DELIVERY</p>
-            <p className="text-[10px] text-gray-400 m-0">
-              {freeDelivery ? '✓ Shipping charge waived' : `Normal charge: ${district ? (district.value === 'Dhaka' || district.value === 'Ashulia (Daffodil Area)' ? '0 (Free)' : '120') : '0–120'} TK`}
-            </p>
-          </div>
-        </div>
-
-        {/* ── Payment ── */}
-        <p className="text-[10px] font-bold text-gray-400 tracking-wider mt-2">PAYMENT DETAILS</p>
-        <div className="flex flex-col sm:flex-row gap-2.5">
-          <select value={paymentMethod}
-            onChange={e => { setPaymentMethod(e.target.value); setOnlinePayment({ senderNumber: '', transactionId: '', screenshot: null, screenshotUrl: '' }); }}
-            className="flex-1 p-3 border border-[#ddd] outline-none text-[13px]">
-            <option value="Cash on Delivery">Cash on Delivery</option>
-            <option value="Bkash">Bkash</option>
-            <option value="Nagad">Nagad</option>
-            <option value="Bank Transfer">Bank Transfer</option>
-          </select>
-          <select value={paymentStatus} onChange={e => { setPaymentStatus(e.target.value); if (e.target.value !== 'Paid') setSelectedReceiver(null); }}
-            className={`flex-1 p-3 border border-[#ddd] outline-none text-[13px] font-bold ${paymentStatus === 'Paid' ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}>
-            <option value="Unpaid">Unpaid</option>
-            <option value="Paid">Paid</option>
-          </select>
-        </div>
-
-        {/* ── Payment Receiver Selection (required when Paid) ── */}
-        {paymentStatus === 'Paid' && (
-          <div className="p-5 bg-[#f9f9f9] border border-[#eee] rounded">
-            <p className="text-[10px] font-bold text-gray-500 tracking-wider mt-0 mb-3">
-              WHO RECEIVED THE PAYMENT? *
-            </p>
-            <div className="flex flex-col gap-1.5 max-h-[250px] overflow-y-auto">
-              {adminList.map(admin => (
-                <label key={admin._id}
-                  className={`flex items-center gap-3 p-3 border cursor-pointer transition-colors ${
-                    selectedReceiver === admin._id
-                      ? 'border-black bg-white'
-                      : 'border-[#eee] hover:border-gray-300 bg-white'
-                  }`}>
-                  <input type="radio" name="paymentReceiver" value={admin._id}
-                    checked={selectedReceiver === admin._id}
-                    onChange={() => setSelectedReceiver(admin._id)}
-                    className="cursor-pointer" />
-                  <div className="flex-1">
-                    <div className="text-[12px] font-bold">
-                      {admin.name}
-                      {admin._id === adminData?.id && (
-                        <span className="ml-2 text-[9px] bg-black text-white px-1.5 py-0.5 rounded-sm">YOU</span>
-                      )}
-                    </div>
-                    <div className="text-[10px] text-gray-400">
-                      {admin.role === 'superadmin' ? '⭐ Super Admin' : 'Admin'}
-                    </div>
-                  </div>
-                </label>
-              ))}
-              {adminList.length === 0 && (
-                <p className="text-[11px] text-[#ccc] text-center py-4">Loading admins...</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── Online Payment Fields ── */}
-        {isOnlinePayment && (
-          <div className="flex flex-col gap-2.5 p-5 bg-[#f9f9f9] border border-[#eee] rounded">
-            <p className="text-[10px] font-bold text-gray-500 tracking-wider mt-0">
-              {paymentMethod.toUpperCase()} PAYMENT DETAILS
-            </p>
-            <input type="tel"
-              placeholder={`Sender ${paymentMethod === 'Bank Transfer' ? 'Account Number' : 'Phone Number'}`}
-              value={onlinePayment.senderNumber} inputMode="numeric"
-              maxLength={paymentMethod === 'Bank Transfer' ? 20 : 11}
-              onChange={e => setOnlinePayment({ ...onlinePayment, senderNumber: e.target.value.replace(/\D/g, '') })}
-              className="p-3 border border-[#ddd] outline-none text-[13px]" />
-            <input type="text" placeholder="Transaction ID (TrxID / Ref No.)"
-              value={onlinePayment.transactionId}
-              onChange={e => setOnlinePayment({ ...onlinePayment, transactionId: e.target.value })}
-              className="p-3 border border-[#ddd] outline-none text-[13px]" />
-            <label className={`flex flex-col items-center justify-center gap-2 p-5 border-2 border-dashed cursor-pointer rounded transition-all ${onlinePayment.screenshot ? 'border-black bg-green-50' : 'border-[#ddd] bg-white'}`}>
-              <ImagePlus size={22} className="text-gray-400" />
-              <span className="text-[11px] font-bold tracking-wider">
-                {onlinePayment.screenshot ? '✓ SCREENSHOT SELECTED' : 'CLICK TO UPLOAD PAYMENT SCREENSHOT'}
-              </span>
-              <span className="text-[10px] text-gray-300">
-                {onlinePayment.screenshot ? onlinePayment.screenshot.name : 'JPG or PNG — proof of payment'}
-              </span>
-              <input type="file" accept="image/*" className="hidden"
-                onChange={e => setOnlinePayment({ ...onlinePayment, screenshot: e.target.files[0], screenshotUrl: '' })} />
-            </label>
-            {onlinePayment.screenshotUrl && !onlinePayment.screenshot && (
-              <div className="flex items-center gap-2.5 text-[11px] text-gray-500">
-                <img src={onlinePayment.screenshotUrl} alt="Payment proof" className="w-15 h-15 object-cover border border-[#eee]" style={{width:60,height:60}} />
-                <span>Payment screenshot uploaded</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Coupon ── */}
-        <p className="text-[10px] font-bold text-gray-400 tracking-wider mt-2">APPLY COUPON (OPTIONAL)</p>
-        <div className="flex flex-col sm:flex-row gap-2.5">
-          <input type="text" placeholder="COUPON CODE" value={couponCode}
-            onChange={e => setCouponCode(e.target.value.toUpperCase())}
-            className="flex-1 p-3 border border-[#ddd] outline-none text-[13px]" />
-          <button type="button" onClick={handleApplyCoupon} disabled={couponLoading || !couponCode}
-            className="px-5 bg-[#444] text-white border-none cursor-pointer text-xs font-bold disabled:opacity-50">
-            {couponLoading ? '...' : 'APPLY'}
-          </button>
-        </div>
-
-        {/* ── Total Discount ── */}
-        <p className="text-[10px] font-bold text-gray-400 tracking-wider mt-2">DISCOUNT ON TOTAL (OPTIONAL)</p>
-        <div className="flex flex-col sm:flex-row gap-2.5">
-          <select value={totalDiscountType} onChange={e => { setTotalDiscountType(e.target.value); if (e.target.value === 'none') setTotalDiscountValue(0); }}
-            className="flex-1 p-3 border border-[#ddd] outline-none text-[13px] bg-[#f9f9f9]">
-            <option value="none">No Discount</option>
-            <option value="fixed">Fixed (TK)</option>
-            <option value="percentage">Percentage (%)</option>
-          </select>
-          <input type="number" placeholder="Discount value" min="0"
-            disabled={totalDiscountType === 'none'}
-            value={totalDiscountValue || ''}
-            onChange={e => setTotalDiscountValue(parseFloat(e.target.value) || 0)}
-            className="flex-1 p-3 border border-[#ddd] outline-none text-[13px] disabled:opacity-40" />
-        </div>
-
-        {/* ── Summary ── */}
-        <div className="mt-5 p-5 bg-black text-white flex justify-between items-center">
-          <div className="flex flex-col gap-1">
-            <span className="text-[11px] opacity-70">SUBTOTAL: {subtotal.toLocaleString()} TK</span>
-            {couponDiscount > 0 && <span className="text-[11px] text-red-400">COUPON: -{couponDiscount.toLocaleString()} TK</span>}
-            {totalDiscountAmount > 0 && <span className="text-[11px] text-red-400">TOTAL DISCOUNT: -{totalDiscountAmount.toLocaleString()} TK</span>}
-            <span className="text-[11px] opacity-70">SHIPPING: {freeDelivery ? '🎁 FREE' : `+${shippingCost} TK`}</span>
-            <span className="text-xs tracking-[2px] mt-1">GRAND TOTAL</span>
-          </div>
-          <span className="text-[22px] font-bold">{grandTotal.toLocaleString()} TK</span>
-        </div>
-
-        <button type="submit" disabled={uploading}
-          className={`p-4 bg-black text-white border-none cursor-pointer font-bold tracking-[2px] mt-2.5 transition-opacity ${uploading ? 'opacity-60' : 'hover:opacity-80'}`}>
-          {uploading ? 'UPLOADING...' : 'CONFIRM ORDER'}
-        </button>
-      </form>
-    </div>
+        <aside className="mo-summary"><div className="mo-summary-heading"><h2>Order summary</h2><span>Manual order</span></div>
+          <div className="mo-summary-items">{lines.length ? selectedItems.map((item, index) => { const opt = getSelectedOption(item); return opt ? <div key={index}><span>{opt.fullName}<small>{item.quantity || 0} × {formatMoney(itemUnitPrice(opt.price, item.discountType, item.discountValue))}</small></span><strong>{formatMoney(itemUnitPrice(opt.price, item.discountType, item.discountValue) * (Number(item.quantity) || 0))}</strong></div> : null; }) : <p>Add a fragrance to start your order.</p>}</div>
+          <dl className="mo-totals"><div><dt>Products</dt><dd>{formatMoney(productsTotal)}</dd></div>{itemDiscount > 0 && <div className="mo-saving"><dt>Item discounts</dt><dd>−{formatMoney(itemDiscount)}</dd></div>}{appliedCoupon && <div className="mo-saving"><dt>Coupon · {appliedCoupon.code}</dt><dd>−{formatMoney(couponDiscount)}</dd></div>}{totalDiscountAmount > 0 && <div className="mo-saving"><dt>Order discount</dt><dd>−{formatMoney(totalDiscountAmount)}</dd></div>}<div><dt>Delivery</dt><dd>{!district ? 'Pending address' : shippingCost === 0 ? 'Free' : formatMoney(shippingCost)}</dd></div></dl>
+          <div className="mo-grand-total"><span>{district ? 'Grand total' : 'Total before delivery'}</span><strong>{formatMoney(grandTotal)}</strong></div>
+          <div className="mo-summary-payment"><span>{paymentMethod}</span><span className={paymentStatus === 'Paid' ? 'mo-paid' : ''}>{paymentStatus}</span></div>
+          <button type="submit" className="mo-primary" disabled={uploading || couponLoading || !lines.length}>{uploading ? 'Creating order…' : 'Create order'}</button><p className="mo-summary-note">Review the details before creating this order. Stock is updated when the order is saved.</p>
+        </aside>
+      </fieldset></form>
+    </section>
   );
 };
 
