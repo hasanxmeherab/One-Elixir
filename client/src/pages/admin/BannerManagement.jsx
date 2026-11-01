@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import adminAxios from '../../utils/adminAxios';
 import { ImagePlus, Save, ChevronDown, ChevronUp, ArrowUpRight, Images, Type, BookOpen, MessageCircle, PanelBottom, Trash2 } from 'lucide-react';
-import './BannerManagement.css';
+
 import { useToast } from '../../context/ToastContext';
 import { Link } from 'react-router-dom';
 
@@ -261,16 +261,16 @@ const BannerManagement = ({ isAdmin }) => {
   ══════════════════════════════════════════════════════ */
   if (isAdmin) {
     return (
-      <div className="banner-manager">
-        <header className="bm-header">
+      <div className="banner-manager [--bm-accent:#dc4939]! max-w-[1440px]! [margin:0_auto]! pb-[64px]! text-[#242424]! [font-family:'Jost',_sans-serif]! [&_h1]:m-[0]! [&_h2]:m-[0]! [&_h3]:m-[0]! [&_[hidden]]:hidden! [&_button:focus-visible]:[outline:2px_solid_#dc4939]! [&_button:focus-visible]:[outline-offset:3px]! [&_a:focus-visible]:[outline:2px_solid_#dc4939]! [&_a:focus-visible]:[outline-offset:3px]!">
+        <header className="bm-header flex! justify-between! items-center! gap-[24px]! mb-[30px]! [&_h1]:[font-size:clamp(26px,_3vw,_38px)]! [&_h1]:leading-[1.2]! [&_h1]:tracking-[-.7px]! [&_>_div_>_p:last-child]:text-[#777]! [&_>_div_>_p:last-child]:text-[14px]! [&_>_div_>_p:last-child]:[margin:12px_0_0]! max-[600px]:items-start! max-[600px]:flex-col! max-[600px]:gap-[18px]! max-[600px]:[&_h1]:text-[28px]!">
           <div>
-            <p className="bm-eyebrow">STOREFRONT / CONTENT</p>
+            <p className="bm-eyebrow text-[#dc4939]! text-[11px]! font-bold! tracking-[2px]! [margin:0_0_10px]!">STOREFRONT / CONTENT</p>
             <h1>Make a great first impression.</h1>
             <p>Manage your homepage images, copy, and the details that tell your story.</p>
           </div>
-          <Link to="/" target="_blank" rel="noopener noreferrer" className="bm-store-link">View storefront <ArrowUpRight size={16} /></Link>
+          <Link to="/" target="_blank" rel="noopener noreferrer" className="bm-store-link inline-flex! items-center! justify-center! gap-[8px]! [padding:11px_16px]! [border:1px_solid_#e3e3e3]! rounded-[9px]! [text-decoration:none]! text-[#333]! text-[13px]! whitespace-nowrap! [&:hover]:bg-[#f8f8f8]!">View storefront <ArrowUpRight size={16} /></Link>
         </header>
-        <nav className="bm-tabs" aria-label="Homepage content sections">
+        <nav className="bm-tabs flex! gap-[6px]! p-[6px]! bg-[#f5f5f4]! [border:1px_solid_#ececea]! rounded-[12px]! mb-[28px]! overflow-x-auto! max-[600px]:mb-[22px]!" aria-label="Homepage content sections">
           {[
             { id: 'images', label: 'Banner images', icon: Images },
             { id: 'hero', label: 'Hero content', icon: Type },
@@ -279,23 +279,23 @@ const BannerManagement = ({ isAdmin }) => {
             { id: 'footer', label: 'Footer', icon: PanelBottom },
           ].map(({ id, label, icon: Icon }) => (
             <button key={id} type="button" aria-current={activeSection === id ? 'page' : undefined}
-              className={activeSection === id ? 'bm-tab bm-tab-active' : 'bm-tab'}
+              className={activeSection === id ? "bm-tab inline-flex! items-center! justify-center! gap-[9px]! [padding:12px_16px]! [flex:1_0_auto]! bg-[transparent]! [border:0]! rounded-[8px]! text-[#717171]! [font:inherit]! text-[13px]! cursor-pointer! [transition:background_.2s,_color_.2s]! [&:hover]:text-[#222]! [&:hover]:bg-[#ececea]! [&.bm-tab-active]:bg-[#fff]! [&.bm-tab-active]:text-[#242424]! [&.bm-tab-active]:[box-shadow:0_1px_5px_#0000000d]! [&.bm-tab-active]:font-semibold! [&.bm-tab-active:hover]:bg-[#fff]! [&.bm-tab-active:hover]:text-[#242424]! [&.bm-tab-active:hover]:[box-shadow:0_1px_5px_#0000000d]! [&.bm-tab-active:hover]:font-semibold! [&.bm-tab-active_svg]:text-[#dc4939]! [&_>_span]:rounded-[5px]! [&_>_span]:[padding:1px_6px]! [&_>_span]:bg-[#f0eeeb]! [&_>_span]:text-[11px]! max-[600px]:[padding:10px_12px]! bm-tab-active" : "bm-tab inline-flex! items-center! justify-center! gap-[9px]! [padding:12px_16px]! [flex:1_0_auto]! bg-[transparent]! [border:0]! rounded-[8px]! text-[#717171]! [font:inherit]! text-[13px]! cursor-pointer! [transition:background_.2s,_color_.2s]! [&:hover]:text-[#222]! [&:hover]:bg-[#ececea]! [&.bm-tab-active]:bg-[#fff]! [&.bm-tab-active]:text-[#242424]! [&.bm-tab-active]:[box-shadow:0_1px_5px_#0000000d]! [&.bm-tab-active]:font-semibold! [&.bm-tab-active:hover]:bg-[#fff]! [&.bm-tab-active:hover]:text-[#242424]! [&.bm-tab-active:hover]:[box-shadow:0_1px_5px_#0000000d]! [&.bm-tab-active:hover]:font-semibold! [&.bm-tab-active_svg]:text-[#dc4939]! [&_>_span]:rounded-[5px]! [&_>_span]:[padding:1px_6px]! [&_>_span]:bg-[#f0eeeb]! [&_>_span]:text-[11px]! max-[600px]:[padding:10px_12px]!"}
               onClick={() => {
                 setActiveSection(id);
                 setHeroOpen(true); setStoryOpen(true); setContactOpen(true); setFooterOpen(true);
               }}><Icon size={17} />{label}{id === 'images' && <span>{banners.length}</span>}</button>
           ))}
         </nav>
-        <div className="bm-workspace">
-        <div className="bm-editor">
+        <div className="bm-workspace grid! [grid-template-columns:minmax(0,_1.6fr)_minmax(260px,_1fr)]! [align-items:start]! gap-[28px]! max-[1100px]:[grid-template-columns:minmax(0,_1fr)]!">
+        <div className="bm-editor min-w-[0]!">
 
         {/* ── Section 1: Background Banner Images ── */}
         <div className="bm-image-section" hidden={activeSection !== 'images'}>
-          <div className="bm-section-heading"><h2>Banner images</h2><p>Your published images rotate automatically on the homepage.</p></div>
+          <div className="bm-section-heading mb-[20px]! [&_h2]:[font:600_19px_'Jost',_sans-serif]! [&_p]:[margin:5px_0_0]! [&_p]:text-[13px]! [&_p]:text-[#777]!"><h2>Banner images</h2><p>Your published images rotate automatically on the homepage.</p></div>
 
-          <form onSubmit={handleBannerSubmit} className="bm-upload-form">
-            <label className="bm-upload-zone">
-              {bannerForm.imageUrl && <img src={bannerForm.imageUrl} alt="New banner ready to publish" className="bm-upload-preview" />}
+          <form onSubmit={handleBannerSubmit} className="bm-upload-form flex! flex-col! items-stretch! gap-[14px]! p-[20px]! bg-[#fff]! [border:1px_solid_#e7e7e5]! rounded-[14px]! max-[600px]:p-[14px]!">
+            <label className="bm-upload-zone relative! flex! flex-col! items-center! justify-center! text-center! gap-[10px]! [padding:32px_18px]! min-h-[200px]! [border:1.5px_dashed_#d6d2ce]! rounded-[10px]! bg-[#faf9f7]! cursor-pointer! [transition:border-color_.2s,_background_.2s]! [&:hover]:[border-color:#dc4939]! [&:hover]:bg-[#fff6f3]! [&:focus-within]:[border-color:#dc4939]! [&:focus-within]:bg-[#fff6f3]!">
+              {bannerForm.imageUrl && <img src={bannerForm.imageUrl} alt="New banner ready to publish" className="bm-upload-preview w-[100%]! max-h-[180px]! object-cover! rounded-[6px]!" />}
               <ImagePlus size={22} className="text-[#888]" />
               <span className="text-xs font-bold tracking-wider text-black">
                 {uploading ? 'UPLOADING…' : bannerForm.imageUrl ? 'IMAGE READY' : 'CLICK TO UPLOAD HERO IMAGE'}
@@ -303,42 +303,42 @@ const BannerManagement = ({ isAdmin }) => {
               <span className="text-[10px] text-[#aaa] text-center">
                 {uploading ? 'Please wait…' : bannerForm.imageUrl ? '✓ Uploaded' : 'JPG, PNG, WEBP — recommended 1920×900px (full-screen hero)'}
               </span>
-              <input type="file" onChange={handleFileUpload} accept="image/*" disabled={uploading || publishing} aria-label="Upload banner image" className="bm-file-input" />
+              <input type="file" onChange={handleFileUpload} accept="image/*" disabled={uploading || publishing} aria-label="Upload banner image" className="bm-file-input absolute! [inset:0]! w-[100%]! h-[100%]! opacity-[0]! cursor-pointer! [&:disabled]:cursor-wait!" />
             </label>
 
             <button
               type="submit" disabled={uploading || publishing || !bannerForm.imageUrl}
-              className="bm-primary"
+              className="bm-primary inline-flex! items-center! justify-center! gap-[9px]! [border:none]! rounded-[8px]! [padding:13px_18px]! bg-[#222]! text-[white]! [font:600_13px_'Jost',_sans-serif]! cursor-pointer! [&:hover]:bg-[#3a3a3a]! [&:disabled]:bg-[#eae9e7]! [&:disabled]:text-[#93918e]! [&:disabled]:cursor-not-allowed!"
             >
               <ImagePlus size={16} /> {publishing ? 'Publishing…' : 'Publish banner'}
             </button>
           </form>
 
           {/* Existing banners */}
-          <div className="bm-library-heading"><h3>Published banners</h3><span>{banners.length} {banners.length === 1 ? 'image' : 'images'}</span></div>
-          <div className="bm-banner-grid">
+          <div className="bm-library-heading flex! items-center! justify-between! [margin:26px_0_13px]! [&_h3]:[font:600_14px_'Jost',_sans-serif]! [&_>_span]:text-[12px]! [&_>_span]:text-[#888]!"><h3>Published banners</h3><span>{banners.length} {banners.length === 1 ? 'image' : 'images'}</span></div>
+          <div className="bm-banner-grid grid! [grid-template-columns:repeat(2,_minmax(0,_1fr))]! gap-[14px]! max-[600px]:[grid-template-columns:minmax(0,_1fr)]!">
             {banners.map((b, index) => (
-              <div key={b._id} className="bm-banner-card">
+              <div key={b._id} className="bm-banner-card [border:1px_solid_#e7e7e5]! rounded-[10px]! overflow-hidden! [&_>_img]:block! [&_>_img]:w-[100%]! [&_>_img]:[aspect-ratio:16_/_8]! [&_>_img]:object-cover!">
                 <img src={b.imageUrl} alt={`Published banner ${index + 1}`} />
-                <div className="bm-banner-meta"><span>Banner {String(index + 1).padStart(2, '0')}</span>
+                <div className="bm-banner-meta flex! justify-between! items-center! p-[12px]! gap-[8px]! text-[12px]!"><span>Banner {String(index + 1).padStart(2, '0')}</span>
                 <button onClick={() => deleteBanner(b._id)}
-                  className="bm-remove" aria-label={`Remove banner ${index + 1}`}>
+                  className="bm-remove inline-flex! items-center! gap-[5px]! p-[4px]! [border:0]! bg-[transparent]! text-[#bf4538]! cursor-pointer! [font:inherit]! [&:hover]:text-[#88261e]!" aria-label={`Remove banner ${index + 1}`}>
                   <Trash2 size={14} /> Remove
                 </button></div>
               </div>
             ))}
           </div>
-          {banners.length === 0 && <div className="bm-empty"><Images size={26} /><h3>No banners yet</h3><p>Upload your first image above. Until then, the homepage uses its default background.</p></div>}
+          {banners.length === 0 && <div className="bm-empty flex! flex-col! items-center! gap-[10px]! [padding:28px_20px]! [border:1px_solid_#e9e9e7]! rounded-[10px]! text-center! text-[#888]! [&_h3]:[font:600_14px_'Jost',_sans-serif]! [&_h3]:text-[#555]! [&_p]:text-[13px]! [&_p]:max-w-[320px]! [&_p]:m-[0]!"><Images size={26} /><h3>No banners yet</h3><p>Upload your first image above. Until then, the homepage uses its default background.</p></div>}
         </div>
 
         {/* ── Section 2: Hero Text Content ── */}
-        <div hidden={activeSection !== 'hero'} className="bm-settings-card">
+        <div hidden={activeSection !== 'hero'} className="bm-settings-card [border:1px_solid_#e7e7e5]! rounded-[14px]! overflow-hidden! bg-[#fff]! [&_label]:text-[11px]! [&_label]:tracking-[.6px]! [&_label]:leading-[1.6]! [&_input:not([type='file'])]:[border-color:#e2e2df]! [&_input:not([type='file'])]:rounded-[8px]! [&_input:not([type='file'])]:[padding:12px_14px]! [&_input:not([type='file'])]:text-[#333]! [&_input:not([type='file'])]:text-[14px]! [&_input:not([type='file'])]:tracking-[normal]! [&_textarea]:[border-color:#e2e2df]! [&_textarea]:rounded-[8px]! [&_textarea]:[padding:12px_14px]! [&_textarea]:text-[#333]! [&_textarea]:text-[14px]! [&_textarea]:tracking-[normal]! [&_input:focus]:[border-color:#dc4939]! [&_input:focus]:[box-shadow:0_0_0_3px_#dc493914]! [&_textarea:focus]:[border-color:#dc4939]! [&_textarea:focus]:[box-shadow:0_0_0_3px_#dc493914]! [&_button:has(>_svg):not(:first-child)]:rounded-[8px]! max-[600px]:[&_>_div]:p-[18px]!">
           {/* Accordion header */}
           <button
             onClick={() => setHeroOpen(o => !o)}
             className="w-full flex items-center justify-between p-5 bg-white border-none cursor-pointer text-left"
           >
-            <span className="bm-panel-title">Hero content</span>
+            <span className="bm-panel-title text-[17px]! font-semibold! text-[#333]!">Hero content</span>
             {heroOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
           </button>
 
@@ -435,13 +435,13 @@ const BannerManagement = ({ isAdmin }) => {
         </div>
 
         {/* ── Section 3: Story Section ── */}
-        <div hidden={activeSection !== 'story'} className="bm-settings-card">
+        <div hidden={activeSection !== 'story'} className="bm-settings-card [border:1px_solid_#e7e7e5]! rounded-[14px]! overflow-hidden! bg-[#fff]! [&_label]:text-[11px]! [&_label]:tracking-[.6px]! [&_label]:leading-[1.6]! [&_input:not([type='file'])]:[border-color:#e2e2df]! [&_input:not([type='file'])]:rounded-[8px]! [&_input:not([type='file'])]:[padding:12px_14px]! [&_input:not([type='file'])]:text-[#333]! [&_input:not([type='file'])]:text-[14px]! [&_input:not([type='file'])]:tracking-[normal]! [&_textarea]:[border-color:#e2e2df]! [&_textarea]:rounded-[8px]! [&_textarea]:[padding:12px_14px]! [&_textarea]:text-[#333]! [&_textarea]:text-[14px]! [&_textarea]:tracking-[normal]! [&_input:focus]:[border-color:#dc4939]! [&_input:focus]:[box-shadow:0_0_0_3px_#dc493914]! [&_textarea:focus]:[border-color:#dc4939]! [&_textarea:focus]:[box-shadow:0_0_0_3px_#dc493914]! [&_button:has(>_svg):not(:first-child)]:rounded-[8px]! max-[600px]:[&_>_div]:p-[18px]!">
           {/* Accordion header */}
           <button
             onClick={() => setStoryOpen(o => !o)}
             className="w-full flex items-center justify-between p-5 bg-white border-none cursor-pointer text-left"
           >
-            <span className="bm-panel-title">Our story · Crafted with Purpose</span>
+            <span className="bm-panel-title text-[17px]! font-semibold! text-[#333]!">Our story · Crafted with Purpose</span>
             {storyOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
           </button>
 
@@ -530,12 +530,12 @@ const BannerManagement = ({ isAdmin }) => {
         </div>
 
         {/* ── Section 4: Connect With Us ── */}
-        <div hidden={activeSection !== 'contact'} className="bm-settings-card">
+        <div hidden={activeSection !== 'contact'} className="bm-settings-card [border:1px_solid_#e7e7e5]! rounded-[14px]! overflow-hidden! bg-[#fff]! [&_label]:text-[11px]! [&_label]:tracking-[.6px]! [&_label]:leading-[1.6]! [&_input:not([type='file'])]:[border-color:#e2e2df]! [&_input:not([type='file'])]:rounded-[8px]! [&_input:not([type='file'])]:[padding:12px_14px]! [&_input:not([type='file'])]:text-[#333]! [&_input:not([type='file'])]:text-[14px]! [&_input:not([type='file'])]:tracking-[normal]! [&_textarea]:[border-color:#e2e2df]! [&_textarea]:rounded-[8px]! [&_textarea]:[padding:12px_14px]! [&_textarea]:text-[#333]! [&_textarea]:text-[14px]! [&_textarea]:tracking-[normal]! [&_input:focus]:[border-color:#dc4939]! [&_input:focus]:[box-shadow:0_0_0_3px_#dc493914]! [&_textarea:focus]:[border-color:#dc4939]! [&_textarea:focus]:[box-shadow:0_0_0_3px_#dc493914]! [&_button:has(>_svg):not(:first-child)]:rounded-[8px]! max-[600px]:[&_>_div]:p-[18px]!">
           <button
             onClick={() => setContactOpen(o => !o)}
             className="w-full flex items-center justify-between p-5 bg-white border-none cursor-pointer text-left"
           >
-            <span className="bm-panel-title">Connect with us</span>
+            <span className="bm-panel-title text-[17px]! font-semibold! text-[#333]!">Connect with us</span>
             {contactOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
           </button>
 
@@ -654,12 +654,12 @@ const BannerManagement = ({ isAdmin }) => {
         </div>
 
         {/* ── Section 5: Footer ── */}
-        <div hidden={activeSection !== 'footer'} className="bm-settings-card">
+        <div hidden={activeSection !== 'footer'} className="bm-settings-card [border:1px_solid_#e7e7e5]! rounded-[14px]! overflow-hidden! bg-[#fff]! [&_label]:text-[11px]! [&_label]:tracking-[.6px]! [&_label]:leading-[1.6]! [&_input:not([type='file'])]:[border-color:#e2e2df]! [&_input:not([type='file'])]:rounded-[8px]! [&_input:not([type='file'])]:[padding:12px_14px]! [&_input:not([type='file'])]:text-[#333]! [&_input:not([type='file'])]:text-[14px]! [&_input:not([type='file'])]:tracking-[normal]! [&_textarea]:[border-color:#e2e2df]! [&_textarea]:rounded-[8px]! [&_textarea]:[padding:12px_14px]! [&_textarea]:text-[#333]! [&_textarea]:text-[14px]! [&_textarea]:tracking-[normal]! [&_input:focus]:[border-color:#dc4939]! [&_input:focus]:[box-shadow:0_0_0_3px_#dc493914]! [&_textarea:focus]:[border-color:#dc4939]! [&_textarea:focus]:[box-shadow:0_0_0_3px_#dc493914]! [&_button:has(>_svg):not(:first-child)]:rounded-[8px]! max-[600px]:[&_>_div]:p-[18px]!">
           <button
             onClick={() => setFooterOpen(o => !o)}
             className="w-full flex items-center justify-between p-5 bg-white border-none cursor-pointer text-left"
           >
-            <span className="bm-panel-title">Storefront footer</span>
+            <span className="bm-panel-title text-[17px]! font-semibold! text-[#333]!">Storefront footer</span>
             {footerOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
           </button>
 
@@ -722,62 +722,62 @@ const BannerManagement = ({ isAdmin }) => {
         </div>
 
         </div>
-        <aside className="bm-preview-column">
-          <div className="bm-preview-heading"><span>{({ images: 'Banner & hero', hero: 'Banner & hero', story: 'Our story', contact: 'Contact', footer: 'Footer' })[activeSection]} preview</span><span className="bm-draft-badge">Draft</span></div>
+        <aside className="bm-preview-column min-w-[0]! p-[18px]! bg-[#f6f6f4]! [border:1px_solid_#eaeae7]! rounded-[14px]! max-[1100px]:max-w-[600px]!">
+          <div className="bm-preview-heading flex! items-center! justify-between! gap-[10px]! mb-[15px]! text-[13px]! font-semibold!"><span>{({ images: 'Banner & hero', hero: 'Banner & hero', story: 'Our story', contact: 'Contact', footer: 'Footer' })[activeSection]} preview</span><span className="bm-draft-badge bg-[#fff]! [border:1px_solid_#e5e2de]! rounded-[5px]! text-[#888]! [padding:3px_8px]! text-[10px]! font-medium!">Draft</span></div>
           {(activeSection === 'images' || activeSection === 'hero') && <>
-          <div className="bm-hero-preview" style={{ backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.28), rgba(0,0,0,.8)), url("${bannerForm.imageUrl || banners[0]?.imageUrl || '/hero-bg.jpg'}")` }}>
-            <span className="bm-preview-brand">{hero.brandLine}</span>
+          <div className="bm-hero-preview flex! flex-col! items-center! justify-center! gap-[16px]! [padding:40px_20px]! min-h-[330px]! rounded-[9px]! [background-color:#191718]! [background-size:cover]! [background-position:center]! text-center! [overflow-wrap:anywhere]! text-[white]! [&_h2]:[font-family:'Playfair_Display',_serif]! [&_h2]:[font-size:clamp(26px,_2.6vw,_38px)]! [&_h2]:leading-[1.15]! [&_h2_em]:text-[#f17965]! [&_h2_em]:[font-style:normal]! [&_p]:text-[12px]! [&_p]:text-[#ece6e1]! [&_p]:[font-style:italic]! [&_p]:m-[0]! [&_.bm-preview-description]:text-[11px]! [&_.bm-preview-description]:[font-style:normal]! [&_.bm-preview-description]:leading-[1.7]!" style={{ backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.28), rgba(0,0,0,.8)), url("${bannerForm.imageUrl || banners[0]?.imageUrl || '/hero-bg.jpg'}")` }}>
+            <span className="bm-preview-brand text-[9px]! tracking-[3px]! text-[#ffb6a9]!">{hero.brandLine}</span>
             <h2>{hero.headline1}<br /><em>{hero.headline2}</em></h2>
             <p>{hero.tagline}</p>
             {hero.description && <p className="bm-preview-description">{hero.description}</p>}
-            <span className="bm-preview-cta">{hero.ctaText}</span>
-            <div className="bm-preview-features">{hero.features.map((feature, index) => <div key={index}><strong>{feature.title}</strong><span>{feature.subtitle}</span></div>)}</div>
+            <span className="bm-preview-cta [border:1px_solid_#ffffff80]! rounded-[3px]! [padding:10px_15px]! text-[9px]! tracking-[1.4px]!">{hero.ctaText}</span>
+            <div className="bm-preview-features grid! [grid-template-columns:repeat(2,_minmax(0,_1fr))]! gap-[8px]! w-[100%]! [&_>_div]:flex! [&_>_div]:flex-col! [&_>_div]:gap-[5px]! [&_>_div]:[padding:12px_8px]! [&_>_div]:[border:1px_solid_#ffffff25]! [&_>_div]:rounded-[6px]! [&_>_div]:bg-[#00000030]! [&_>_div]:text-[10px]! [&_span]:text-[#ffffffa6]! [&_span]:text-[9px]! [&_span]:leading-[1.5]!">{hero.features.map((feature, index) => <div key={index}><strong>{feature.title}</strong><span>{feature.subtitle}</span></div>)}</div>
           </div>
-          <div className="bm-tip"><ImagePlus size={18} /><div><h3>A little room goes a long way</h3><p>Use a wide image, ideally 1920 × 900 px. Keep the center uncluttered so your headline stays readable on every screen.</p></div></div>
+          <div className="bm-tip flex! items-start! gap-[10px]! [border-top:1px_solid_#e2e2de]! pt-[18px]! mt-[18px]! [&_>_svg]:[flex-shrink:0]! [&_>_svg]:text-[#dc4939]! [&_>_svg]:mt-[2px]! [&_h3]:[font:600_13px_'Jost',_sans-serif]! [&_p]:text-[#888]! [&_p]:text-[12px]! [&_p]:leading-[1.7]! [&_p]:[margin:6px_0_0]!"><ImagePlus size={18} /><div><h3>A little room goes a long way</h3><p>Use a wide image, ideally 1920 × 900 px. Keep the center uncluttered so your headline stays readable on every screen.</p></div></div>
           </>}
-          {activeSection === 'story' && <div className="bm-section-preview bm-story-preview">
-            <span className="bm-section-label">{hero.storyLabel}</span>
+          {activeSection === 'story' && <div className="bm-section-preview [padding:26px_20px]! rounded-[9px]! bg-[#000]! text-[#fff]! [overflow-wrap:anywhere]! [&_h2]:[font:600_26px/1.25_'Playfair_Display',_serif]! [&_h2]:[margin:0_0_16px]! [&_>_p]:text-[#b8b8c8]! [&_>_p]:text-[12px]! [&_>_p]:leading-[1.8]! [&_>_p]:[margin:0_0_14px]! [&_>_p]:whitespace-pre-line! [&_.bm-preview-empty-note]:[margin:14px_0_0]! [&_.bm-preview-empty-note]:text-[11px]! [&_.bm-preview-empty-note]:text-[#aaa]! [&.bm-contact-preview]:bg-[#111219]! [&.bm-contact-preview]:[border:1px_solid_#ffffff0d]! [&.bm-footer-preview]:flex! [&.bm-footer-preview]:flex-col! [&.bm-footer-preview]:items-center! [&.bm-footer-preview]:gap-[24px]! [&.bm-footer-preview]:[padding:36px_20px_24px]! [&.bm-footer-preview]:text-center! [&.bm-footer-preview_>_p]:text-[#ffffff8c]! [&.bm-footer-preview_>_p]:m-[0]! bm-story-preview">
+            <span className="bm-section-label block! mb-[12px]! text-[#f04a3a]! text-[9px]! font-semibold! tracking-[1.8px]!">{hero.storyLabel}</span>
             <h2>{hero.storyHeading}</h2>
             <p>{hero.storyPara1}</p>
             <p>{hero.storyPara2}</p>
-            <div className="bm-story-images">
+            <div className="bm-story-images grid! [grid-template-columns:repeat(2,_minmax(0,_1fr))]! gap-[9px]! mt-[20px]! [&_>_:first-child]:[grid-column:1_/_-1]! [&_img]:w-[100%]! [&_img]:h-[100px]! [&_img]:object-cover! [&_img]:rounded-[6px]! [&_img:first-child]:h-[160px]!">
               {[
                 { key: 'storyImageRight', label: 'Product photo' },
                 { key: 'storyImageLeft', label: 'Ingredient photo' },
                 { key: 'storyImageBot', label: 'Floral photo' },
               ].map(({ key, label }) => hero[key]
                 ? <img key={key} src={hero[key]} alt={label} />
-                : <div key={key} className="bm-preview-placeholder"><ImagePlus size={20} /><span>{label}</span></div>)}
+                : <div key={key} className="bm-preview-placeholder flex! flex-col! items-center! justify-center! gap-[8px]! min-h-[95px]! [border:1px_dashed_#ffffff30]! rounded-[6px]! text-[#777]! text-[10px]!"><ImagePlus size={20} /><span>{label}</span></div>)}
             </div>
             {!hero.storyImageRight && !hero.storyImageLeft && !hero.storyImageBot && <p className="bm-preview-empty-note">Add a story image to make this section visible on the homepage.</p>}
           </div>}
-          {activeSection === 'contact' && <div className="bm-section-preview bm-contact-preview">
-            <span className="bm-section-label">{hero.contactLabel}</span>
+          {activeSection === 'contact' && <div className="bm-section-preview [padding:26px_20px]! rounded-[9px]! bg-[#000]! text-[#fff]! [overflow-wrap:anywhere]! [&_h2]:[font:600_26px/1.25_'Playfair_Display',_serif]! [&_h2]:[margin:0_0_16px]! [&_>_p]:text-[#b8b8c8]! [&_>_p]:text-[12px]! [&_>_p]:leading-[1.8]! [&_>_p]:[margin:0_0_14px]! [&_>_p]:whitespace-pre-line! [&_.bm-preview-empty-note]:[margin:14px_0_0]! [&_.bm-preview-empty-note]:text-[11px]! [&_.bm-preview-empty-note]:text-[#aaa]! [&.bm-contact-preview]:bg-[#111219]! [&.bm-contact-preview]:[border:1px_solid_#ffffff0d]! [&.bm-footer-preview]:flex! [&.bm-footer-preview]:flex-col! [&.bm-footer-preview]:items-center! [&.bm-footer-preview]:gap-[24px]! [&.bm-footer-preview]:[padding:36px_20px_24px]! [&.bm-footer-preview]:text-center! [&.bm-footer-preview_>_p]:text-[#ffffff8c]! [&.bm-footer-preview_>_p]:m-[0]! bm-contact-preview">
+            <span className="bm-section-label block! mb-[12px]! text-[#f04a3a]! text-[9px]! font-semibold! tracking-[1.8px]!">{hero.contactLabel}</span>
             <h2>{hero.contactHeading}</h2>
             <p>{hero.contactDesc}</p>
-            <div className="bm-contact-details">
+            <div className="bm-contact-details flex! flex-col! gap-[10px]! text-[#b8b8c8]! text-[11px]! [padding:6px_0_22px]! [&_small]:text-[10px]! [&_small]:text-[#8c8c9e]!">
               <span>Official page: {hero.contactStoreText || 'Your official page'}</span>
               {hero.contactStoreUrl && <small>{hero.contactStoreUrl}</small>}
               <span>{hero.contactLocation}</span>
               <span>{hero.contactBullet}</span>
             </div>
-            <div className="bm-contact-inquiry">
+            <div className="bm-contact-inquiry [&_p]:text-[#b8b8c8]! [&_p]:text-[12px]! [&_p]:leading-[1.8]! [&_p]:m-[0]! [&_p]:whitespace-pre-line! [&_small]:text-[10px]! [&_small]:text-[#8c8c9e]! flex! flex-col! items-center! gap-[12px]! [border-top:1px_solid_#ffffff15]! pt-[24px]! text-center! [&_img]:w-[115px]! [&_img]:h-[115px]! [&_img]:object-cover! [&_img]:rounded-[8px]! [&_h3]:[font:600_19px_'Playfair_Display',_serif]!">
               {hero.contactImage && <img src={hero.contactImage} alt="Contact product" />}
               <h3>{hero.contactInquiryHeading}</h3>
               <p>{hero.contactInquiryDesc}</p>
-              <span className="bm-whatsapp-preview"><MessageCircle size={14} />Order via WhatsApp</span>
+              <span className="bm-whatsapp-preview inline-flex! items-center! gap-[7px]! bg-[#25d366]! text-[#fff]! [padding:10px_16px]! rounded-[6px]! text-[11px]! font-semibold!"><MessageCircle size={14} />Order via WhatsApp</span>
               {hero.contactWhatsApp && <small>{hero.contactWhatsApp}</small>}
             </div>
           </div>}
-          {activeSection === 'footer' && <div className="bm-section-preview bm-footer-preview">
+          {activeSection === 'footer' && <div className="bm-section-preview [padding:26px_20px]! rounded-[9px]! bg-[#000]! text-[#fff]! [overflow-wrap:anywhere]! [&_h2]:[font:600_26px/1.25_'Playfair_Display',_serif]! [&_h2]:[margin:0_0_16px]! [&_>_p]:text-[#b8b8c8]! [&_>_p]:text-[12px]! [&_>_p]:leading-[1.8]! [&_>_p]:[margin:0_0_14px]! [&_>_p]:whitespace-pre-line! [&_.bm-preview-empty-note]:[margin:14px_0_0]! [&_.bm-preview-empty-note]:text-[11px]! [&_.bm-preview-empty-note]:text-[#aaa]! [&.bm-contact-preview]:bg-[#111219]! [&.bm-contact-preview]:[border:1px_solid_#ffffff0d]! [&.bm-footer-preview]:flex! [&.bm-footer-preview]:flex-col! [&.bm-footer-preview]:items-center! [&.bm-footer-preview]:gap-[24px]! [&.bm-footer-preview]:[padding:36px_20px_24px]! [&.bm-footer-preview]:text-center! [&.bm-footer-preview_>_p]:text-[#ffffff8c]! [&.bm-footer-preview_>_p]:m-[0]! bm-footer-preview">
             {hero.footerLogoImage
-              ? <img className="bm-footer-logo" src={hero.footerLogoImage} alt="OneElixir footer logo" />
-              : <span className="bm-footer-wordmark">ONE-ELIXIR</span>}
+              ? <img className="bm-footer-logo max-w-[100%]! w-[auto]! max-h-[44px]! object-contain!" src={hero.footerLogoImage} alt="OneElixir footer logo" />
+              : <span className="bm-footer-wordmark [font:600_22px_'Playfair_Display',_serif]! tracking-[4px]!">ONE-ELIXIR</span>}
             <p>{hero.footerTagline}</p>
-            <div className="bm-footer-nav">{['Overview', 'Core values', 'Collections', 'Craftsmanship', 'New arrivals', 'Contact', 'Official page'].map(label => <span key={label}>{label}</span>)}</div>
-            <div className="bm-footer-copyright">{hero.footerCopyright}</div>
+            <div className="bm-footer-nav flex! flex-wrap! justify-center! [gap:12px_18px]! text-[#ffffff99]! text-[8px]! font-semibold! tracking-[1.4px]! uppercase!">{['Overview', 'Core values', 'Collections', 'Craftsmanship', 'New arrivals', 'Contact', 'Official page'].map(label => <span key={label}>{label}</span>)}</div>
+            <div className="bm-footer-copyright w-[100%]! [border-top:1px_solid_#ffffff1a]! pt-[18px]! text-[#ffffff59]! text-[10px]!">{hero.footerCopyright}</div>
           </div>}
-          <p className="bm-preview-note">A simplified preview of the selected section. Changes appear as you edit; save your content to update the storefront.</p>
+          <p className="bm-preview-note text-[#888]! text-[12px]! leading-[1.7]! [margin:12px_0_0]!">A simplified preview of the selected section. Changes appear as you edit; save your content to update the storefront.</p>
         </aside>
         </div>
       </div>

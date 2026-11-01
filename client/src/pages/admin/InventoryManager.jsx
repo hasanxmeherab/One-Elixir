@@ -4,7 +4,7 @@ import adminAxios from '../../utils/adminAxios';
 import { useOutletContext } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
 import { Plus, X, ImagePlus, Search, Package, Pencil, Trash2, ArrowLeft } from 'lucide-react';
-import './InventoryManager.css';
+
 
 // ── Stock display cell ────────────────────────────────────────
 const StockCell = ({ p, API_URL, fetchData, toast }) => {
@@ -53,7 +53,7 @@ const StockCell = ({ p, API_URL, fetchData, toast }) => {
 
   return (
     <button type="button" onClick={() => { setValue(p.stock); setEditing(true); }}
-      className="im-stock-edit" aria-label={`Edit stock for ${p.name}`}>
+      className="im-stock-edit inline-flex! items-center! gap-[6px]! bg-[transparent]! p-[0]! [border:0]! cursor-pointer! [font:400_11px_'Jost',_sans-serif]! text-[#777]!" aria-label={`Edit stock for ${p.name}`}>
       {p.stock} units <Pencil size={11} />
     </button>
   );
@@ -105,7 +105,7 @@ const AddStockCell = ({ p, API_URL, fetchData, toast }) => {
 
   return (
     <button onClick={() => setOpen(true)}
-      className="im-restock">
+      className="im-restock inline-flex! items-center! justify-center! gap-[7px]! [font:500_12px_'Jost',_sans-serif]! cursor-pointer! whitespace-nowrap! [border:1px_solid_#d9e9df]! text-[#397451]! bg-[#f5faf6]! rounded-[6px]! [padding:6px_10px]! [&:hover]:bg-[#e8f4ec]!">
       <Plus size={13} /> Restock
     </button>
   );
@@ -354,36 +354,36 @@ const InventoryManager = () => {
   };
 
   return (
-    <section className="inventory-manager">
-      <header className="im-header">
-        <div><p className="im-eyebrow">STOREFRONT / INVENTORY</p><h1>Your collection, in order.</h1><p>Manage fragrances, keep stock up to date, and get products ready to sell.</p></div>
-        {!formOpen && <button className="im-primary" onClick={() => { cancelEdit(); setFormOpen(true); }}><Plus size={17} /> Add product</button>}
+    <section className="inventory-manager max-w-[1440px]! [margin:0_auto]! pb-[64px]! text-[#242424]! [font-family:'Jost',_sans-serif]! [&_[hidden]]:hidden! [&_button:focus-visible]:[outline:2px_solid_#dc4939]! [&_button:focus-visible]:[outline-offset:3px]! [&_button:disabled]:cursor-wait! [&_button:disabled]:opacity-[.55]!">
+      <header className="im-header flex! items-center! justify-between! gap-[24px]! mb-[30px]! [&_h1]:[font:600_clamp(26px,_3vw,_38px)/1.2_'Playfair_Display',_serif]! [&_h1]:m-[0]! [&_h1]:tracking-[-.7px]! [&_>_div_>_p:last-child]:text-[#777]! [&_>_div_>_p:last-child]:text-[14px]! [&_>_div_>_p:last-child]:[margin:12px_0_0]! max-[700px]:flex-col! max-[700px]:items-start! max-[700px]:gap-[18px]!">
+        <div><p className="im-eyebrow text-[#dc4939]! text-[11px]! font-bold! tracking-[2px]! [margin:0_0_10px]!">STOREFRONT / INVENTORY</p><h1>Your collection, in order.</h1><p>Manage fragrances, keep stock up to date, and get products ready to sell.</p></div>
+        {!formOpen && <button className="im-primary inline-flex! items-center! justify-center! gap-[7px]! [font:500_12px_'Jost',_sans-serif]! cursor-pointer! whitespace-nowrap! [padding:12px_18px]! [border:0]! bg-[#222]! text-[white]! rounded-[8px]! text-[13px]! [&:hover]:bg-[#444]!" onClick={() => { cancelEdit(); setFormOpen(true); }}><Plus size={17} /> Add product</button>}
       </header>
 
       {/* FORM */}
-      {formOpen && <div className="im-editor">
-      <div className="im-editor-header"><div><button type="button" className="im-back" onClick={cancelEdit} disabled={uploading}><ArrowLeft size={14} /> Back to inventory</button><h2>{editId ? 'Edit product' : 'Add a new fragrance'}</h2></div></div>
-      <form onSubmit={handleSubmit} className="im-product-form">
-        <fieldset disabled={uploading} className="im-fields">
-        <div className="im-form-section"><h3>Basic details</h3><p>The name, story, and scent notes your customers will see.</p>
-        <label className="im-field-label" htmlFor="im-name">Product name</label>
+      {formOpen && <div className="im-editor max-w-[900px]! [border:1px_solid_#e7e7e5]! rounded-[14px]! overflow-hidden!">
+      <div className="im-editor-header [padding:22px_26px]! bg-[#fafaf8]! [border-bottom:1px_solid_#e7e7e5]! [&_h2]:[font:600_24px_'Playfair_Display',_serif]! [&_h2]:[margin:12px_0_0]! max-[700px]:[padding:18px_16px]!"><div><button type="button" className="im-back inline-flex! items-center! justify-center! gap-[7px]! [font:500_12px_'Jost',_sans-serif]! cursor-pointer! whitespace-nowrap! [border:0]! p-[0]! bg-[transparent]! text-[#888]!" onClick={cancelEdit} disabled={uploading}><ArrowLeft size={14} /> Back to inventory</button><h2>{editId ? 'Edit product' : 'Add a new fragrance'}</h2></div></div>
+      <form onSubmit={handleSubmit} className="im-product-form [&_input:not([type='checkbox']):not([type='file'])]:min-w-[0]! [&_input:not([type='checkbox']):not([type='file'])]:rounded-[8px]! [&_input:not([type='checkbox']):not([type='file'])]:[border-color:#e2e2df]! [&_textarea]:min-w-[0]! [&_textarea]:rounded-[8px]! [&_textarea]:[border-color:#e2e2df]! [&_input:focus]:[border-color:#dc4939]! [&_input:focus]:[box-shadow:0_0_0_3px_#dc493914]! [&_textarea:focus]:[border-color:#dc4939]! [&_textarea:focus]:[box-shadow:0_0_0_3px_#dc493914]! [&_button]:rounded-[6px]!">
+        <fieldset disabled={uploading} className="im-fields [border:0]! p-[0]! m-[0]! min-w-[0]!">
+        <div className="im-form-section flex! flex-col! gap-[14px]! p-[26px]! [border-bottom:1px_solid_#eeedea]! [&_h3]:[font:600_16px_'Jost',_sans-serif]! [&_h3]:m-[0]! [&_>_p]:text-[#888]! [&_>_p]:text-[12px]! [&_>_p]:[margin:-8px_0_3px]! [&_>_small]:text-[#999]! [&_>_small]:text-[11px]! [&_>_small]:mt-[-8px]! max-[700px]:[padding:20px_16px]!"><h3>Basic details</h3><p>The name, story, and scent notes your customers will see.</p>
+        <label className="im-field-label text-[12px]! font-medium! text-[#666]! mb-[-8px]!" htmlFor="im-name">Product name</label>
         <input
           id="im-name" type="text" placeholder="e.g. Amber Oud" required autoFocus
           value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
           className="p-3 border border-[#ddd] outline-none text-sm"
         />
-        <label className="im-field-label" htmlFor="im-description">Description</label>
+        <label className="im-field-label text-[12px]! font-medium! text-[#666]! mb-[-8px]!" htmlFor="im-description">Description</label>
         <textarea id="im-description" placeholder="Tell the story of this fragrance"
           value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}
           className="p-3 border border-[#ddd] outline-none text-sm min-h-[80px]" />
-        <label className="im-field-label" htmlFor="im-notes">Scent notes</label>
+        <label className="im-field-label text-[12px]! font-medium! text-[#666]! mb-[-8px]!" htmlFor="im-notes">Scent notes</label>
         <input id="im-notes" type="text" placeholder="Bergamot, rose, amber"
           value={formData.scentProfile} onChange={e => setFormData({...formData, scentProfile: e.target.value})}
           className="p-3 border border-[#ddd] outline-none text-sm" />
         <small>Separate notes with commas.</small>
         </div>
-        <div className="im-form-section"><h3>Pricing & sizes</h3><p>Set a single price and stock quantity, or add individual sizes below.</p>
-        <div className="im-price-fields">
+        <div className="im-form-section flex! flex-col! gap-[14px]! p-[26px]! [border-bottom:1px_solid_#eeedea]! [&_h3]:[font:600_16px_'Jost',_sans-serif]! [&_h3]:m-[0]! [&_>_p]:text-[#888]! [&_>_p]:text-[12px]! [&_>_p]:[margin:-8px_0_3px]! [&_>_small]:text-[#999]! [&_>_small]:text-[11px]! [&_>_small]:mt-[-8px]! max-[700px]:[padding:20px_16px]!"><h3>Pricing & sizes</h3><p>Set a single price and stock quantity, or add individual sizes below.</p>
+        <div className="im-price-fields [&_>_label]:text-[12px]! [&_>_label]:font-medium! [&_>_label]:text-[#666]! [&_>_label]:flex! [&_>_label]:flex-col! [&_>_label]:gap-[7px]! grid! [grid-template-columns:repeat(2,_minmax(0,_1fr))]! gap-[14px]! max-[700px]:[grid-template-columns:minmax(0,_1fr)]!">
           <label>Price (TK)
           <input
             type="number" placeholder="Price (TK)" min="1" required={formData.variants.length === 0}
@@ -403,7 +403,7 @@ const InventoryManager = () => {
 
         {/* ── Featured toggle ── */}
         <label className="flex items-center gap-3 cursor-pointer select-none w-fit">
-          <input type="checkbox" checked={formData.featured} onChange={e => setFormData(f => ({ ...f, featured: e.target.checked }))} className="im-feature-checkbox" />
+          <input type="checkbox" checked={formData.featured} onChange={e => setFormData(f => ({ ...f, featured: e.target.checked }))} className="im-feature-checkbox [accent-color:#222]! w-[16px]! h-[16px]! [&_+_div]:hidden!" />
           <div className={`w-11 h-6 rounded-full transition-colors relative ${formData.featured ? 'bg-black' : 'bg-[#ddd]'}`}>
             <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${formData.featured ? 'translate-x-5' : 'translate-x-0.5'}`} />
           </div>
@@ -457,7 +457,7 @@ const InventoryManager = () => {
 
         {/* Existing images (edit mode) */}
         </div>
-        <div className="im-form-section"><h3>Product images</h3><p>Add clear photos that help customers explore your fragrance.</p>
+        <div className="im-form-section flex! flex-col! gap-[14px]! p-[26px]! [border-bottom:1px_solid_#eeedea]! [&_h3]:[font:600_16px_'Jost',_sans-serif]! [&_h3]:m-[0]! [&_>_p]:text-[#888]! [&_>_p]:text-[12px]! [&_>_p]:[margin:-8px_0_3px]! [&_>_small]:text-[#999]! [&_>_small]:text-[11px]! [&_>_small]:mt-[-8px]! max-[700px]:[padding:20px_16px]!"><h3>Product images</h3><p>Add clear photos that help customers explore your fragrance.</p>
         {editId && formData.images?.length > 0 && (
           <div>
             <p className="text-[10px] font-bold tracking-wider text-[#888] mb-2">CURRENT IMAGES</p>
@@ -515,7 +515,7 @@ const InventoryManager = () => {
         </div>
 
         </div>
-        <div className="im-form-actions">
+        <div className="im-form-actions flex! flex-wrap! gap-[10px]! [padding:20px_26px]! bg-[#fafaf8]! [&_button]:text-[12px]! [&_button]:font-medium! [&_button]:[padding:12px_20px]! max-[700px]:[padding:18px_16px]!">
           <button type="submit" disabled={uploading}
             className="px-6 py-4 bg-black text-white border-none cursor-pointer font-bold hover:bg-gray-800 transition-colors disabled:opacity-60">
             {uploading ? (uploadProgress || 'Saving…') : editId ? 'Save changes' : 'Add product'}
@@ -531,25 +531,25 @@ const InventoryManager = () => {
 
       {/* SEARCH */}
       <div hidden={formOpen}>
-      <div className="im-summary">
+      <div className="im-summary grid! [grid-template-columns:repeat(3,_minmax(0,_1fr))]! gap-[16px]! mb-[26px]! [&_>_div]:flex! [&_>_div]:items-start! [&_>_div]:gap-[14px]! [&_>_div]:p-[20px]! [&_>_div]:[border:1px_solid_#e7e7e5]! [&_>_div]:rounded-[12px]! [&_>_div]:bg-[#fafaf9]! [&_svg]:text-[#8a8580]! [&_svg]:mt-[3px]! [&_>_div_>_span:last-child]:flex! [&_>_div_>_span:last-child]:flex-col! [&_>_div_>_span:last-child]:gap-[6px]! [&_>_div_>_span:last-child]:text-[#777]! [&_>_div_>_span:last-child]:text-[12px]! [&_strong]:text-[#222]! [&_strong]:text-[28px]! [&_strong]:leading-[1.2]! [&_strong]:font-semibold! max-[700px]:gap-[8px]! max-[700px]:[&_>_div]:[padding:14px_10px]! max-[700px]:[&_>_div]:gap-[8px]! max-[700px]:[&_svg]:hidden! max-[700px]:[&_>_div_>_span:last-child]:text-[10px]! max-[700px]:[&_strong]:text-[24px]!">
         <div><Package size={20} /><span>Total fragrances<strong>{stockCounts.all}</strong></span></div>
-        <div><span className="im-status-dot im-dot-low" /><span>Low stock<strong>{stockCounts.low}</strong></span></div>
-        <div><span className="im-status-dot im-dot-out" /><span>Out of stock<strong>{stockCounts.out}</strong></span></div>
+        <div><span className="im-status-dot block! w-[10px]! h-[10px]! rounded-[50%]! mt-[7px]! max-[700px]:hidden! im-dot-low bg-[#d8a044]!" /><span>Low stock<strong>{stockCounts.low}</strong></span></div>
+        <div><span className="im-status-dot block! w-[10px]! h-[10px]! rounded-[50%]! mt-[7px]! max-[700px]:hidden! im-dot-out bg-[#dc4939]!" /><span>Out of stock<strong>{stockCounts.out}</strong></span></div>
       </div>
-      <div className="im-toolbar">
-        <div className="im-filters" aria-label="Filter by stock">{[{ id: 'all', label: 'All products' }, { id: 'low', label: 'Low stock' }, { id: 'out', label: 'Out of stock' }].map(({ id, label }) => <button key={id} aria-pressed={stockFilter === id} className={stockFilter === id ? 'im-filter active' : 'im-filter'} onClick={() => setStockFilter(id)}>{label}<span>{stockCounts[id]}</span></button>)}</div>
-        <label className="im-search"><Search size={16} />
+      <div className="im-toolbar flex! justify-between! items-center! flex-wrap! gap-[16px]! max-[700px]:items-stretch! max-[700px]:flex-col!">
+        <div className="im-filters flex! flex-wrap! gap-[5px]! p-[5px]! bg-[#f5f5f4]! [border:1px_solid_#ececea]! rounded-[10px]! max-[700px]:w-[fit-content]! max-[700px]:max-w-[100%]!" aria-label="Filter by stock">{[{ id: 'all', label: 'All products' }, { id: 'low', label: 'Low stock' }, { id: 'out', label: 'Out of stock' }].map(({ id, label }) => <button key={id} aria-pressed={stockFilter === id} className={stockFilter === id ? "im-filter inline-flex! items-center! gap-[8px]! [border:0]! rounded-[7px]! bg-[transparent]! text-[#777]! [padding:9px_12px]! [font:500_12px_'Jost',_sans-serif]! cursor-pointer! [&.active]:bg-[#fff]! [&.active]:text-[#242424]! [&.active]:[box-shadow:0_1px_5px_#0000000d]! [&_span]:rounded-[4px]! [&_span]:[padding:1px_5px]! [&_span]:text-[10px]! [&_span]:bg-[#eee]! max-[700px]:p-[8px]! max-[700px]:text-[11px]! max-[700px]:gap-[5px]! active" : "im-filter inline-flex! items-center! gap-[8px]! [border:0]! rounded-[7px]! bg-[transparent]! text-[#777]! [padding:9px_12px]! [font:500_12px_'Jost',_sans-serif]! cursor-pointer! [&.active]:bg-[#fff]! [&.active]:text-[#242424]! [&.active]:[box-shadow:0_1px_5px_#0000000d]! [&_span]:rounded-[4px]! [&_span]:[padding:1px_5px]! [&_span]:text-[10px]! [&_span]:bg-[#eee]! max-[700px]:p-[8px]! max-[700px]:text-[11px]! max-[700px]:gap-[5px]!"} onClick={() => setStockFilter(id)}>{label}<span>{stockCounts[id]}</span></button>)}</div>
+        <label className="im-search flex! items-center! gap-[8px]! min-w-[220px]! max-w-[100%]! [border:1px_solid_#e2e2df]! rounded-[9px]! [padding:0_12px]! text-[#888]! [&:focus-within]:[border-color:#dc4939]! [&:focus-within]:[box-shadow:0_0_0_3px_#dc493914]! [&_input]:[border:0]! [&_input]:[outline:none]! [&_input]:w-[100%]! [&_input]:min-w-[0]! [&_input]:bg-[transparent]! [&_input]:text-[13px]! [&_input]:[padding:11px_0]! max-[700px]:w-[100%]!"><Search size={16} />
         <input
           type="search" placeholder="Search fragrances…" aria-label="Search fragrances by name"
           value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
           className="p-2.5 px-4 border border-black outline-none w-[300px] max-w-full text-sm"
         /></label>
       </div>
-      <p className="im-results">Showing {filteredPerfumes.length} of {perfumes.length} fragrances · Low stock means fewer than 5 units.</p>
+      <p className="im-results text-[11px]! text-[#999]! [margin:14px_0]!">Showing {filteredPerfumes.length} of {perfumes.length} fragrances · Low stock means fewer than 5 units.</p>
 
       {/* TABLE */}
-      <div className="im-table-wrap">
-        <table className="im-table">
+      <div className="im-table-wrap [border:1px_solid_#e7e7e5]! rounded-[12px]! overflow-x-auto! max-[700px]:[border:0]! max-[700px]:rounded-[0]! max-[700px]:overflow-visible!">
+        <table className="im-table w-[100%]! [border-collapse:collapse]! text-left! [&_thead]:bg-[#f8f8f6]! [&_thead_tr]:[border-bottom:1px_solid_#e7e7e5]! [&_th]:[padding:14px_16px]! [&_th]:text-[#888]! [&_th]:[font:600_10px_'Jost',_sans-serif]! [&_th]:tracking-[1px]! max-[700px]:block! max-[700px]:[&_tbody]:block! max-[700px]:[&_thead]:hidden!">
           <thead>
             <tr className="border-b-2 border-black">
               <th className="p-2.5 text-xs tracking-wider">PRODUCT</th>
@@ -566,11 +566,11 @@ const InventoryManager = () => {
               const thumbnail = p.images?.[0] || p.image || p.variants?.find(v => v.image)?.image;
               return (
                 <React.Fragment key={p._id}>
-                  <tr className="im-product-row">
+                  <tr className="im-product-row [border-bottom:1px_solid_#eeedea]! [&:last-child]:[border-bottom:0]! [&:hover]:bg-[#fdfcfb]! [&_>_td]:[padding:18px_16px]! [&_>_td]:text-[13px]! [&_>_td]:[vertical-align:middle]! max-[700px]:grid! max-[700px]:[grid-template-columns:minmax(0,_1fr)_minmax(0,_1fr)]! max-[700px]:[border:1px_solid_#e7e7e5]! max-[700px]:rounded-[12px]! max-[700px]:mb-[14px]! max-[700px]:p-[16px]! max-[700px]:[gap:18px_12px]! max-[700px]:[&:last-child]:[border-bottom:1px_solid_#e7e7e5]! max-[700px]:[&_>_td]:block! max-[700px]:[&_>_td]:p-[0]! max-[700px]:[&_>_td]:min-w-[0]! max-[700px]:[&_>_td::before]:[content:attr(data-label)]! max-[700px]:[&_>_td::before]:block! max-[700px]:[&_>_td::before]:mb-[8px]! max-[700px]:[&_>_td::before]:text-[9px]! max-[700px]:[&_>_td::before]:text-[#999]! max-[700px]:[&_>_td::before]:uppercase! max-[700px]:[&_>_td::before]:tracking-[1px]! max-[700px]:[&_>_td:first-child]:[grid-column:1_/_-1]! max-[700px]:[&_>_td:first-child::before]:hidden! max-[700px]:[&_>_td:last-child]:[grid-column:1_/_-1]! max-[700px]:[&_>_td:last-child]:[border-top:1px_solid_#eeedea]! max-[700px]:[&_>_td:last-child]:pt-[12px]! max-[700px]:[&_>_td:last-child::before]:hidden!">
                     <td data-label="Product">
-                      <div className="im-product-identity">
-                      {thumbnail ? <img src={thumbnail} alt="" className="im-thumbnail" loading="lazy" /> : <div className="im-thumbnail im-no-image"><Package size={22} /></div>}
-                      <div className="im-product-name"><strong>{p.name}</strong>
+                      <div className="im-product-identity flex! items-center! gap-[12px]! min-w-[190px]!">
+                      {thumbnail ? <img src={thumbnail} alt="" className="im-thumbnail w-[52px]! h-[58px]! [border:1px_solid_#eeedea]! rounded-[8px]! object-contain! bg-[#fafaf8]! [flex-shrink:0]!" loading="lazy" /> : <div className="im-thumbnail w-[52px]! h-[58px]! [border:1px_solid_#eeedea]! rounded-[8px]! object-contain! bg-[#fafaf8]! [flex-shrink:0]! im-no-image flex! justify-center! items-center! text-[#bbb]!"><Package size={22} /></div>}
+                      <div className="im-product-name min-w-[0]! [&_>_strong]:block! [&_>_strong]:text-[13px]! [&_>_strong]:font-semibold! [&_>_strong]:[overflow-wrap:anywhere]! [&_span]:rounded-[4px]! [&_span]:font-normal!"><strong>{p.name}</strong>
                       {p.variants?.length > 0 && (
                         <div className="flex gap-1 mt-1 flex-wrap">
                           {p.variants.map((v, vi) => (
@@ -582,21 +582,21 @@ const InventoryManager = () => {
                       )}
                       </div></div>
                     </td>
-                    <td data-label="Price"><span className="im-price">{p.variants?.length > 0 ? 'From ' : ''}{Number(p.price).toLocaleString()} TK</span></td>
+                    <td data-label="Price"><span className="im-price text-[12px]! font-medium! whitespace-nowrap!">{p.variants?.length > 0 ? 'From ' : ''}{Number(p.price).toLocaleString()} TK</span></td>
                     <td data-label="Availability">
-                      <div className="im-stock-cell">
-                      <span className={`im-stock-badge ${stock === 0 ? 'out' : stock < 5 ? 'low' : 'in'}`}>{stock === 0 ? 'Sold out' : stock < 5 ? 'Low stock' : 'In stock'}</span>
-                      {p.variants?.length ? <span className="im-stock-total">{stock} units across sizes</span> : <StockCell p={p} API_URL={API_URL} fetchData={fetchData} toast={toast} />}
+                      <div className="im-stock-cell flex! flex-col! items-start! gap-[7px]!">
+                      <span className={`im-stock-badge [padding:4px_8px]! rounded-[5px]! text-[10px]! font-medium! whitespace-nowrap! [&.in]:bg-[#eef6f0]! [&.in]:text-[#397451]! [&.low]:bg-[#fff5e3]! [&.low]:text-[#a17021]! [&.out]:bg-[#fff0ed]! [&.out]:text-[#c34c40]! ${stock === 0 ? 'out' : stock < 5 ? 'low' : 'in'}`}>{stock === 0 ? 'Sold out' : stock < 5 ? 'Low stock' : 'In stock'}</span>
+                      {p.variants?.length ? <span className="im-stock-total text-[11px]! text-[#888]!">{stock} units across sizes</span> : <StockCell p={p} API_URL={API_URL} fetchData={fetchData} toast={toast} />}
                       </div>
                     </td>
 
                     {/* ── Featured / Exclusive Column ── */}
-                    <td data-label="Promotions"><div className="im-promotions">
+                    <td data-label="Promotions"><div className="im-promotions flex! items-start! flex-col! gap-[9px]!">
                       <button
                         onClick={() => toggleFeatured(p)}
                         title={p.featured ? 'Remove from Exclusive section' : 'Add to Exclusive section'}
                         aria-pressed={Boolean(p.featured)}
-                        className={`im-featured ${p.featured ? 'selected' : ''}`}>
+                        className={`im-featured [border:0]! bg-[transparent]! p-[0]! text-[#999]! [font:500_11px_'Jost',_sans-serif]! cursor-pointer! whitespace-nowrap! [&.selected]:text-[#a17021]! ${p.featured ? 'selected' : ''}`}>
                         {p.featured ? '★ Featured' : '☆ Feature'}
                       </button>
 
@@ -620,14 +620,14 @@ const InventoryManager = () => {
                       )}
                     </div></td>
 
-                    <td data-label="Actions"><div className="im-row-actions">
+                    <td data-label="Actions"><div className="im-row-actions flex! items-start! flex-wrap! gap-[8px]! min-w-[145px]!">
                       <button onClick={() => handleEditClick(p)}
-                        className="im-edit">
+                        className="im-edit inline-flex! items-center! justify-center! gap-[7px]! [font:500_12px_'Jost',_sans-serif]! cursor-pointer! whitespace-nowrap! [padding:6px_10px]! [border:1px_solid_#e2e2df]! rounded-[6px]! bg-[#fff]! text-[#444]! [&:hover]:bg-[#f4f4f2]!">
                         <Pencil size={13} /> Edit
                       </button>
-                      {p.variants?.length ? <button className="im-restock" onClick={() => handleEditClick(p)}><Plus size={13} /> Edit size stock</button> : <AddStockCell p={p} API_URL={API_URL} fetchData={fetchData} toast={toast} />}
+                      {p.variants?.length ? <button className="im-restock inline-flex! items-center! justify-center! gap-[7px]! [font:500_12px_'Jost',_sans-serif]! cursor-pointer! whitespace-nowrap! [border:1px_solid_#d9e9df]! text-[#397451]! bg-[#f5faf6]! rounded-[6px]! [padding:6px_10px]! [&:hover]:bg-[#e8f4ec]!" onClick={() => handleEditClick(p)}><Plus size={13} /> Edit size stock</button> : <AddStockCell p={p} API_URL={API_URL} fetchData={fetchData} toast={toast} />}
                       <button onClick={() => deletePerfume(p._id)}
-                        className="im-delete" aria-label={`Delete ${p.name}`}>
+                        className="im-delete inline-flex! items-center! justify-center! gap-[7px]! [font:500_12px_'Jost',_sans-serif]! cursor-pointer! whitespace-nowrap! bg-[transparent]! [border:0]! text-[#be6d64]! [padding:6px_2px]! text-[11px]! [&:hover]:text-[#a12d21]!" aria-label={`Delete ${p.name}`}>
                         <Trash2 size={13} /> Delete
                       </button>
                     </div></td>
@@ -635,7 +635,7 @@ const InventoryManager = () => {
 
                   {/* ── Inline Flash Sale Form ── */}
                   {flashEditId === p._id && (
-                    <tr className="im-sale-editor border-b border-[#eee] bg-amber-50">
+                    <tr className="im-sale-editor max-[700px]:block! max-[700px]:w-[100%]! max-[700px]:rounded-[10px]! max-[700px]:[margin:-6px_0_14px]! max-[700px]:[&_>_td]:block! max-[700px]:[&_>_td]:w-[100%]! max-[700px]:[&_input]:max-w-[100%]! border-b border-[#eee] bg-amber-50">
                       <td colSpan="5" className="px-3 py-3">
                         <div className="flex flex-wrap gap-2.5 items-center">
                           <span className="text-[10px] font-bold tracking-wider text-amber-600">🔥 FLASH SALE</span>
@@ -667,10 +667,10 @@ const InventoryManager = () => {
               );
             }) : (
               <tr>
-                <td colSpan="5" className="im-empty">
+                <td colSpan="5" className="im-empty text-center! [padding:46px_20px]! text-[#999]! [&_>_svg]:[margin:0_auto_12px]! [&_h3]:[margin:0_0_8px]! [&_h3]:[font:600_18px_'Jost',_sans-serif]! [&_h3]:text-[#555]! [&_p]:[margin:0_0_16px]! [&_p]:text-[13px]!">
                   <Package size={28} /><h3>{perfumes.length === 0 ? 'Your collection starts here' : 'No fragrances found'}</h3>
                   <p>{perfumes.length === 0 ? 'Add your first product to start building your collection.' : 'Try a different search or stock filter.'}</p>
-                  {perfumes.length > 0 && <button onClick={() => { setSearchTerm(''); setStockFilter('all'); }} className="im-edit">Clear filters</button>}
+                  {perfumes.length > 0 && <button onClick={() => { setSearchTerm(''); setStockFilter('all'); }} className="im-edit inline-flex! items-center! justify-center! gap-[7px]! [font:500_12px_'Jost',_sans-serif]! cursor-pointer! whitespace-nowrap! [padding:6px_10px]! [border:1px_solid_#e2e2df]! rounded-[6px]! bg-[#fff]! text-[#444]! [&:hover]:bg-[#f4f4f2]!">Clear filters</button>}
                 </td>
               </tr>
             )}

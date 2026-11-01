@@ -1,224 +1,77 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
+import { Users, UserRound, Eye, X, Search, Phone, Mail, MapPin } from 'lucide-react';
 import Pagination from '../../components/Pagination';
+import { buildCustomerProfiles, normalizeCustomerPhone, outstandingAmount } from '../../utils/customerProfiles';
 
 const PAGE_SIZE = 10;
+const currency = value => `${Number(value || 0).toLocaleString('en-BD', { maximumFractionDigits: 2 })} TK`;
+const date = value => value && !Number.isNaN(new Date(value).getTime()) ? new Date(value).toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka', day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+const tone = status => ({ paid: 'bg-[#edf6ef] text-[#397451]', delivered: 'bg-[#edf6ef] text-[#397451]', partial: 'bg-[#fff5e3] text-[#a17021]', pending: 'bg-[#fff5e3] text-[#a17021]', 'pending verification': 'bg-[#fff5e3] text-[#a17021]', processing: 'bg-[#eef3fc] text-[#4d70a2]', shipped: 'bg-[#eef3fc] text-[#4d70a2]', unpaid: 'bg-[#fff0ed] text-[#bd5142]', canceled: 'bg-[#f0efed] text-[#888]', cancelled: 'bg-[#f0efed] text-[#888]' })[String(status || '').toLowerCase()] || 'bg-[#f0efed] text-[#888]';
 
-const CustomerList = () => {
+export default function CustomerList() {
   const { orders = [] } = useOutletContext();
   const [search, setSearch] = useState('');
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [filter, setFilter] = useState('all');
+  const [sort, setSort] = useState('recent');
+  const [selectedKey, setSelectedKey] = useState(null);
   const [orderSearch, setOrderSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [page, setPage] = useState(1);
-
-  const customers = useMemo(() => {
-    const map = {};
-    orders.forEach(order => {
-      const key = order.phone;
-      if (!map[key]) {
-        map[key] = {
-          name: order.customerName, phone: order.phone,
-          email: order.customerEmail || '—', orders: [],
-          totalSpent: 0, firstOrder: order.createdAt, lastOrder: order.createdAt,
-        };
-      }
-      map[key].orders.push(order);
-      if (order.status?.toLowerCase() === 'delivered' && order.paymentStatus?.toLowerCase() === 'paid')
-        map[key].totalSpent += Number(order.totalAmount) || 0;
-      if (new Date(order.createdAt) < new Date(map[key].firstOrder)) map[key].firstOrder = order.createdAt;
-      if (new Date(order.createdAt) > new Date(map[key].lastOrder))  map[key].lastOrder  = order.createdAt;
-    });
-    return Object.values(map).sort((a, b) => b.totalSpent - a.totalSpent);
-  }, [orders]);
-
+  const dialog = useRef(null);
+  const customers = useMemo(() => buildCustomerProfiles(orders), [orders]);
+  const customer = customers.find(profile => profile.key === selectedKey);
+  const counts = { all: customers.length, repeat: customers.filter(profile => profile.repeatBuyer).length, due: customers.filter(profile => profile.outstanding > 0).length };
   const filtered = useMemo(() => {
-    if (!search.trim()) return customers;
-    const s = search.toLowerCase();
-    return customers.filter(c =>
-      c.name.toLowerCase().includes(s) || c.phone.includes(s) || c.email.toLowerCase().includes(s)
-    );
-  }, [customers, search]);
+    const text = search.trim().toLowerCase();
+    const phoneSearch = normalizeCustomerPhone(text);
+    return customers.filter(profile => (!text || profile.name.toLowerCase().includes(text) || profile.email.toLowerCase().includes(text) || (phoneSearch && profile.phone.includes(phoneSearch)))
+      && (filter === 'all' || (filter === 'repeat' ? profile.repeatBuyer : profile.outstanding > 0)))
+      .sort((a, b) => sort === 'spent' ? b.totalSpent - a.totalSpent : sort === 'orders' ? b.orders.length - a.orders.length : new Date(b.lastOrder) - new Date(a.lastOrder));
+  }, [customers, search, filter, sort]);
+  useEffect(() => { setPage(1); }, [search, filter, sort]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const drawerOpen = Boolean(customer);
+  useEffect(() => {
+    if (!drawerOpen || !dialog.current) return;
+    const element = dialog.current;
+    element.showModal();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { element.close(); document.body.style.overflow = previousOverflow; };
+  }, [drawerOpen]);
+  const openCustomer = profile => { setSelectedKey(profile.key); setOrderSearch(''); setStatusFilter('ALL'); };
+  const history = (customer?.orders || []).filter(order => {
+    const text = orderSearch.trim().toLowerCase().replace(/^#/, '');
+    return (!text || String(order._id).toLowerCase().includes(text) || order.items?.some(item => String(item.name).toLowerCase().includes(text)))
+      && (statusFilter === 'ALL' || (statusFilter === 'Canceled' ? ['canceled', 'cancelled'].includes(String(order.status).toLowerCase()) : String(order.status).toLowerCase() === statusFilter.toLowerCase()));
+  });
 
-  // Reset page on search change
-  React.useEffect(() => { setPage(1); }, [search]);
-
-  const customerOrders = useMemo(() => {
-    if (!selectedCustomer) return [];
-    return selectedCustomer.orders
-      .filter(o => {
-        const matchSearch = orderSearch ? o.items?.some(i => i.name.toLowerCase().includes(orderSearch.toLowerCase())) : true;
-        const matchStatus = statusFilter === 'ALL' || o.status === statusFilter;
-        return matchSearch && matchStatus;
-      })
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }, [selectedCustomer, orderSearch, statusFilter]);
-
-  const getStatusClass = (status) => {
-    const map = {
-      Pending:    'bg-amber-100 text-amber-800',
-      Processing: 'bg-blue-100 text-blue-800',
-      Shipped:    'bg-violet-100 text-violet-800',
-      Delivered:  'bg-emerald-100 text-emerald-800',
-      Cancelled:  'bg-red-100 text-red-800',
-      Canceled:   'bg-red-100 text-red-800',
-    };
-    return map[status] || 'bg-gray-100 text-gray-600';
-  };
-
-  const totalPages        = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginatedCustomers = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-    return (
-    <div className="w-full">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <h3 className="tracking-[3px] font-bold text-base">CUSTOMER LIST</h3>
-        <div className="flex items-center gap-3">
-          <span className="text-[11px] text-gray-400">{filtered.length} customers</span>
-          <input
-            type="text" placeholder="Search name, phone, email..."
-            value={search} onChange={e => setSearch(e.target.value)}
-            className="px-3 py-2 border border-[#ddd] text-xs outline-none w-56"
-          />
-        </div>
-      </div>
-
-      <div className={`grid gap-5 ${selectedCustomer ? 'grid-cols-[1fr_1.6fr]' : 'grid-cols-1'}`}>
-
-        {/* ── Customer Table ── */}
-        <div className="border border-[#eee] overflow-auto">
-          <table className="w-full border-collapse text-xs">
-            <thead>
-              <tr className="border-b-2 border-black bg-[#fafafa]">
-                {['#', 'CUSTOMER', 'ORDERS', 'TOTAL SPENT', 'LAST ORDER', ''].map(h => (
-                  <th key={h} className="px-3 py-2.5 text-left text-[9px] font-bold tracking-wider text-gray-400 whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr><td colSpan="6" className="text-center py-10 text-gray-300">No customers found.</td></tr>
-              ) : paginatedCustomers.map((c, i) => (
-                <tr key={c.phone}
-                  className={`border-b border-[#f0f0f0] cursor-pointer hover:bg-[#fafafa] transition-colors ${selectedCustomer?.phone === c.phone ? 'bg-[#f9f9f9]' : 'bg-white'}`}
-                  onClick={() => { setSelectedCustomer(c); setOrderSearch(''); setStatusFilter('ALL'); }}
-                >
-                  <td className="px-3 py-2.5 align-middle"><span className="text-gray-300 text-[11px]">{i + 1}</span></td>
-                  <td className="px-3 py-2.5 align-middle">
-                    <div className="font-bold">{c.name}</div>
-                    <div className="text-[10px] text-gray-400">{c.phone}</div>
-                    {c.email !== '—' && <div className="text-[10px] text-gray-300">{c.email}</div>}
-                  </td>
-                  <td className="px-3 py-2.5 align-middle text-center font-bold">{c.orders.length}</td>
-                  <td className={`px-3 py-2.5 align-middle font-bold ${c.totalSpent > 0 ? 'text-black' : 'text-gray-300'}`}>
-                    {c.totalSpent > 0 ? `${c.totalSpent.toLocaleString()} TK` : '—'}
-                  </td>
-                  <td className="px-3 py-2.5 align-middle text-[11px] text-gray-400">
-                    {new Date(c.lastOrder).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}
-                  </td>
-                  <td className="px-3 py-2.5 align-middle">
-                    <div className={`w-2 h-2 rounded-full mx-auto ${selectedCustomer?.phone === c.phone ? 'bg-black' : 'bg-[#eee]'}`} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* ── Order History Panel ── */}
-        {selectedCustomer && (
-          <div className="border border-[#eee] flex flex-col">
-            {/* Panel Header */}
-            <div className="px-5 py-4 border-b border-[#eee] bg-[#fafafa]">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-bold text-sm mb-0.5">{selectedCustomer.name}</p>
-                  <p className="text-[11px] text-gray-400">{selectedCustomer.phone}</p>
-                  {selectedCustomer.email !== '—' && (
-                    <p className="text-[11px] text-gray-300 mt-0.5">{selectedCustomer.email}</p>
-                  )}
-                </div>
-                <button onClick={() => setSelectedCustomer(null)}
-                  className="bg-transparent border-none text-lg cursor-pointer text-gray-400 leading-none hover:text-black">×</button>
-              </div>
-
-              {/* Stats */}
-              <div className="flex gap-4 mt-3">
-                {[
-                  { label: 'TOTAL ORDERS', value: selectedCustomer.orders.length },
-                  { label: 'TOTAL SPENT',  value: `${selectedCustomer.totalSpent.toLocaleString()} TK` },
-                  { label: 'FIRST ORDER',  value: new Date(selectedCustomer.firstOrder).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) },
-                  { label: 'LAST ORDER',   value: new Date(selectedCustomer.lastOrder).toLocaleDateString('en-GB',  { day: '2-digit', month: 'short', year: '2-digit' }) },
-                ].map(s => (
-                  <div key={s.label} className="flex-1 bg-white border border-[#eee] px-2.5 py-2">
-                    <div className="text-[9px] text-gray-300 font-bold tracking-wider mb-0.5">{s.label}</div>
-                    <div className="text-[13px] font-bold">{s.value}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Filters */}
-              <div className="flex gap-2 mt-2.5">
-                <input type="text" placeholder="Search items..." value={orderSearch}
-                  onChange={e => setOrderSearch(e.target.value)}
-                  className="flex-1 px-2.5 py-1.5 border border-[#ddd] text-[11px] outline-none" />
-                <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-                  className="px-2 py-1.5 border border-[#ddd] text-[11px] outline-none">
-                  <option value="ALL">ALL STATUS</option>
-                  <option value="Pending">PENDING</option>
-                  <option value="Processing">PROCESSING</option>
-                  <option value="Shipped">SHIPPED</option>
-                  <option value="Delivered">DELIVERED</option>
-                  <option value="Canceled">CANCELED</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Orders List */}
-            <div className="overflow-y-auto max-h-[600px]">
-              {customerOrders.length === 0 ? (
-                <div className="py-10 text-center text-gray-300 text-xs">No orders match filter.</div>
-              ) : customerOrders.map(order => (
-                <div key={order._id} className="px-5 py-3.5 border-b border-[#f5f5f5]">
-                  <div className="flex justify-between items-start mb-1.5">
-                    <div className="flex gap-2 items-center">
-                      <span className="text-[10px] text-gray-300 font-mono">#{order._id.slice(-6).toUpperCase()}</span>
-                      <span className={`px-2 py-0.5 text-[9px] font-bold rounded-sm ${getStatusClass(order.status)}`}>
-                        {order.status?.toUpperCase()}
-                      </span>
-                      <span className={`px-2 py-0.5 text-[9px] font-bold rounded-sm ${order.paymentStatus === 'Paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                        {order.paymentStatus?.toUpperCase()}
-                      </span>
-                    </div>
-                    <span className="font-bold text-[13px]">{Number(order.totalAmount).toLocaleString()} TK</span>
-                  </div>
-
-                  <div className="text-[11px] text-gray-500 mb-1">
-                    {order.items?.map((item, i) => (
-                      <span key={i}>{item.quantity}× {item.name}{i < order.items.length - 1 ? ', ' : ''}</span>
-                    ))}
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <div className="text-[10px] text-gray-300">
-                      {new Date(order.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      {order.paymentMethod && ` · ${order.paymentMethod}`}
-                      {order.shippingCost > 0 && ` · Shipping: ${order.shippingCost} TK`}
-                    </div>
-                    {order.isManual && (
-                      <span className="text-[9px] text-gray-300 border border-[#eee] px-1.5 py-0.5">MANUAL</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-    </div>
-  );
-};
-
-export default CustomerList;
+  return <section className="mx-auto max-w-[1440px] pb-16 text-[#242424] [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-[#dc4939] [&_button:focus-visible]:outline-offset-3">
+    <header className="mb-7 [&_h1]:m-0 [&_h1]:text-[clamp(26px,3vw,38px)] [&_h1]:leading-[1.2] [&_h1]:font-semibold [&_h1]:tracking-[-.7px] [&>p:last-child]:mt-3 [&>p:last-child]:mb-0 [&>p:last-child]:text-sm [&>p:last-child]:text-[#888]"><p className="mt-0 mb-2.5 text-[11px] font-bold tracking-[2px] text-[#dc4939]">STOREFRONT / CUSTOMERS</p><h1>The people behind every order.</h1><p>Explore customer history, recognize repeat buyers, and follow up on outstanding payments.</p></header>
+    <div className="mb-6 grid grid-cols-3 gap-4 max-[600px]:gap-2 [&>div]:flex [&>div]:items-start [&>div]:gap-3.5 [&>div]:rounded-xl [&>div]:border [&>div]:border-[#e7e7e5] [&>div]:bg-[#fafaf9] [&>div]:p-5 max-[600px]:[&>div]:px-2.5 max-[600px]:[&>div]:py-[13px] [&_svg]:mt-[3px] [&_svg]:shrink-0 [&_svg]:text-[#a88d80] max-[600px]:[&_svg]:hidden [&_span]:flex [&_span]:flex-col [&_span]:gap-2 [&_span]:text-xs [&_span]:text-[#888] max-[600px]:[&_span]:text-[10px] [&_strong]:text-[28px] [&_strong]:font-semibold [&_strong]:leading-[1.2] [&_strong]:text-[#242424] max-[600px]:[&_strong]:text-2xl">{[{ label: 'Customers', value: counts.all, icon: Users }, { label: 'Repeat buyers', value: counts.repeat, icon: UserRound }, { label: 'Customers with a balance', value: counts.due, icon: Users }].map(({ label, value, icon: Icon }) => <div key={label}><Icon size={19} /><span>{label}<strong>{value}</strong></span></div>)}</div>
+    <nav className="mb-[22px] flex gap-[5px] overflow-x-auto rounded-[11px] border border-[#ececea] bg-[#f5f5f4] p-[5px] [&_button]:flex [&_button]:flex-[1_0_auto] [&_button]:cursor-pointer [&_button]:items-center [&_button]:justify-center [&_button]:gap-[9px] [&_button]:rounded-[7px] [&_button]:border-0 [&_button]:px-3.5 [&_button]:py-[11px] [&_button]:text-xs [&_button]:font-medium [&_span]:rounded [&_span]:bg-[#eae9e6] [&_span]:px-1.5 [&_span]:py-px [&_span]:text-[10px]" aria-label="Filter customers">{[{ id: 'all', label: 'All customers' }, { id: 'repeat', label: 'Repeat buyers' }, { id: 'due', label: 'Outstanding payments' }].map(({ id, label }) => <button key={id} aria-pressed={filter === id} className={filter === id ? 'bg-white text-[#222] shadow-[0_1px_5px_#0000000d]' : 'bg-transparent text-[#888]'} onClick={() => setFilter(id)}>{label}<span>{counts[id]}</span></button>)}</nav>
+    <div className="flex items-center justify-between gap-4 max-[600px]:flex-col max-[600px]:items-stretch"><label className="flex w-[380px] max-w-full items-center gap-[9px] rounded-lg border border-[#e2e2df] px-3 text-[#999] focus-within:border-[#dc4939] focus-within:shadow-[0_0_0_3px_#dc493914] max-[600px]:w-full [&_input]:w-full [&_input]:min-w-0 [&_input]:border-0 [&_input]:bg-transparent [&_input]:py-[11px] [&_input]:text-[13px] [&_input]:outline-none"><Search size={16} /><input type="search" aria-label="Search customers by name, phone, or email" placeholder="Search name, phone, or email…" value={search} onChange={event => setSearch(event.target.value)} /></label><label className="flex items-center gap-2.5 text-[11px] text-[#999] max-[600px]:justify-between [&_select]:min-w-0 [&_select]:rounded-lg [&_select]:border [&_select]:border-[#e2e2df] [&_select]:bg-white [&_select]:px-3 [&_select]:py-2.5 [&_select]:text-xs [&_select]:text-[#555] [&_select]:outline-none [&_select:focus]:border-[#dc4939] [&_select:focus]:shadow-[0_0_0_3px_#dc493914]">Sort by<select value={sort} onChange={event => setSort(event.target.value)}><option value="recent">Most recent order</option><option value="spent">Highest completed spend</option><option value="orders">Most orders</option></select></label></div>
+    <p className="my-[15px] text-[11px] leading-[1.7] text-[#999]">{filtered.length} {filtered.length === 1 ? 'customer' : 'customers'} · Repeat buyers have at least two non-canceled orders.</p>
+    <div className="rounded-xl border border-[#e7e7e5] max-[1000px]:border-0"><table className="w-full border-collapse text-left max-[1000px]:block [&_th]:border-b [&_th]:border-[#e7e7e5] [&_th]:bg-[#f8f8f6] [&_th]:px-4 [&_th]:py-3.5 [&_th]:text-[10px] [&_th]:font-semibold [&_th]:tracking-[.7px] [&_th]:text-[#888] [&_th]:uppercase [&_th:first-child]:rounded-tl-xl [&_th:last-child]:rounded-tr-xl [&_td]:border-b [&_td]:border-[#eeedea] [&_td]:px-4 [&_td]:py-[18px] [&_td]:align-middle [&_td]:text-xs [&_tr:last-child_td]:border-b-0 [&_tr:hover]:bg-[#fdfcfb] [&_strong]:font-medium max-[1000px]:[&_thead]:hidden max-[1000px]:[&_tbody]:block max-[1000px]:[&_tbody>tr]:mb-3.5 max-[1000px]:[&_tbody>tr]:grid max-[1000px]:[&_tbody>tr]:grid-cols-2 max-[1000px]:[&_tbody>tr]:gap-[18px] max-[1000px]:[&_tbody>tr]:rounded-xl max-[1000px]:[&_tbody>tr]:border max-[1000px]:[&_tbody>tr]:border-[#e7e7e5] max-[1000px]:[&_tbody>tr]:p-[18px] max-[1000px]:[&_td]:block max-[1000px]:[&_td]:min-w-0 max-[1000px]:[&_td]:border-0 max-[1000px]:[&_td]:p-0 max-[1000px]:[&_td[data-label]]:before:mb-[7px] max-[1000px]:[&_td[data-label]]:before:block max-[1000px]:[&_td[data-label]]:before:text-[9px] max-[1000px]:[&_td[data-label]]:before:tracking-[1px] max-[1000px]:[&_td[data-label]]:before:text-[#999] max-[1000px]:[&_td[data-label]]:before:uppercase max-[1000px]:[&_td[data-label]]:before:content-[attr(data-label)]"><thead><tr>{['#', 'Customer', 'Orders', 'Completed spend', 'Outstanding', 'Last order', ''].map((heading, index) => <th key={index}>{heading}</th>)}</tr></thead><tbody>
+      {visible.map((profile, index) => <tr key={profile.key}>
+        <td className="text-[#bbb] max-[1000px]:hidden!">{(currentPage - 1) * PAGE_SIZE + index + 1}</td>
+        <td className="max-[1000px]:col-span-full max-[1000px]:before:hidden!" data-label="Customer"><div className="flex items-center gap-3 [&_small]:mt-1 [&_small]:block [&_small]:text-[10px] [&_small]:text-[#999]"><span className="flex size-[38px] shrink-0 items-center justify-center rounded-full bg-[#f3eeea] text-base text-[#967c70]">{profile.name.charAt(0).toUpperCase()}</span><div><button className="cursor-pointer border-0 bg-transparent p-0 text-left text-[13px] font-semibold text-[#333] [overflow-wrap:anywhere] hover:text-[#dc4939]" onClick={() => openCustomer(profile)}>{profile.name}</button><small>{profile.phone || profile.email || 'No contact details'}</small>{profile.repeatBuyer && <span className="inline-block rounded-[5px] px-[7px] py-[3px] text-[9px] font-medium bg-[#edf6ef] text-[#397451]">Repeat buyer</span>}</div></div></td>
+        <td data-label="Orders"><strong>{profile.orders.length}</strong></td><td data-label="Completed spend">{currency(profile.totalSpent)}</td><td data-label="Outstanding"><span className={profile.outstanding > 0 ? 'text-[#bd5142]' : ''}>{currency(profile.outstanding)}</span></td><td data-label="Last order">{date(profile.lastOrder)}</td><td className="max-[1000px]:col-span-full max-[1000px]:border-t! max-[1000px]:border-[#eee]! max-[1000px]:pt-3!"><button className="inline-flex cursor-pointer items-center justify-center gap-[7px] whitespace-nowrap rounded-[7px] border border-[#e2e2df] bg-white px-3 py-[9px] text-[11px] font-medium text-[#555] hover:bg-[#f5f5f3]" onClick={() => openCustomer(profile)}><Eye size={14} /> View customer</button></td>
+      </tr>)}
+      {!visible.length && <tr><td colSpan={7} className="px-[18px]! py-11! text-center text-[#999] max-[1000px]:col-span-full [&>svg]:mx-auto [&>svg]:mb-3 [&_h3]:m-0 [&_h3]:font-sans [&_h3]:text-[17px] [&_h3]:font-medium [&_h3]:text-[#555] [&_p]:mt-2 [&_p]:mb-4"><Users size={28} /><h3>{customers.length ? 'No customers found' : 'Your customer list starts with an order'}</h3><p>{customers.length ? 'Try a different search or customer filter.' : 'Customers appear here automatically when orders are recorded.'}</p>{customers.length > 0 && <button className="inline-flex cursor-pointer items-center justify-center gap-[7px] whitespace-nowrap rounded-[7px] border border-[#e2e2df] bg-white px-3 py-[9px] text-[11px] font-medium text-[#555] hover:bg-[#f5f5f3]" onClick={() => { setSearch(''); setFilter('all'); }}>Clear filters</button>}</td></tr>}
+    </tbody></table></div><p className="my-[15px] text-[11px] leading-[1.7] text-[#999]">Completed spend counts delivered, fully paid orders. Outstanding balances exclude canceled orders.</p>
+    <Pagination page={currentPage} totalPages={totalPages} onPageChange={setPage} />
+    {customer && <dialog ref={dialog} className="fixed inset-y-0 right-0 left-auto m-0 ml-auto h-dvh max-h-dvh w-[min(580px,100%)] max-w-full border-0 bg-white p-0 text-[#333] shadow-[-12px_0_50px_#00000018] outline-none backdrop:bg-black/40 [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-[#dc4939] [&_button:focus-visible]:outline-offset-3" aria-labelledby="cl-profile-title" onCancel={() => setSelectedKey(null)} onClose={() => setSelectedKey(null)} onClick={event => { if (event.target === event.currentTarget) setSelectedKey(null); }}>
+      <header className="flex items-start justify-between gap-[15px] border-b border-[#eeedea] p-[26px] max-[600px]:px-[18px] [&_h2]:mt-0 [&_h2]:mb-2.5 [&_h2]:text-[28px] [&_h2]:font-semibold [&_h2]:[overflow-wrap:anywhere]"><div><p className="mt-0 mb-2.5 text-[11px] font-bold tracking-[2px] text-[#dc4939]">CUSTOMER PROFILE</p><h2 id="cl-profile-title">{customer.name}</h2>{customer.repeatBuyer && <span className="inline-block rounded-[5px] px-[7px] py-[3px] text-[9px] font-medium bg-[#edf6ef] text-[#397451]">Repeat buyer</span>}</div><button className="inline-flex cursor-pointer items-center justify-center gap-[7px] whitespace-nowrap rounded-[7px] border border-[#e2e2df] bg-white px-3 py-[9px] text-[11px] font-medium text-[#555] hover:bg-[#f5f5f3]" autoFocus aria-label="Close customer profile" onClick={() => setSelectedKey(null)}><X size={18} /></button></header>
+      <div className="px-[26px] max-[600px]:px-[18px] [&_section]:border-b [&_section]:border-[#eeedea] [&_section]:py-[23px] [&_h3]:mt-0 [&_h3]:mb-4 [&_h3]:font-sans [&_h3]:text-sm [&_h3]:font-semibold [&_h3_span]:text-[11px] [&_h3_span]:text-[#999]"><section className="[&_p]:flex [&_p]:items-start [&_p]:gap-2.5 [&_p]:text-xs [&_p]:leading-[1.7] [&_p]:text-[#888] [&_p]:[overflow-wrap:anywhere] [&_svg]:mt-[3px] [&_svg]:shrink-0 [&_svg]:text-[#aaa]"><h3>Contact & latest delivery address</h3><p><Phone size={14} />{customer.phone || 'No phone provided'}</p><p><Mail size={14} />{customer.email || 'No email provided'}</p><p><MapPin size={14} />{customer.address || 'No delivery address provided'}</p></section>
+        <section><h3>Customer overview</h3><div className="grid grid-cols-2 gap-2.5 [&>div]:rounded-lg [&>div]:border [&>div]:border-[#e7e7e5] [&>div]:bg-[#fafaf8] [&>div]:p-3.5 [&_small]:mb-1.5 [&_small]:block [&_small]:text-[10px] [&_small]:text-[#999] [&_strong]:text-[15px] [&_strong]:font-medium">{[{ label: 'Total orders', value: customer.orders.length }, { label: 'Completed spend', value: currency(customer.totalSpent) }, { label: 'Partial collections', value: currency(customer.partialCollected) }, { label: 'Outstanding', value: currency(customer.outstanding) }, { label: 'First order', value: date(customer.firstOrder) }, { label: 'Last order', value: date(customer.lastOrder) }].map(stat => <div key={stat.label}><small>{stat.label}</small><strong>{stat.value}</strong></div>)}</div><p className="my-[15px] text-[11px] leading-[1.7] text-[#999]">Partial collections are payments on orders not yet fully paid, excluding canceled orders.</p></section>
+        <section><h3>Order history <span>({customer.orders.length})</span></h3><div className="mb-[18px] flex gap-2.5 max-[600px]:flex-col [&_input]:w-full [&_input]:flex-1"><input className="min-w-0 rounded-lg border border-[#e2e2df] bg-white px-3 py-2.5 text-xs font-normal text-[#555] outline-none focus:border-[#dc4939] focus:shadow-[0_0_0_3px_#dc493914]" type="search" aria-label="Search customer orders" placeholder="Search products or order ID…" value={orderSearch} onChange={event => setOrderSearch(event.target.value)} /><select className="min-w-0 rounded-lg border border-[#e2e2df] bg-white px-3 py-2.5 text-xs font-normal text-[#555] outline-none focus:border-[#dc4939] focus:shadow-[0_0_0_3px_#dc493914]" aria-label="Filter customer orders by status" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>{['ALL', 'Pending', 'Processing', 'Shipped', 'Delivered', 'Canceled'].map(status => <option key={status} value={status}>{status === 'ALL' ? 'All statuses' : status}</option>)}</select></div>
+          {history.map(order => <article key={order._id} className="mb-3 rounded-[9px] border border-[#e7e7e5] p-4 [&>p]:mt-3 [&>p]:mb-1.5 [&>p]:text-xs [&>p]:leading-[1.7] [&>p]:text-[#888] [&>small]:text-[10px] [&>small]:text-[#aaa]"><div className="flex items-center justify-between gap-3 text-xs [&_strong]:font-medium"><strong>#{String(order._id).slice(-6).toUpperCase()}</strong><strong>{currency(order.totalAmount)}</strong></div><div className="mt-2.5 flex flex-wrap gap-1.5"><span className={`inline-block rounded-[5px] px-[7px] py-[3px] text-[9px] font-medium ${tone(order.status)}`}>{order.status || 'Pending'}</span><span className={`inline-block rounded-[5px] px-[7px] py-[3px] text-[9px] font-medium ${tone(order.paymentStatus || 'Unpaid')}`}>{order.paymentStatus || 'Unpaid'}</span>{order.isManual && <span className="inline-block rounded-[5px] px-[7px] py-[3px] text-[9px] font-medium bg-[#f0efed] text-[#888]">Manual</span>}</div><p>{order.items?.map(item => `${item.quantity} × ${item.name}`).join(', ') || 'No products listed'}</p><small>{date(order.createdAt)}{order.paymentMethod ? ` · ${order.paymentMethod}` : ''}</small>{outstandingAmount(order) > 0 && <p className="text-[11px]! text-[#bd5142]!">Due: {currency(outstandingAmount(order))}</p>}</article>)}
+          {!history.length && <p className="p-6 text-center text-xs text-[#999]">No orders match these filters.</p>}
+        </section></div>
+    </dialog>}
+  </section>;
+}
