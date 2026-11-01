@@ -3,7 +3,8 @@ import adminAxios from '../../utils/adminAxios';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useSearchParams } from 'react-router-dom';
+import { outstandingAmount } from '../../utils/customerProfiles';
 import { useToast } from '../../context/ToastContext';
 import Pagination from '../../components/Pagination';
 import PaymentDetailsModal from './order-modals/PaymentDetailsModal';
@@ -21,6 +22,8 @@ import { togglePageSelection, isPageSelected } from '../../utils/orderSelection'
 const PAGE_SIZE = 15;
 
 const OrderList = () => {
+  const [query] = useSearchParams();
+  const [dueOnly, setDueOnly] = useState(query.get('due') === '1');
   const { orders = [], perfumes = [], fetchData } = useOutletContext();
   const toast = useToast();
   const [showArchived, setShowArchived] = useState(false);
@@ -35,6 +38,13 @@ const OrderList = () => {
   const [page, setPage] = useState(1);
   const [viewOrderId, setViewOrderId] = useState(null);
   const viewOrder = orders.find(order => order._id === viewOrderId);
+  useEffect(() => {
+    setOrderStatusFilter(['Pending', 'Processing', 'Shipped', 'Delivered', 'Canceled'].includes(query.get('status')) ? query.get('status') : 'ALL');
+    setPaymentStatusFilter(['Paid', 'Unpaid', 'Partial', 'Pending Verification'].includes(query.get('payment')) ? query.get('payment') : 'ALL');
+    setDueOnly(query.get('due') === '1');
+    setViewOrderId(query.get('order'));
+    setPage(1);
+  }, [query]);
 
   // ── NEW: Date range filter ──
   const [dateFrom, setDateFrom] = useState('');
@@ -74,8 +84,8 @@ const OrderList = () => {
 
 
 
-  useEffect(() => { setPage(1); }, [searchTerm, paymentStatusFilter, paymentMethodFilter, orderStatusFilter, showArchived, dateFrom, dateTo]);
-  useEffect(() => { setSelectedIds(new Set()); }, [searchTerm, paymentStatusFilter, paymentMethodFilter, orderStatusFilter, showArchived, dateFrom, dateTo]);
+  useEffect(() => { setPage(1); }, [searchTerm, paymentStatusFilter, paymentMethodFilter, orderStatusFilter, showArchived, dateFrom, dateTo, dueOnly]);
+  useEffect(() => { setSelectedIds(new Set()); }, [searchTerm, paymentStatusFilter, paymentMethodFilter, orderStatusFilter, showArchived, dateFrom, dateTo, dueOnly]);
 
   // Fetch admin list for payment receiver selection
   useEffect(() => {
@@ -479,7 +489,7 @@ const OrderList = () => {
   };
 
   // ── Filtering (UPDATED: search by Order ID + date range) ──
-  const baseFiltered = orders.filter(o => showArchived ? o.status === 'Canceled' : o.status !== 'Canceled');
+  const baseFiltered = orders.filter(o => showArchived ? ['canceled', 'cancelled'].includes(String(o.status).toLowerCase()) : !['canceled', 'cancelled'].includes(String(o.status).toLowerCase()));
   const allFiltered = baseFiltered.filter(order => {
     const s = searchTerm.trim().toLowerCase();
     const matchesSearch = !s ||
@@ -498,7 +508,7 @@ const OrderList = () => {
       const to = new Date(`${dateTo}T23:59:59.999+06:00`);
       matchesDate = new Date(order.createdAt) <= to;
     }
-    return matchesSearch && matchesPaymentStatus && matchesPaymentMethod && matchesOrderStatus && matchesDate;
+    return matchesSearch && matchesPaymentStatus && matchesPaymentMethod && matchesOrderStatus && matchesDate && (!dueOnly || outstandingAmount(order) > 0);
   });
   const totalPages = Math.max(1, Math.ceil(allFiltered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -751,6 +761,7 @@ const OrderList = () => {
         </div>
       )}
 
+      {dueOnly && <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800"><span>Showing orders with a remaining customer balance.</span><button className="cursor-pointer border-0 bg-transparent underline" onClick={() => setDueOnly(false)}>Show all balances</button></div>}
       <OrderTable orders={displayedOrders} selectedIds={selectedIds} allSelected={isPageSelected(selectedIds, displayedOrders)} onSelect={toggleSelect} onSelectAll={toggleSelectAll} onView={setViewOrderId} onEdit={openEditOrder} onReceipt={downloadReceipt} onNotes={setNotesOrder} />
       <OrderDetailsDrawer order={viewOrder} onClose={() => setViewOrderId(null)} onStatus={updateStatus}
         onPaymentStatus={(id, status) => { if (status === 'Paid') setViewOrderId(null); updatePaymentStatus(id, status); }}

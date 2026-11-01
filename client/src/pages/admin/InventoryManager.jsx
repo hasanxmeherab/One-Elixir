@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import adminAxios from '../../utils/adminAxios';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
 import { Plus, X, ImagePlus, Search, Package, Pencil, Trash2, ArrowLeft } from 'lucide-react';
 
@@ -113,6 +113,7 @@ const AddStockCell = ({ p, API_URL, fetchData, toast }) => {
 
 
 const InventoryManager = () => {
+  const [query] = useSearchParams();
   const toast = useToast();
   const { perfumes = [], fetchData } = useOutletContext();
 
@@ -121,6 +122,7 @@ const InventoryManager = () => {
   const [editId, setEditId]     = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [stockFilter, setStockFilter] = useState('all');
+  React.useEffect(() => { setStockFilter(['low', 'out'].includes(query.get('stock')) ? query.get('stock') : 'all'); }, [query]);
   const [formOpen, setFormOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '', price: '', description: '', scentProfile: '',
@@ -146,15 +148,15 @@ const InventoryManager = () => {
   const getStock = p => p.variants?.length
     ? p.variants.reduce((total, variant) => total + Number(variant.stock || 0), 0)
     : Number(p.stock || 0);
+  const stockLevels = product => product.variants?.length ? product.variants.map(variant => Number(variant.stock) || 0) : [getStock(product)];
   const stockCounts = {
     all: perfumes.length,
-    low: perfumes.filter(p => getStock(p) > 0 && getStock(p) < 5).length,
-    out: perfumes.filter(p => getStock(p) === 0).length,
+    low: perfumes.filter(p => stockLevels(p).some(stock => stock > 0 && stock < 5)).length,
+    out: perfumes.filter(p => stockLevels(p).some(stock => stock <= 0)).length,
   };
   const filteredPerfumes = perfumes.filter(p => {
-    const stock = getStock(p);
     return p.name.toLowerCase().includes(searchTerm.trim().toLowerCase())
-      && (stockFilter === 'all' || (stockFilter === 'low' ? stock > 0 && stock < 5 : stock === 0));
+      && (stockFilter === 'all' || stockLevels(p).some(stock => stockFilter === 'low' ? stock > 0 && stock < 5 : stock <= 0));
   });
 
   const handleEditClick = (p) => {

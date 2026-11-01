@@ -1,679 +1,109 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
-import { DashboardSkeleton } from '../../components/Skeleton';
-import ConfirmDialog from '../../components/ConfirmDialog';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { RefreshCw, ArrowUpRight, Plus, Clock, AlertCircle, Wallet, Package, Users, ChevronRight } from 'lucide-react';
 import adminAxios from '../../utils/adminAxios';
-import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, XAxis, YAxis,
-  CartesianGrid, Tooltip, ResponsiveContainer, Cell
-} from 'recharts';
+import { expenseDay } from '../../utils/expenseRecords';
+import { useToast } from '../../context/ToastContext';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-
-const CustomTooltip = ({ active, payload, label, suffix = '' }) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div style={{ background: '#111', padding: '8px 12px', borderRadius: 4 }}>
-      <p style={{ color: '#aaa', fontSize: 10, marginBottom: 4 }}>{label}</p>
-      {payload.map((p, i) => (
-        <p key={i} style={{ color: '#fff', fontSize: 11, margin: 0 }}>
-          {p.name}: {Number(p.value).toLocaleString()}{suffix}
-        </p>
-      ))}
-    </div>
-  );
+const button = 'inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#e2e2df] bg-white px-3.5 py-2.5 text-xs font-medium text-[#555] no-underline hover:bg-[#f5f5f3] disabled:cursor-not-allowed disabled:opacity-50';
+const card = 'min-w-0 rounded-xl border border-[#e7e7e5] bg-white p-5 sm:p-6';
+const field = 'min-w-0 rounded-lg border border-[#e2e2df] bg-white px-3 py-2 text-xs text-[#555] outline-none focus:border-[#dc4939]';
+const money = value => `${Number(value || 0).toLocaleString('en-BD', { maximumFractionDigits: 2 })} TK`;
+const shiftDay = (value, days) => new Date(Date.parse(`${value}T00:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
+const presetDates = days => { const to = expenseDay(); return { from: shiftDay(to, 1 - days), to }; };
+const dateLabel = value => new Date(`${value}T00:00:00+06:00`).toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka', day: '2-digit', month: 'short' });
+const changeText = (current, previous, percent = false) => {
+  if (percent) return `${Math.round((current - previous) * 100) / 100 > 0 ? '+' : ''}${Math.round((current - previous) * 100) / 100} percentage points vs previous period`;
+  if (!previous) return current ? 'No previous-period baseline' : 'No change vs previous period';
+  const difference = Math.round((current - previous) / previous * 1000) / 10;
+  return `${difference > 0 ? '+' : ''}${difference}% vs previous period`;
 };
 
-const AdminDashboard = () => {
-  const { perfumes = [], orders = [], investments = [], toast = () => { } } = useOutletContext();
-  const navigate = useNavigate();
-  const [filterType, setFilterType] = useState(null);
-  const [revenueRange, setRevenueRange] = useState('30');
-  const [now, setNow] = useState(new Date());
-
-  // ── Cost records for margin calculation & Superadmin Money tracking ──
-  const [costRecords, setCostRecords] = useState([]);
-  const [expenses, setExpenses] = useState([]);
-  const [adminBalances, setAdminBalances] = useState([]);
-  const [resetting, setResetting] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+export default function AdminDashboard() {
+  const toast = useToast();
+  const [dates, setDates] = useState(() => presetDates(30));
+  const [preset, setPreset] = useState('30');
+  const [draft, setDraft] = useState(() => presetDates(30));
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [revision, setRevision] = useState(0);
+  const [chartMode, setChartMode] = useState('money');
   const [confirmReset, setConfirmReset] = useState(false);
-  const adminData = JSON.parse(localStorage.getItem('adminData') || '{}');
-  const isSuperadmin = adminData?.role === 'superadmin';
-
-  const fetchSettlementDashboard = useCallback(() => {
-    adminAxios.get(`${API_URL}/api/settlements/dashboard`)
-      .then(r => setAdminBalances(r.data.admins || []))
-      .catch(() => { });
+  const [resetting, setResetting] = useState(false);
+  const refresh = () => setRevision(value => value + 1);
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true); setError('');
+    adminAxios.get('/api/dashboard', { params: dates, signal: controller.signal })
+      .then(response => { if (!controller.signal.aborted) setData(response.data); })
+      .catch(requestError => { if (!controller.signal.aborted) setError(requestError.response?.data?.message === 'Route not found' ? 'Dashboard API is not deployed yet. Deploy the updated backend, then refresh.' : requestError.response?.data?.message || 'Could not load the dashboard. Please retry.'); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [dates, revision]);
+  useEffect(() => {
+    const update = () => { if (document.visibilityState === 'visible') refresh(); };
+    const timer = setInterval(update, 60000);
+    window.addEventListener('focus', update);
+    return () => { clearInterval(timer); window.removeEventListener('focus', update); };
   }, []);
-
-  useEffect(() => {
-    adminAxios.get(`${API_URL}/api/costs`).then(r => setCostRecords(r.data)).catch(() => { });
-    adminAxios.get(`${API_URL}/api/expenses`).then(r => setExpenses(r.data)).catch(() => { });
-    if (isSuperadmin) fetchSettlementDashboard();
-  }, [isSuperadmin, fetchSettlementDashboard]);
-
-  // Auto-refresh admin holding balances when any order's payment status changes
-  // e.g. when an order is marked unpaid, the admin's holding should immediately decrease
-  const orderPaymentFingerprint = orders.map(o => `${o._id}:${o.paymentStatus}:${o.amountPaid || 0}`).join('|');
-  useEffect(() => {
-    if (isSuperadmin) fetchSettlementDashboard();
-  }, [orderPaymentFingerprint]);
-
-
-  // ── Product revenue chart tab ─────────────────────────────
-  const [productTab, setProductTab] = useState('revenue');
-
-  if (!perfumes || !orders) {
-    return <DashboardSkeleton />;
-  }
-
-  // ── KPIs ────────────────────────────────────────────────────
-  const lowStockItems = perfumes.filter(p => p.stock > 0 && p.stock <= 5);
-  const outOfStockItems = perfumes.filter(p => p.stock === 0);
-  const activeFlashSales = perfumes.filter(p =>
-    p.flashSale?.active && p.flashSale?.salePrice && p.flashSale?.endsAt && new Date(p.flashSale.endsAt) > new Date()
-  );
-  const totalStock = perfumes.reduce((a, p) => a + (Number(p.stock) || 0), 0);
-  const totalValuation = perfumes.reduce((a, p) => {
-    const flashActive = p.flashSale?.active && p.flashSale?.salePrice && new Date(p.flashSale.endsAt) > new Date();
-    const price = flashActive ? p.flashSale.salePrice : p.price;
-    return a + (price * (Number(p.stock) || 0));
-  }, 0);
-  const totalRevenue = orders.reduce((sum, o) => {
-    const oStatus = (o.status || '').toLowerCase();
-    if (oStatus === 'cancelled' || oStatus === 'canceled' || oStatus === 'archived') return sum;
-
-    const pStatus = (o.paymentStatus || '').toLowerCase();
-    const paidAmt = Number(o.amountPaid) || 0;
-    const totalAmt = Number(o.totalAmount) || 0;
-
-    if (pStatus === 'paid') {
-      return sum + totalAmt;
-    }
-    if (pStatus === 'partial' || paidAmt > 0) {
-      return sum + paidAmt;
-    }
-    return sum;
-  }, 0);
-  const totalInvestment = investments.reduce((a, inv) => {
-    const v = parseFloat(inv.totalAmount); return a + (isNaN(v) ? 0 : v);
-  }, 0);
-  const totalExpenses = expenses.reduce((a, e) => a + (Number(e.amount) || 0), 0);
-  const availableMoney = (totalRevenue + totalInvestment) - totalExpenses;
-  const totalOrders = orders.length;
-
-  // ── Quick stats ────────────────────────────────────────────────
-  const deliveredOrders = orders.filter(o => o.status?.toLowerCase() === 'delivered' && o.paymentStatus?.toLowerCase() === 'paid');
-  const avgOrderValue = deliveredOrders.length
-    ? Math.round(deliveredOrders.reduce((a, o) => a + (Number(o.totalAmount) || 0), 0) / deliveredOrders.length)
-    : 0;
-  const uniqueCustomers = new Set(orders.map(o => o.customerEmail).filter(Boolean)).size;
-  const conversionRate = totalOrders > 0
-    ? Math.round((deliveredOrders.length / totalOrders) * 100)
-    : 0;
-
-  // ── Payment status data for pie chart ───────────────────
-  const paymentData = useMemo(() => {
-    const map = {};
-    orders.forEach(o => {
-      const s = o.paymentStatus || 'Unknown';
-      map[s] = (map[s] || 0) + 1;
-    });
-    return Object.entries(map).map(([name, value]) => ({ name, value }));
-  }, [orders]);
-  const PAYMENT_COLORS = { Paid: '#16a34a', Unpaid: '#dc2626', Partial: '#f59e0b', Unknown: '#999' };
-
-  // ── Revenue + Volume data ────────────────────────────────────
-  const chartData = useMemo(() => {
-    const days = parseInt(revenueRange);
-    const now = new Date();
-    const map = {};
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(now); d.setDate(d.getDate() - i);
-      const key = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-      map[key] = { date: key, revenue: 0, orders: 0 };
-    }
-    orders.forEach(o => {
-      const d = new Date(o.createdAt);
-      const diff = Math.floor((now - d) / 86400000);
-      if (diff < days) {
-        const key = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-        if (map[key]) {
-          map[key].orders += 1;
-          const pStatus = (o.paymentStatus || '').toLowerCase();
-          const paidAmt = Number(o.amountPaid) || 0;
-          if (pStatus === 'paid') {
-            map[key].revenue += Number(o.totalAmount) || 0;
-          } else if (pStatus === 'partial' || paidAmt > 0) {
-            map[key].revenue += paidAmt;
-          }
-        }
-      }
-    });
-    return Object.values(map);
-  }, [orders, revenueRange]);
-
-  // ── Top Products ─────────────────────────────────────────────
-  const topProducts = useMemo(() => {
-    const map = {};
-    orders
-      .filter(o => o.status?.toLowerCase() === 'delivered' && o.paymentStatus?.toLowerCase() === 'paid')
-      .forEach(o => o.items?.forEach(item => {
-        if (!map[item.name]) map[item.name] = { name: item.name, units: 0 };
-        map[item.name].units += item.quantity;
-      }));
-    return Object.values(map).sort((a, b) => b.units - a.units).slice(0, 6);
-  }, [orders]);
-
-  // ── Product Revenue / Units / Margin data ────────────────────
-  const productRevenueData = useMemo(() => {
-    const map = {};
-    orders
-      .filter(o => o.status?.toLowerCase() === 'delivered' && o.paymentStatus?.toLowerCase() === 'paid')
-      .forEach(o => o.items?.forEach(item => {
-        if (!map[item.name]) map[item.name] = { name: item.name, revenue: 0, units: 0 };
-        map[item.name].units += item.quantity;
-        map[item.name].revenue += (Number(item.price) || 0) * item.quantity;
-      }));
-
-    // Attach latest margin from cost records
-    const latestMargin = {};
-    costRecords.forEach(r => {
-      if (!latestMargin[r.perfumeName] ||
-        new Date(r.createdAt) > new Date(latestMargin[r.perfumeName].createdAt)) {
-        latestMargin[r.perfumeName] = r;
-      }
-    });
-
-    return Object.values(map)
-      .map(p => ({
-        ...p,
-        margin: latestMargin[p.name] ? parseFloat(latestMargin[p.name].profitMargin.toFixed(1)) : null,
-        shortName: p.name.length > 14 ? p.name.slice(0, 13) + '…' : p.name,
-      }))
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 8);
-  }, [orders, costRecords]);
-
-  // ── Status Breakdown ─────────────────────────────────────────
-  const statusData = useMemo(() => {
-    const map = {};
-    orders.forEach(o => { const s = o.status || 'Unknown'; map[s] = (map[s] || 0) + 1; });
-    return Object.entries(map).map(([name, value]) => ({ name, value }));
-  }, [orders]);
-
-  const STATUS_COLORS = {
-    Pending: '#f39c12', Processing: '#3498db',
-    Shipped: '#9b59b6', Delivered: '#27ae60',
-    Cancelled: '#e74c3c', Canceled: '#e74c3c',
+  const selectPreset = value => {
+    setPreset(value);
+    if (value !== 'custom') { const next = presetDates(Number(value)); setDates(next); setDraft(next); }
   };
+  const applyCustom = event => {
+    event.preventDefault();
+    const days = (Date.parse(draft.to) - Date.parse(draft.from)) / 86400000 + 1;
+    if (!Number.isFinite(days) || days < 1 || days > 366) { toast.warning('Select a date range of 1 to 366 days.'); return; }
+    setDates({ ...draft });
+  };
+  const resetBalances = async () => {
+    setConfirmReset(false); setResetting(true);
+    try { await adminAxios.post('/api/settlements/reset-ledger'); toast.success('Accounting balances reset.'); refresh(); }
+    catch (requestError) { toast.error(requestError.response?.data?.message || 'Could not reset balances.'); }
+    finally { setResetting(false); }
+  };
+  const business = data?.isSuperadmin;
+  const headlineCards = data ? [
+    { label: 'Orders placed', key: 'orders', format: value => value, note: 'Active orders created in this period' },
+    { label: business ? 'Customer collections' : 'My collections', key: 'collections', format: money, note: 'Recorded by collection ledger date' },
+    business ? { label: 'Completed sales', key: 'completedSales', format: money, note: 'Delivered & paid orders placed in period' } : { label: 'Delivered rate', key: 'deliveredRate', format: value => `${value}%`, percent: true, note: 'Delivered share of orders placed in period' },
+    business ? { label: 'Expenses', key: 'expenses', format: money, note: 'Expense dates within this period' } : { label: 'Completed sales', key: 'completedSales', format: money, note: 'Business delivered & paid orders in period' },
+  ] : [];
+  const snapshot = data?.snapshot;
+  const moneyCards = data ? business ? [
+    { label: 'Customer balances due', value: snapshot.customerDue, note: 'Active order totals less customer payments', path: '/admin/order-list?due=1' },
+    { label: 'Held by regular admins', value: snapshot.adminHeld, note: 'Outstanding collection ledger balances', path: '/admin/settlements' },
+    { label: 'My superadmin holding', value: snapshot.myHolding, note: 'Direct collections + received funds − vault transfers', path: '/admin/settlements' },
+    { label: 'Transferred to vault', value: snapshot.vault, note: 'Recorded vault transfers; not spendable-cash inference', path: '/admin/settlements' },
+    { label: 'Net capital recorded', value: snapshot.netCapital, note: 'Investor contributions less withdrawals', path: '/admin/investment' },
+    { label: 'All-time expenses', value: snapshot.allExpenses, note: 'Recorded expenditure, shown separately', path: '/admin/expenses' },
+  ] : [
+    { label: 'My outstanding settlement balance', value: snapshot.myOutstanding, note: 'My collections + adjustments − settled amounts', path: '/admin/settlements' },
+    { label: 'My total collections', value: snapshot.myCollected, note: 'Recorded in the current ledger', path: '/admin/settlements' },
+    { label: 'Customer balances due', value: snapshot.customerDue, note: 'Business snapshot of active unpaid balances', path: '/admin/order-list?due=1' },
+  ] : [];
 
-  const BAR_COLORS = ['#111', '#333', '#555', '#777', '#999', '#bbb'];
-
-  const axisStyle = { fontSize: 10, fill: '#bbb' };
-
-  // margin bar color
-  const marginBarColor = (val) => val >= 60 ? '#16a34a' : val >= 30 ? '#d97706' : '#dc2626';
-
-  return (
-    <>
-      <ConfirmDialog
-        isOpen={confirmReset}
-        type="danger"
-        title="Reset All Balances to ৳0?"
-        message="This will permanently clear all admin holding balances and start fresh. All unsettled amounts will be lost. This action cannot be undone."
-        confirmText="Yes, Reset"
-        cancelText="Cancel"
-        onCancel={() => setConfirmReset(false)}
-        onConfirm={() => {
-          setConfirmReset(false);
-          setResetting(true);
-          adminAxios.post(`${API_URL}/api/settlements/reset-ledger`)
-            .then(r => {
-              toast.success(r.data.message || 'All balances reset to ৳0.');
-              fetchSettlementDashboard();
-            })
-            .catch(e => toast.error('Reset failed: ' + (e.response?.data?.message || e.message)))
-            .finally(() => setResetting(false));
-        }}
-      />
-      <div>
-        <h3 className="tracking-[3px] mb-8 font-bold">DASHBOARD OVERVIEW</h3>
-
-        {/* ── KPI Cards ── */}
-        <div className="flex gap-5 flex-wrap mb-5">
-          {[
-            { label: 'TOTAL REVENUE', value: `${totalRevenue.toLocaleString()} TK`, accent: 'border-l-black' },
-            { label: 'TOTAL CAPITAL', value: `${totalInvestment.toLocaleString()} TK`, accent: 'border-l-black' },
-            { label: 'AVAILABLE MONEY', value: `${availableMoney.toLocaleString()} TK`, accent: 'border-l-black' },
-            { label: 'TOTAL UNITS', value: totalStock, accent: 'border-l-black' },
-            { label: 'INVENTORY VALUE', value: `${totalValuation.toLocaleString()} TK`, accent: 'border-l-[#8b5cf6]' },
-          ].map(c => (
-            <div key={c.label} className={`flex-1 min-w-[150px] p-6 bg-white border border-[#eee] border-l-4 ${c.accent}`}>
-              <span className="block text-[10px] text-[#888] font-bold tracking-[2px] mb-2.5">{c.label}</span>
-              <span className="text-xl font-bold">{c.value}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* ── SUPER ADMIN: ADMIN MONEY OVERVIEW ── */}
-        {isSuperadmin && (
-          <div className="bg-white border border-[#eee] p-6 mb-6">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <p className="text-[10px] tracking-[3px] text-[#888] font-bold">💰 ADMIN MONEY OVERVIEW (SUPER ADMIN)</p>
-                <p className="text-xs text-[#aaa] mt-0.5">Track current cash/money held by each admin</p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  disabled={resetting}
-                  onClick={() => setConfirmReset(true)}
-                  className="px-3 py-1.5 text-[10px] font-bold tracking-wider border border-red-400 text-red-600 bg-red-50 hover:bg-red-600 hover:text-white transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5">
-                  {resetting ? (
-                    <><span className="btn-spin" /> RESETTING...</>
-                  ) : '🗑 RESET TO ZERO'}
-                </button>
-                <button
-                  disabled={refreshing}
-                  onClick={() => { setRefreshing(true); fetchSettlementDashboard(); setTimeout(() => setRefreshing(false), 800); }}
-                  className="px-3 py-1.5 text-[10px] font-bold tracking-wider border border-emerald-600 text-emerald-700 bg-emerald-50 hover:bg-emerald-600 hover:text-white transition-colors cursor-pointer disabled:opacity-60 flex items-center gap-1.5">
-                  {refreshing ? (
-                    <><span className="btn-spin" /> SYNCING...</>
-                  ) : '🔄 REFRESH'}
-                </button>
-                <button onClick={() => navigate('/admin/settlements')}
-                  className="px-3 py-1.5 text-[10px] font-bold tracking-wider border border-[#ddd] bg-white hover:border-black transition-colors cursor-pointer">
-                  SETTLEMENT DASHBOARD →
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {adminBalances.map(a => {
-                const hasMoney = a.outstandingBalance > 0;
-                return (
-                  <div key={a.adminId} className={`p-5 border-2 rounded transition-all shadow-sm ${hasMoney ? 'border-amber-400 bg-amber-50/40' : 'border-emerald-300 bg-emerald-50/30'
-                    }`}>
-                    {/* Header */}
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="text-sm font-bold text-black flex items-center gap-1.5">
-                        👤 {a.adminName}
-                      </span>
-                      <span className={`text-[9px] px-2 py-0.5 font-bold rounded tracking-wider ${a.role === 'superadmin' ? 'bg-black text-white' : 'bg-gray-800 text-white'
-                        }`}>
-                        {a.role === 'superadmin' ? '⭐ SUPER ADMIN' : 'ADMIN'}
-                      </span>
-                    </div>
-
-                    {/* Primary Metric: Exact Money Currently Held */}
-                    <div className="my-3 py-3 px-3 bg-white border border-[#eee] rounded">
-                      <span className="block text-[9px] font-bold text-gray-500 tracking-[2px] mb-1">
-                        CURRENT CASH HELD IN HAND
-                      </span>
-                      <span className={`text-2xl font-black ${hasMoney ? 'text-amber-700' : 'text-emerald-700'}`}>
-                        ৳{a.outstandingBalance.toLocaleString()} <span className="text-xs font-semibold text-gray-500">TK</span>
-                      </span>
-                      <span className={`block text-[10px] font-semibold mt-1 ${hasMoney ? 'text-amber-600' : 'text-emerald-600'}`}>
-                        {hasMoney ? `⚠️ Holding ৳${a.outstandingBalance.toLocaleString()} to settle` : '✓ Fully Settled (৳0 Held)'}
-                      </span>
-                    </div>
-
-                    {/* Breakdown details */}
-                    <div className="space-y-1.5 text-[11px] pt-1 border-t border-[#eee]">
-                      <div className="flex justify-between text-gray-600">
-                        <span>Total Collected:</span>
-                        <span className="font-bold text-black">৳{a.totalAmountCollected.toLocaleString()} ({a.totalOrdersCollected} orders)</span>
-                      </div>
-                      <div className="flex justify-between text-gray-600">
-                        <span>Settled to Vault:</span>
-                        <span className="font-bold text-emerald-700">৳{a.amountSettled.toLocaleString()}</span>
-                      </div>
-                      {a.pendingAmount > 0 && (
-                        <div className="flex justify-between text-amber-700 font-bold bg-amber-100/60 px-1.5 py-0.5 rounded">
-                          <span>Pending Settlement:</span>
-                          <span>৳{a.pendingAmount.toLocaleString()} ({a.pendingSettlements} request)</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-              {adminBalances.length === 0 && (
-                <p className="text-xs text-gray-400 py-6 col-span-3 text-center">Loading admin balances...</p>
-              )}
-            </div>
-          </div>
-        )}
-
-
-        {/* ── Alert KPI Cards ── */}
-        <div className="flex gap-5 flex-wrap mb-5">
-          <div onClick={() => setFilterType(f => f === 'low' ? null : 'low')}
-            className={`flex-1 min-w-[150px] p-6 border border-[#eee] border-l-4 border-l-[#f39c12] cursor-pointer transition-colors ${filterType === 'low' ? 'bg-[#fff9f0]' : 'bg-white'}`}>
-            <span className="block text-[10px] text-[#f39c12] font-bold tracking-[2px] mb-2.5">LOW STOCK (VIEW)</span>
-            <span className="text-xl font-bold text-[#f39c12]">{lowStockItems.length}</span>
-          </div>
-          <div onClick={() => setFilterType(f => f === 'out' ? null : 'out')}
-            className={`flex-1 min-w-[150px] p-6 border border-[#eee] border-l-4 border-l-[#e74c3c] cursor-pointer transition-colors ${filterType === 'out' ? 'bg-[#fff5f5]' : 'bg-white'}`}>
-            <span className="block text-[10px] text-[#e74c3c] font-bold tracking-[2px] mb-2.5">OUT OF STOCK (VIEW)</span>
-            <span className="text-xl font-bold text-[#e74c3c]">{outOfStockItems.length}</span>
-          </div>
-        </div>
-
-        {/* ── Quick Stats Row ── */}
-        <div className="flex gap-5 flex-wrap mb-8">
-          {[
-            { label: 'AVG ORDER VALUE', value: `${avgOrderValue.toLocaleString()} TK`, color: '#8b5cf6' },
-            { label: 'UNIQUE CUSTOMERS', value: uniqueCustomers, color: '#0ea5e9' },
-            { label: 'DELIVERED RATE', value: `${conversionRate}%`, color: '#16a34a' },
-            { label: 'ACTIVE FLASH SALES', value: activeFlashSales.length, color: '#dc2626' },
-          ].map(s => (
-            <div key={s.label} className="flex-1 min-w-[130px] p-5 bg-white border border-[#eee] border-l-4" style={{ borderLeftColor: s.color }}>
-              <span className="block text-[10px] font-bold tracking-[2px] mb-2" style={{ color: s.color }}>{s.label}</span>
-              <span className="text-lg font-bold">{s.value}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* ── Alert List ── */}
-        {filterType && (
-          <div className="mb-8 p-6 bg-white border border-black">
-            <div className="flex justify-between mb-4">
-              <p className="font-bold text-[11px] tracking-wider">
-                {filterType === 'low' ? '⚠️ LOW STOCK ITEMS' : '🚫 OUT OF STOCK ITEMS'}
-              </p>
-              <button onClick={() => setFilterType(null)} className="bg-transparent border-none text-[#888] cursor-pointer text-[10px] underline">CLOSE</button>
-            </div>
-            <div className="max-h-[300px] overflow-y-auto">
-              {(filterType === 'low' ? lowStockItems : outOfStockItems).map(item => (
-                <div key={item._id} className="flex justify-between items-center py-4 border-b border-[#eee]">
-                  <div>
-                    <span className="text-sm font-medium">{item.name}</span>
-                    <span className={`block text-[11px] ${filterType === 'low' ? 'text-[#f39c12]' : 'text-[#e74c3c]'}`}>Stock: {item.stock}</span>
-                  </div>
-                  <button onClick={() => navigate('/admin/inventory')}
-                    className="bg-black text-white border-none px-3 py-1.5 text-[10px] cursor-pointer font-bold hover:bg-gray-800 transition-colors">
-                    RESTOCK →
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── Active Flash Sales Panel ── */}
-        {activeFlashSales.length > 0 && (
-          <div className="bg-white border border-[#eee] p-6 mb-6">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <p className="text-[10px] tracking-[3px] text-[#888] font-bold">🔥 ACTIVE FLASH SALES</p>
-                <p className="text-xs text-[#aaa] mt-0.5">{activeFlashSales.length} product{activeFlashSales.length !== 1 ? 's' : ''} on sale right now</p>
-              </div>
-              <button onClick={() => navigate('/admin/inventory')}
-                className="px-3 py-1.5 text-[10px] font-bold tracking-wider border border-[#ddd] bg-white hover:border-black transition-colors cursor-pointer">
-                MANAGE →
-              </button>
-            </div>
-            <div className="space-y-3">
-              {activeFlashSales.map(p => {
-                const cd = getCountdown(p.flashSale.endsAt);
-                const discount = Math.round(((p.price - p.flashSale.salePrice) / p.price) * 100);
-                return (
-                  <div key={p._id} className="flex items-center gap-4 p-4 border border-[#f0f0f0] rounded">
-                    <img src={p.image} alt={p.name} className="w-12 h-12 object-cover rounded bg-[#f9f9f9]" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[12px] font-bold truncate">{p.name}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[11px] text-red-600 font-bold">{p.flashSale.salePrice.toLocaleString()} TK</span>
-                        <span className="text-[10px] text-[#aaa] line-through">{p.price.toLocaleString()} TK</span>
-                        <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 font-bold rounded">-{discount}%</span>
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className="block text-[9px] text-[#888] tracking-wider font-bold">ENDS IN</span>
-                      <span className="text-[13px] font-mono font-bold" style={{ color: cd ? '#111' : '#e74c3c' }}>{cd || 'EXPIRED'}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ── Revenue Chart ── */}
-        <div className="bg-white border border-[#eee] p-6 mb-6">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-            <div>
-              <p className="text-[10px] tracking-[3px] text-[#888] font-bold">REVENUE OVER TIME</p>
-              <p className="text-xs text-[#aaa] mt-0.5">Delivered orders only</p>
-            </div>
-            <div className="flex gap-2">
-              {[['7', '7D'], ['30', '30D'], ['90', '90D']].map(([val, label]) => (
-                <button key={val} onClick={() => setRevenueRange(val)}
-                  className={`px-3 py-1.5 text-[10px] font-bold tracking-wider border transition-colors ${revenueRange === val ? 'bg-black text-white border-black' : 'bg-white text-[#888] border-[#ddd] hover:border-black'}`}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height={240}>
-            <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-              <defs>
-                <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#000" stopOpacity={0.12} />
-                  <stop offset="95%" stopColor="#000" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="date" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={axisStyle} tickLine={false} axisLine={false} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
-              <Tooltip content={<CustomTooltip suffix=" TK" />} />
-              <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#000" strokeWidth={2} fill="url(#revenueGrad)" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* ── Top Products + Order Volume ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <div className="bg-white border border-[#eee] p-6">
-            <p className="text-[10px] tracking-[3px] text-[#888] font-bold mb-1">TOP SELLING PRODUCTS</p>
-            <p className="text-xs text-[#aaa] mb-5">By units sold — delivered orders</p>
-            {topProducts.length === 0
-              ? <p className="text-xs text-[#aaa] text-center py-10">No delivered orders yet.</p>
-              : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={topProducts} margin={{ top: 5, right: 10, left: 0, bottom: 40 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                    <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#888' }} tickLine={false} axisLine={false} angle={-30} textAnchor="end" interval={0} />
-                    <YAxis tick={axisStyle} tickLine={false} axisLine={false} allowDecimals={false} />
-                    <Tooltip content={<CustomTooltip suffix=" units" />} />
-                    <Bar dataKey="units" name="Units Sold" radius={[3, 3, 0, 0]}>
-                      {topProducts.map((_, i) => <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )
-            }
-          </div>
-
-          <div className="bg-white border border-[#eee] p-6">
-            <p className="text-[10px] tracking-[3px] text-[#888] font-bold mb-1">ORDER VOLUME</p>
-            <p className="text-xs text-[#aaa] mb-5">All orders — last {revenueRange} days</p>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                <XAxis dataKey="date" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-                <YAxis tick={axisStyle} tickLine={false} axisLine={false} allowDecimals={false} />
-                <Tooltip content={<CustomTooltip suffix=" orders" />} />
-                <Bar dataKey="orders" name="Orders" fill="#111" radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* ── NEW: Revenue by Product ── */}
-        <div className="bg-white border border-[#eee] p-6 mb-6">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-            <div>
-              <p className="text-[10px] tracking-[3px] text-[#888] font-bold">REVENUE BY PRODUCT</p>
-              <p className="text-xs text-[#aaa] mt-0.5">Delivered & paid orders only</p>
-            </div>
-            {/* Tab switcher */}
-            <div className="flex gap-2">
-              {[
-                ['revenue', 'REVENUE'],
-                ['units', 'UNITS SOLD'],
-                ['margin', 'MARGIN %'],
-              ].map(([key, label]) => (
-                <button key={key} onClick={() => setProductTab(key)}
-                  className={`px-3 py-1.5 text-[10px] font-bold tracking-wider border transition-colors cursor-pointer ${productTab === key ? 'bg-black text-white border-black' : 'bg-white text-[#888] border-[#ddd] hover:border-black'}`}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {productRevenueData.length === 0 ? (
-            <p className="text-xs text-[#aaa] text-center py-10">No delivered orders yet.</p>
-          ) : productTab === 'margin' && productRevenueData.every(p => p.margin === null) ? (
-            <div className="text-center py-10">
-              <p className="text-xs text-[#aaa] mb-2">No cost records found.</p>
-              <p className="text-[10px] text-[#bbb]">Add cost records in the <button onClick={() => navigate('/admin/costs')} className="underline cursor-pointer bg-transparent border-none text-[#bbb]">Cost Calculator</button> to see margins.</p>
-            </div>
-          ) : (
-            <>
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart
-                  data={productRevenueData}
-                  margin={{ top: 5, right: 10, left: 0, bottom: 50 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis
-                    dataKey="shortName"
-                    tick={{ fontSize: 9, fill: '#888' }}
-                    tickLine={false}
-                    axisLine={false}
-                    angle={-35}
-                    textAnchor="end"
-                    interval={0}
-                  />
-                  <YAxis
-                    tick={axisStyle}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={v =>
-                      productTab === 'revenue' && v >= 1000 ? `${(v / 1000).toFixed(0)}k`
-                        : productTab === 'margin' ? `${v}%`
-                          : v
-                    }
-                  />
-                  <Tooltip
-                    content={<CustomTooltip
-                      suffix={productTab === 'revenue' ? ' TK' : productTab === 'margin' ? '%' : ' units'}
-                    />}
-                  />
-                  <Bar
-                    dataKey={productTab}
-                    name={productTab === 'revenue' ? 'Revenue' : productTab === 'units' ? 'Units Sold' : 'Margin'}
-                    radius={[3, 3, 0, 0]}
-                  >
-                    {productRevenueData.map((entry, i) => (
-                      <Cell
-                        key={i}
-                        fill={
-                          productTab === 'margin' && entry.margin !== null
-                            ? marginBarColor(entry.margin)
-                            : BAR_COLORS[i % BAR_COLORS.length]
-                        }
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-
-              {/* ── Summary table below chart ── */}
-              <div className="mt-6 border-t border-[#f5f5f5] pt-4">
-                <div className="grid grid-cols-4 gap-2 mb-2">
-                  {['PRODUCT', 'REVENUE', 'UNITS', 'MARGIN'].map(h => (
-                    <span key={h} className="text-[9px] font-bold tracking-wider text-[#aaa]">{h}</span>
-                  ))}
-                </div>
-                {productRevenueData.map((p, i) => (
-                  <div key={i} className="grid grid-cols-4 gap-2 py-2.5 border-b border-[#f9f9f9]">
-                    <span className="text-[11px] font-medium truncate">{p.name}</span>
-                    <span className="text-[11px]">{p.revenue.toLocaleString()} TK</span>
-                    <span className="text-[11px]">{p.units}</span>
-                    <span className="text-[11px] font-bold" style={{
-                      color: p.margin !== null ? marginBarColor(p.margin) : '#ccc'
-                    }}>
-                      {p.margin !== null ? `${p.margin}%` : '—'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* ── Status Breakdown + Payment Status ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white border border-[#eee] p-6">
-            <p className="text-[10px] tracking-[3px] text-[#888] font-bold mb-6">ORDER STATUS BREAKDOWN</p>
-            {statusData.length === 0
-              ? <p className="text-xs text-[#aaa] text-center py-6">No orders yet.</p>
-              : (
-                <div className="flex flex-wrap gap-4">
-                  {statusData.map(({ name, value }) => (
-                    <div key={name} className="flex-1 min-w-[110px] border border-[#eee] p-4 text-center">
-                      <div className="w-3 h-3 rounded-full mx-auto mb-2" style={{ background: STATUS_COLORS[name] || '#999' }} />
-                      <p className="text-[9px] tracking-wider text-[#888] font-bold mb-1">{name.toUpperCase()}</p>
-                      <p className="text-xl font-bold">{value}</p>
-                      <p className="text-[10px] text-[#aaa]">{totalOrders ? Math.round((value / totalOrders) * 100) : 0}%</p>
-                      <div className="mt-2 h-1 bg-[#f0f0f0] rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-500"
-                          style={{ width: `${totalOrders ? (value / totalOrders) * 100 : 0}%`, background: STATUS_COLORS[name] || '#999' }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )
-            }
-          </div>
-
-          {/* ── Payment Status Pie Chart ── */}
-          <div className="bg-white border border-[#eee] p-6">
-            <p className="text-[10px] tracking-[3px] text-[#888] font-bold mb-4">PAYMENT STATUS</p>
-            {paymentData.length === 0
-              ? <p className="text-xs text-[#aaa] text-center py-6">No data.</p>
-              : (
-                <>
-                  <ResponsiveContainer width="100%" height={180}>
-                    <PieChart>
-                      <Pie data={paymentData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} strokeWidth={0}>
-                        {paymentData.map((entry, i) => (
-                          <Cell key={i} fill={PAYMENT_COLORS[entry.name] || '#999'} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<CustomTooltip suffix=" orders" />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="flex flex-wrap justify-center gap-3 mt-3">
-                    {paymentData.map(d => (
-                      <div key={d.name} className="flex items-center gap-1.5">
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ background: PAYMENT_COLORS[d.name] || '#999' }} />
-                        <span className="text-[10px] font-bold text-[#666]">{d.name}: {d.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )
-            }
-          </div>
-        </div>
-      </div>
-    </>
-  );
-};
-
-export default AdminDashboard;
+  return <section className="mx-auto max-w-[1500px] pb-16 text-[#242424] [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-[#dc4939] [&_button:focus-visible]:outline-offset-3 [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-[#dc4939] [&_a:focus-visible]:outline-offset-3">
+    <header className="mb-7 flex flex-wrap items-center justify-between gap-5"><div><p className="mb-2.5 text-[11px] font-bold tracking-[2px] text-[#dc4939]">OVERVIEW / {business ? 'BUSINESS' : 'OPERATIONS'}</p><h1 className="m-0 text-[clamp(26px,3vw,38px)] leading-tight font-semibold tracking-[-.7px]">A clearer view of  business.</h1><p className="mt-3 text-sm text-[#888]">What needs attention, where money sits, and how business is moving.</p></div><div className="flex flex-wrap gap-2"><Link className={button} to="/admin/manual-order"><Plus size={14} /> New order</Link><Link className={button} to="/admin/inventory">Inventory</Link><button className={button} disabled={loading} onClick={refresh}><RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh</button></div></header>
+    <div className="mb-5 rounded-xl border border-[#e7e7e5] bg-[#fafaf8] p-4"><div className="flex flex-wrap items-center justify-between gap-4"><div className="flex flex-wrap gap-1.5" aria-label="Dashboard date range">{[{ value: '1', label: 'Today' }, { value: '7', label: '7 days' }, { value: '30', label: '30 days' }, { value: 'custom', label: 'Custom' }].map(option => <button key={option.value} aria-pressed={preset === option.value} className={`cursor-pointer rounded-lg border px-3.5 py-2 text-xs ${preset === option.value ? 'border-[#222] bg-[#222] text-white' : 'border-[#e5e5e2] bg-white text-[#777]'}`} onClick={() => selectPreset(option.value)}>{option.label}</button>)}</div><p className="m-0 text-[11px] text-[#999]">{dates.from} — {dates.to} · Bangladesh time</p></div>{preset === 'custom' && <form onSubmit={applyCustom} className="mt-4 flex flex-wrap items-end gap-3"><label className="flex flex-col gap-1 text-[11px] text-[#888]">From<input required type="date" className={field} max={draft.to} value={draft.from} onChange={event => setDraft({ ...draft, from: event.target.value })} /></label><label className="flex flex-col gap-1 text-[11px] text-[#888]">To<input required type="date" className={field} min={draft.from} value={draft.to} onChange={event => setDraft({ ...draft, to: event.target.value })} /></label><button className={button}>Apply range</button></form>}<p className="mb-0 mt-3 text-[10px] leading-relaxed text-[#999]">Period metrics follow this date range. Balances, stock, and customer counts below are current snapshots.</p></div>
+    {error && <div role="alert" className="mb-5 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-xs text-red-700"><AlertCircle size={16} className="shrink-0" /><div>{error}<button className="ml-3 cursor-pointer underline" onClick={refresh}>Retry</button></div></div>}
+    {loading ? <div role="status" aria-label="Loading dashboard" className="grid animate-pulse grid-cols-2 gap-4 lg:grid-cols-4">{[1, 2, 3, 4].map(value => <div key={value} className="h-36 rounded-xl bg-[#f1f1ef]" />)}</div> : !error && data && <>
+      <section className="mb-6 rounded-xl border border-[#ded9d1] bg-[#faf8f4] p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="m-0 text-xs font-medium text-[#777]">{business ? 'Current balance' : 'My current settlement balance'}</p><strong className="my-3 block text-3xl font-semibold tracking-tight">{business ? snapshot.currentBalance == null ? 'Unavailable' : money(snapshot.currentBalance) : money(snapshot.myOutstanding)}</strong><p className="m-0 max-w-[650px] text-[11px] leading-relaxed text-[#999]">{business ? 'Recorded customer payments + net investor capital ? expenses. Includes money held by admins; this is a recorded balance, not vault-only cash.' : 'Your collected payments + adjustments ? confirmed settlements.'}</p></div><span className="rounded border border-[#e5e0d8] bg-white px-2 py-1 text-[10px] text-[#999]">Current snapshot ? independent of date filter</span></div>{business && <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-[#e8e3db] pt-3 text-[11px] text-[#888]"><span>Customer payments: {snapshot.recordedCustomerPayments == null ? 'Unavailable' : money(snapshot.recordedCustomerPayments)}</span><span>Net capital: {money(snapshot.netCapital)}</span><span>Expenses: ?{money(snapshot.allExpenses)}</span></div>}</section>
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">{headlineCards.map(metric => <div className="rounded-xl border border-[#e7e7e5] bg-white p-5" key={metric.key}><p className="m-0 text-xs text-[#888]">{metric.label}</p><strong className="my-3 block text-2xl font-semibold">{metric.format(data.current[metric.key])}</strong><p className="m-0 text-[11px] text-[#777]">{changeText(data.current[metric.key], data.previous[metric.key], metric.percent)}</p><p className="mb-0 mt-2 text-[10px] leading-relaxed text-[#aaa]">{metric.note}</p></div>)}</div>
+      <div className="mb-6 flex flex-wrap gap-x-6 gap-y-2 rounded-lg bg-[#fafaf8] px-5 py-3 text-[11px] text-[#888]"><span>Delivered rate: <strong className="font-medium text-[#444]">{data.current.deliveredRate}%</strong></span><span>Average completed order: <strong className="font-medium text-[#444]">{data.current.completedOrders ? money(data.current.completedSales / data.current.completedOrders) : '?'}</strong></span><span>{data.current.completedOrders} delivered & paid orders placed in period</span></div>
+      <section className={`${card} mb-6`}><div className="mb-4 flex items-center gap-2"><AlertCircle size={17} className="text-[#dc4939]" /><h2 className="m-0 font-sans text-base font-semibold">Needs attention</h2><span className="ml-auto text-[10px] text-[#aaa]">Current snapshot</span></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">{data.attention.map(item => <Link key={item.label} to={item.path} className={`flex items-center justify-between gap-3 rounded-lg border p-4 no-underline ${item.count ? 'border-[#eee0d4] bg-[#fffaf5] text-[#5b4437]' : 'border-[#eeedea] bg-[#fafaf8] text-[#888]'}`}><span className="text-xs">{item.label}</span><strong className="ml-auto text-xl font-semibold">{item.count}</strong><ChevronRight size={14} /></Link>)}</div></section>
+      <section className={`${card} mb-6`}><div className="mb-2 flex flex-wrap items-center justify-between gap-3"><h2 className="m-0 flex items-center gap-2 font-sans text-base font-semibold"><Wallet size={17} className="text-[#dc4939]" />{business ? 'Money overview' : 'My collections & settlements'}</h2><Link className="flex items-center gap-1 text-xs text-[#888] no-underline hover:text-[#dc4939]" to="/admin/settlements">Open settlements <ArrowUpRight size={13} /></Link></div><p className="mb-5 text-[11px] leading-relaxed text-[#999]">Current snapshots. These categories overlap and must not be added together as available cash.{data.resetAt ? ` Ledger balances reflect the reset on ${expenseDay(data.resetAt)}.` : ''}</p><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">{moneyCards.map(metric => <Link key={metric.label} to={metric.path} className="rounded-lg border border-[#eeedea] bg-[#fafaf8] p-4 text-inherit no-underline hover:border-[#ccc]"><span className="text-xs text-[#888]">{metric.label}</span><strong className="my-2 block text-xl font-semibold">{money(metric.value)}</strong><small className="text-[10px] leading-relaxed text-[#999]">{metric.note}</small></Link>)}</div>{business && data.adminBalances.some(admin => admin.role !== 'superadmin') && <details className="mt-5 border-t border-[#eee] pt-4"><summary className="cursor-pointer text-xs text-[#777]">Balances by admin</summary><div className="mt-3 grid gap-2 sm:grid-cols-2">{data.adminBalances.filter(admin => admin.role !== 'superadmin').map(admin => <div className="flex justify-between gap-3 rounded-lg bg-[#fafaf8] p-3 text-xs" key={admin.id}><span>{admin.name}</span><strong className="font-medium">{money(admin.outstanding)}</strong></div>)}</div></details>}</section>
+      {data.collectionCoverage > 0 && <p className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[11px] leading-relaxed text-amber-800">{data.collectionCoverage} active paid/part-paid orders have no matching collection ledger entry. They are excluded from dated collection totals; review their payment records. Historical recovered entries use their stored ledger dates.</p>}
+      <section className={`${card} mb-6`}><div className="mb-2 flex flex-wrap items-center justify-between gap-3"><h2 className="m-0 font-sans text-base font-semibold">{chartMode === 'money' ? business ? 'Collections & expenses' : 'My collection trend' : 'Order volume'}</h2><div className="flex gap-2">{['money', 'orders'].map(mode => <button key={mode} className={`cursor-pointer rounded-lg border px-3 py-1.5 text-[11px] ${chartMode === mode ? 'border-[#222] bg-[#222] text-white' : 'border-[#eee] bg-white text-[#888]'}`} onClick={() => setChartMode(mode)} aria-pressed={chartMode === mode}>{mode === 'money' ? 'Money' : 'Orders'}</button>)}</div></div><p className="mb-5 text-[11px] text-[#999]">{chartMode === 'money' ? 'Collections use recorded ledger dates; expenses use expense dates. Historical recovered collections follow their stored ledger timestamps.' : 'Active orders by placement date, excluding canceled orders.'}</p><div className="h-[280px] w-full min-w-0"><ResponsiveContainer width="100%" height="100%"><AreaChart data={data.trend} margin={{ top: 12, right: 12, left: 4, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} /><XAxis dataKey="date" tickFormatter={dateLabel} minTickGap={25} tick={{ fill: '#999', fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis width={55} tick={{ fill: '#999', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={value => value >= 1000 ? `${Math.round(value / 100) / 10}k` : value} /><Tooltip labelFormatter={dateLabel} formatter={(value, name) => [chartMode === 'orders' ? value : money(value), name]} contentStyle={{ borderRadius: 8, borderColor: '#eee', fontSize: 12 }} /><Area type="monotone" dataKey={chartMode === 'orders' ? 'orders' : 'collections'} name={chartMode === 'orders' ? 'Orders' : business ? 'Collections' : 'My collections'} stroke="#dc4939" fill="#dc4939" fillOpacity={0.1} strokeWidth={2} dot={data.trend.length === 1 ? { r: 3 } : false} />{chartMode === 'money' && business && <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#7d879b" fill="#7d879b" fillOpacity={0.06} strokeWidth={2} />}</AreaChart></ResponsiveContainer></div></section>
+      <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-2"><section className={card}><div className="mb-3 flex items-center justify-between gap-3"><h2 className="m-0 font-sans text-base font-semibold">Product performance</h2><span className="text-[10px] text-[#aaa]">Selected period</span></div><p className="mb-4 text-[11px] leading-relaxed text-[#999]">Delivered & paid orders placed in period. Item and order discounts allocated to goods; delivery excluded. Cost margins are omitted without a reliable historical cost basis.</p>{data.topProducts.length ? <div className="space-y-3">{data.topProducts.map(product => <div key={product.id} className="border-b border-[#eee] pb-3 last:border-0"><div className="flex items-start justify-between gap-4 text-xs"><span className="min-w-0 [overflow-wrap:anywhere]">{product.name}<small className="mt-1 block text-[10px] text-[#aaa]">{product.units} units sold</small></span><strong className="shrink-0 font-medium">{money(product.revenue)}</strong></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#f2f1ee]"><div className="h-full rounded-full bg-[#cf9d88]" style={{ width: `${data.topProducts[0].revenue > 0 ? product.revenue / data.topProducts[0].revenue * 100 : 0}%` }} /></div></div>)}</div> : <p className="py-8 text-center text-xs text-[#aaa]">No completed product sales in this period.</p>}</section>
+        <section className={card}><div className="mb-4 flex items-center justify-between gap-3"><h2 className="m-0 flex items-center gap-2 font-sans text-base font-semibold"><Clock size={16} className="text-[#dc4939]" /> Recent activity</h2><span className="text-[10px] text-[#aaa]">Selected period</span></div>{data.activity.length ? <div className="max-h-[440px] overflow-y-auto">{data.activity.map(entry => <Link key={entry.key} to={entry.path} className="flex items-start gap-3 border-b border-[#eee] py-3 text-inherit no-underline last:border-0 hover:bg-[#fafaf8]"><span className="mt-0.5 rounded bg-[#f3eeea] px-2 py-1 text-[9px] text-[#967c70]">{entry.type}</span><span className="min-w-0 flex-1 text-xs [overflow-wrap:anywhere]">{entry.text}<small className="mt-1 block text-[10px] text-[#aaa]">{new Date(entry.date).toLocaleString('en-GB', { timeZone: 'Asia/Dhaka', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</small></span><strong className="shrink-0 text-[11px] font-medium">{money(entry.amount)}</strong></Link>)}</div> : <p className="py-8 text-center text-xs text-[#aaa]">No activity in this period.</p>}</section></div>
+      <section className={card}><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 className="m-0 flex items-center gap-2 font-sans text-base font-semibold"><Package size={17} className="text-[#dc4939]" /> Stock & customers</h2><span className="text-[10px] text-[#aaa]">Current snapshots</span></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-3">{[{ label: 'Units in stock', value: snapshot.stockUnits, icon: Package }, { label: 'Retail value of stock', value: money(snapshot.retailStockValue), icon: Wallet }, { label: 'Customers with active orders', value: snapshot.customers, icon: Users }].map(metric => <div key={metric.label} className="rounded-lg bg-[#fafaf8] p-4"><span className="text-xs text-[#888]">{metric.label}</span><strong className="mt-2 block text-xl font-semibold">{metric.value}</strong></div>)}</div><p className="my-3 text-[10px] text-[#999]">Retail stock value uses each size’s listed price, not inventory cost. Customers are grouped by normalized phone, with email fallback.</p><div className="grid gap-5 sm:grid-cols-2">{[{ label: 'Low stock · fewer than 5 units', items: snapshot.lowStock, filter: 'low' }, { label: 'Sold out', items: snapshot.outOfStock, filter: 'out' }].map(group => <div key={group.filter}><h3 className="mb-3 font-sans text-xs font-medium text-[#777]">{group.label}</h3>{group.items.length ? <div className="max-h-48 overflow-y-auto">{group.items.slice(0, 10).map((item, index) => <Link className="flex justify-between gap-3 border-b border-[#eee] py-2 text-xs text-[#666] no-underline hover:text-[#dc4939]" key={`${item.id}-${index}`} to={`/admin/inventory?stock=${group.filter}`}><span>{item.name}{item.size ? ` · ${item.size}` : ''}</span><span>{item.stock}</span></Link>)}<Link to={`/admin/inventory?stock=${group.filter}`} className="mt-3 inline-block text-[11px] text-[#a75449]">View all {group.items.length} alerts →</Link></div> : <p className="text-xs text-[#aaa]">No alerts.</p>}</div>)}</div></section>
+      <p className="mt-5 text-[10px] text-[#aaa]">Updated {new Date(data.generatedAt).toLocaleTimeString('en-GB', { timeZone: 'Asia/Dhaka' })} Bangladesh time · Refreshes every minute while visible. Comparison period: {data.range.previousFrom} — {data.range.previousTo}.</p>
+      {business && <details className="mt-8 rounded-lg border border-[#eee] p-4"><summary className="cursor-pointer text-xs text-[#999]">Accounting maintenance</summary><p className="mt-3 text-[11px] text-[#999]">Resetting the ledger is a separate administrative action and does not correct order payment history.</p><button className="mt-2 cursor-pointer rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 disabled:opacity-50" disabled={resetting} onClick={() => setConfirmReset(true)}>{resetting ? 'Resetting…' : 'Reset accounting balances'}</button></details>}
+    </>}
+    <ConfirmDialog isOpen={confirmReset} type="danger" title="Reset accounting balances?" message="This permanently clears the payment ledger and settlement balances. It cannot be undone." confirmText="Reset balances" cancelText="Cancel" onCancel={() => setConfirmReset(false)} onConfirm={resetBalances} />
+  </section>;
+}

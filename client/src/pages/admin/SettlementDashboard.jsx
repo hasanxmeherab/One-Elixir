@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import adminAxios from '../../utils/adminAxios';
+import { useSearchParams } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
 import {
   BarChart, Bar, PieChart, Pie, XAxis, YAxis,
@@ -25,6 +26,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 const SettlementDashboard = () => {
+  const [query] = useSearchParams();
   const toast = useToast();
   const adminData = JSON.parse(localStorage.getItem('adminData') || '{}');
   const isSuperadmin = adminData?.role === 'superadmin';
@@ -49,6 +51,10 @@ const SettlementDashboard = () => {
 
   // ── Tab ──
   const [activeTab, setActiveTab] = useState(isSuperadmin ? 'dashboard' : 'balance');
+  useEffect(() => {
+    const tab = query.get('tab');
+    if ((isSuperadmin ? ['dashboard', 'pending', 'history', 'reports'] : ['balance', 'history']).includes(tab)) setActiveTab(tab);
+  }, [query, isSuperadmin]);
 
   // ── Confirm/Reject state ──
   const [confirmingId, setConfirmingId] = useState(null);

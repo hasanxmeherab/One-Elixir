@@ -3,6 +3,8 @@ const router = express.Router();
 const Investment = require('../models/Investment');
 const { verifyAdmin } = require('../middleware/authMiddleware');
 const { validate, addInvestmentSchema } = require('../middleware/validate');
+const investmentInput = require('../utils/investmentInput');
+const writeLog = require('../utils/writeLog');
 
 // 1. GET Names for dropdown (admin only)
 router.get('/names', verifyAdmin, async (req, res) => {
@@ -45,43 +47,44 @@ router.get('/', verifyAdmin, async (req, res) => {
 
 // 3. POST Add/Update Investment (admin only)
 router.post('/add', verifyAdmin, validate(addInvestmentSchema), async (req, res) => {
-  const { investorName, amount, note, date } = req.body;
   try {
+    const { investorName, amount: numericAmount, note, date: customDate, namePattern } = investmentInput(req.body);
     let investment = await Investment.findOne({ 
-      investorName: { $regex: new RegExp("^" + investorName + "$", "i") } 
+      investorName: { $regex: namePattern }
     });
 
     // Ensure we use the date selected by Admin, or fallback to Today
-    const customDate = date ? new Date(date) : new Date();
-    const numericAmount = Number(amount) || 0;
 
     if (investment) {
+      if (numericAmount === 0) return res.status(409).json({ message: 'This investor already exists. Select their account to record a transaction.' });
       // Update existing investor
       investment.transactions.push({ 
         amount: numericAmount, 
-        note: note || "Capital Injection", 
+        note,
         date: customDate 
       });
       
       // Safety: Ensure we aren't adding to a NaN value
       const currentTotal = Number(investment.totalAmount) || 0;
-      investment.totalAmount = currentTotal + numericAmount;
+      investment.totalAmount = Math.round((currentTotal + numericAmount) * 100) / 100;
       
       investment.lastUpdated = Date.now();
       await investment.save();
+      await writeLog(req, 'ADD_INVESTMENT', 'Investment', `${investorName}: ${numericAmount} TK`);
       res.json(investment);
     } else {
       // Create new investor
       const newInv = new Investment({
         investorName,
         totalAmount: numericAmount,
-        transactions: [{ 
+        transactions: numericAmount === 0 ? [] : [{
           amount: numericAmount, 
           note: note || "Initial Investment", 
           date: customDate 
         }]
       });
       await newInv.save();
+      await writeLog(req, 'ADD_INVESTMENT', 'Investment', `Created investor ${investorName}: ${numericAmount} TK`);
       res.status(201).json(newInv);
     }
   } catch (err) { 
@@ -98,11 +101,12 @@ router.delete('/:investorId/transaction/:transactionId', verifyAdmin, async (req
     const transaction = investment.transactions.id(req.params.transactionId);
     if (transaction) {
       const currentTotal = Number(investment.totalAmount) || 0;
-      investment.totalAmount = currentTotal - (Number(transaction.amount) || 0);
+      investment.totalAmount = Math.round((currentTotal - (Number(transaction.amount) || 0)) * 100) / 100;
       
       investment.transactions.pull(req.params.transactionId);
       await investment.save();
-    }
+      await writeLog(req, 'DELETE_INVESTMENT_TRANSACTION', 'Investment', `${investment.investorName}: removed ${transaction.amount} TK`);
+    } else return res.status(404).json({ message: 'Transaction not found.' });
     res.json({ message: "Transaction removed and total recalculated" });
   } catch (err) { 
     res.status(500).json({ message: err.message }); 

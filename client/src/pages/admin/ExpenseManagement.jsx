@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useSearchParams } from 'react-router-dom';
 import Select from 'react-select';
 import { Plus, ArrowLeft, Pencil, Trash2, Download, Search, Receipt } from 'lucide-react';
 import adminAxios from '../../utils/adminAxios';
@@ -18,6 +18,7 @@ const freshForm = () => ({ title: '', amount: '', quantity: '', unitPrice: '', u
 const categoryColors = { Packaging: 'bg-[#f4eefb] text-[#8064a8]', Ingredients: 'bg-[#edf6ef] text-[#397451]', Marketing: 'bg-[#fff5e3] text-[#a17021]', Tools: 'bg-[#eef3fc] text-[#4d70a2]', Other: 'bg-[#f0efed] text-[#888]' };
 
 export default function ExpenseManagement() {
+  const [query] = useSearchParams();
   const toast = useToast();
   const { perfumes = [] } = useOutletContext();
   const [expenses, setExpenses] = useState([]);
@@ -30,6 +31,7 @@ export default function ExpenseManagement() {
   const [mode, setMode] = useState('total');
   const [form, setForm] = useState(freshForm);
   const [filters, setFilters] = useState({ search: '', category: 'ALL', from: '', to: '' });
+  useEffect(() => { setFilters(previous => ({ ...previous, search: query.get('search') || '' })); }, [query]);
   const [page, setPage] = useState(1);
   const submitLock = useRef(false);
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
