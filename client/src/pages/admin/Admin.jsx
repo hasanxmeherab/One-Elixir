@@ -37,9 +37,7 @@ const Admin = () => {
   // ── Order bell notification state ──
   const [unreadOrders, setUnreadOrders] = useState([]);
   const [bellOpen, setBellOpen] = useState(false);
-  const [toastNotifs, setToastNotifs] = useState([]);
   const bellRef = useRef(null);
-  const prevOrderIdsRef = useRef(null);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -65,19 +63,6 @@ const Admin = () => {
   useEffect(() => {
     if (!orders.length) return;
     const seen = getSeen();
-    const currentIds = new Set(orders.map(o => o._id));
-
-    // Detect brand-new orders (not in previous poll) for toast
-    if (prevOrderIdsRef.current !== null) {
-      const brandNew = orders.filter(o =>
-        !prevOrderIdsRef.current.has(o._id) && !seen.has(o._id)
-      );
-      if (brandNew.length > 0) {
-        setToastNotifs(prev => [...prev, ...brandNew.map(o => ({ ...o, _toastId: Date.now() + Math.random() }))]);
-      }
-    }
-    prevOrderIdsRef.current = currentIds;
-
     // Compute unread list
     const unread = orders.filter(o => !seen.has(o._id));
     setUnreadOrders(unread);
@@ -88,15 +73,6 @@ const Admin = () => {
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, [fetchData]);
-
-  // ── Auto-dismiss toast after 6s ──
-  useEffect(() => {
-    if (toastNotifs.length === 0) return;
-    const timer = setTimeout(() => {
-      setToastNotifs(prev => prev.slice(1));
-    }, 6000);
-    return () => clearTimeout(timer);
-  }, [toastNotifs]);
 
   // ── Close bell dropdown on outside click ──
   useEffect(() => {

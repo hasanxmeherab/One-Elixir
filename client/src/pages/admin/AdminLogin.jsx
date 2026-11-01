@@ -14,7 +14,6 @@ const AdminLogin = () => {
 
   // ── Password change state ──
   const [mustChangePassword, setMustChangePassword] = useState(false);
-  const [tempToken, setTempToken] = useState('');
   const [currentPass, setCurrentPass] = useState('');
   const [newPass, setNewPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
@@ -28,7 +27,6 @@ const AdminLogin = () => {
 
       // Check if password change is required
       if (res.data.mustChangePassword) {
-        setTempToken(res.data.accessToken);
         localStorage.setItem('adminToken', res.data.accessToken);
         localStorage.setItem('adminRefreshToken', res.data.refreshToken);
         setCurrentPass(password); // remember current password for verification

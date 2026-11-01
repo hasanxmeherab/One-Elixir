@@ -31,16 +31,10 @@ ${allUrls.map(u => `  <url>
   </url>`).join('\n')}
 </urlset>`;
 
-    // Write to public folder (Vite frontend) and server root
+    // The server serves sitemap.xml from its public directory.
     const serverPath = path.join(__dirname, '..', 'public', 'sitemap.xml');
-    const serverRoot = path.join(__dirname, 'sitemap.xml');
-
-    // Try writing to both locations
-    try {
-      if (!fs.existsSync(path.dirname(serverPath))) fs.mkdirSync(path.dirname(serverPath), { recursive: true });
-      fs.writeFileSync(serverPath, xml);
-    } catch {}
-    fs.writeFileSync(serverRoot, xml);
+    fs.mkdirSync(path.dirname(serverPath), { recursive: true });
+    fs.writeFileSync(serverPath, xml);
 
     console.log(`✓ Sitemap updated — ${perfumes.length} products`);
   } catch (err) {

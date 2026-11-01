@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, memo } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useUser } from '../context/UserContext';
 import { Menu, Search, ShoppingCart, User, X } from 'lucide-react';
@@ -13,7 +13,6 @@ const Navbar = memo(() => {
   const { user, logout } = useUser();
   const { cart } = useCart();
   const navigate = useNavigate();
-  const location = useLocation();
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);

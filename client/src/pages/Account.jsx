@@ -35,8 +35,6 @@ const Account = () => {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
 
-  const userId = user?._id || localStorage.getItem('userId');
-
   useEffect(() => {
     if (user) setProfileForm(f => ({ ...f, name: user.name || '' }));
   }, [user]);
@@ -53,25 +51,6 @@ const Account = () => {
       console.error('Fetch failed', err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Resolve userId — use from context/localStorage, or fetch from /me as fallback
-  const resolveUserId = async () => {
-    if (userId) return userId;
-    try {
-      const token = localStorage.getItem('userToken');
-      if (!token) return null;
-      const res = await axios.get(`${API_URL}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const id = res.data._id;
-      localStorage.setItem('userId', id);
-      updateUser({ _id: id, avatar: res.data.avatar });
-      return id;
-    } catch (err) {
-      console.error('Could not resolve userId', err);
-      return null;
     }
   };
 

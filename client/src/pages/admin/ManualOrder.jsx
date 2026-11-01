@@ -170,7 +170,6 @@ const ManualOrder = () => {
         try { screenshotUrl = await uploadScreenshot(onlinePayment.screenshot); }
         catch { throw new Error('Payment screenshot upload failed. Please try again; the order has not been created.'); }
       }
-      const authHeader = { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } };
       // Build payment receiver info if Paid
       let paymentReceiverPayload = undefined;
       if (paymentStatus === 'Paid' && selectedReceiver) {
@@ -190,7 +189,7 @@ const ManualOrder = () => {
         ...(isOnlinePayment && { paymentDetails: { platform: paymentMethod, senderNumber: onlinePayment.senderNumber, transactionId: onlinePayment.transactionId, screenshot: screenshotUrl } }),
         ...(paymentReceiverPayload && { paymentReceivedBy: paymentReceiverPayload })
       };
-      await adminAxios.post(`${API_URL}/api/orders/manual`, orderPayload, authHeader);
+      await adminAxios.post(`${API_URL}/api/orders/manual`, orderPayload);
 
       setOrderData({ customerName: '', phone: '', address: '', orderDate: getLocalDate() });
       setDivision(null); setDistrict(null);

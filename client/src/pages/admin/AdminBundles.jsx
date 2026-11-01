@@ -21,8 +21,6 @@ const AdminBundles = () => {
     products: [], image: '', active: true,
   });
 
-  const authHeader = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } });
-
   const fetchAll = async () => {
     try {
       const [bRes, pRes] = await Promise.all([
