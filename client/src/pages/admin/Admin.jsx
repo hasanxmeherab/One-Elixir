@@ -3,6 +3,7 @@ import adminAxios from '../../utils/adminAxios';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import useToast from '../../hooks/useToast';
 import ToastContainer from '../../components/ToastContainer';
+import AdminNotifications from '../../components/admin/AdminNotifications';
 
 const LINKS = [
   { to: '/admin', label: 'DASHBOARD', icon: '▦' },
@@ -21,10 +22,6 @@ const LINKS = [
   { to: '/admin/admins', label: 'ADMIN MANAGEMENT', icon: '🔐' },
 ];
 
-const SEEN_KEY = 'admin_seen_order_ids';
-const getSeen = () => { try { return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || '[]')); } catch { return new Set(); } };
-const saveSeen = (set) => localStorage.setItem(SEEN_KEY, JSON.stringify([...set]));
-
 const Admin = () => {
   const [perfumes, setPerfumes] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -35,74 +32,48 @@ const Admin = () => {
   const { toasts, toast, dismiss } = useToast();
 
   // ── Order bell notification state ──
-  const [unreadOrders, setUnreadOrders] = useState([]);
-  const [bellOpen, setBellOpen] = useState(false);
-  const bellRef = useRef(null);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [ordersError, setOrdersError] = useState('');
+  const requestVersion = useRef(0);
+  const [adminId] = useState(() => {
+    try { const account = JSON.parse(localStorage.getItem('adminData') || '{}'); return account.id || account._id || 'unknown'; }
+    catch { return 'unknown'; }
+  });
 
   const location = useLocation();
   const navigate = useNavigate();
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   const fetchData = useCallback(async () => {
-    try {
-      const [pRes, oRes, iRes] = await Promise.all([
-        adminAxios.get(`${API_URL}/api/perfumes`),
-        adminAxios.get(`${API_URL}/api/orders`),
-        adminAxios.get(`${API_URL}/api/investments`),
-      ]);
-      setPerfumes(pRes.data);
-      setOrders(oRes.data);
-      setInvestments(iRes.data);
-    } catch (err) { console.error('Fetch failed', err); }
+    const version = ++requestVersion.current;
+    const current = () => version === requestVersion.current;
+    await Promise.allSettled([
+      adminAxios.get(`${API_URL}/api/perfumes`, { timeout: 15000 }).then(res => { if (current()) setPerfumes(res.data); }),
+      adminAxios.get(`${API_URL}/api/orders`, { timeout: 15000 }).then(res => {
+        const next = Array.isArray(res.data) ? res.data : res.data.orders;
+        if (!Array.isArray(next)) throw new Error('Invalid order response');
+        if (current()) { setOrders(next); setOrdersError(''); }
+      }).catch(() => { if (current()) setOrdersError('Could not refresh order notifications.'); })
+        .finally(() => { if (current()) setOrdersLoading(false); }),
+      adminAxios.get(`${API_URL}/api/investments`, { timeout: 15000 }).then(res => { if (current()) setInvestments(res.data); }),
+    ]);
   }, [API_URL]);
+  const cancelFetch = useCallback(() => { requestVersion.current++; }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
-  useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
-
-  // ── Compute unread orders whenever orders change ──
   useEffect(() => {
-    if (!orders.length) return;
-    const seen = getSeen();
-    // Compute unread list
-    const unread = orders.filter(o => !seen.has(o._id));
-    setUnreadOrders(unread);
-  }, [orders]);
-
-  // ── Poll every 30s ──
-  useEffect(() => {
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
-
-  // ── Close bell dropdown on outside click ──
-  useEffect(() => {
-    const handler = (e) => {
-      if (bellRef.current && !bellRef.current.contains(e.target)) setBellOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  // ── Mark one as read ──
-  const dismissOrder = (orderId) => {
-    const seen = getSeen();
-    seen.add(orderId);
-    saveSeen(seen);
-    setUnreadOrders(prev => prev.filter(o => o._id !== orderId));
-  };
-
-  // ── Mark all as read ──
-  const markAllRead = () => {
-    const seen = getSeen();
-    unreadOrders.forEach(o => seen.add(o._id));
-    saveSeen(seen);
-    setUnreadOrders([]);
-    setBellOpen(false);
-  };
+    fetchData();
+    const refresh = () => { if (document.visibilityState === 'visible') { setOrdersLoading(true); fetchData(); } };
+    const interval = setInterval(refresh, 30000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { cancelFetch(); clearInterval(interval); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
+  }, [fetchData, cancelFetch]);
 
   const handleAdminLogout = () => {
     localStorage.removeItem('isAdminAuthenticated');
     localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminRefreshToken');
+    localStorage.removeItem('adminRole');
     localStorage.removeItem('adminData');
     navigate('/admin-login');
   };
@@ -126,7 +97,7 @@ const Admin = () => {
             <span className={`block w-5 h-0.5 bg-white transition-all duration-200 ${sidebarOpen ? 'opacity-0' : ''}`} />
             <span className={`block w-5 h-0.5 bg-white transition-all duration-200 ${sidebarOpen ? '-rotate-45 -translate-y-2' : ''}`} />
           </button>
-          <Link to="/admin" className="flex items-center gap-2 no-underline">
+          <Link to="/admin" onClick={() => setSidebarOpen(false)} className="flex items-center gap-2 no-underline">
             <img src="/logos/OneElixir Name(Sg).png" alt="OneElixir" className="h-8 md:h-10 w-auto" />
             <span className="text-[9px] bg-white text-black px-1.5 py-0.5 rounded-sm hidden md:inline">ADMIN</span>
           </Link>
@@ -136,91 +107,7 @@ const Admin = () => {
 
         <div className="flex items-center gap-3">
           {/* ── Notification Bell ── */}
-          <div ref={bellRef} className="relative">
-            <button
-              onClick={() => setBellOpen(o => !o)}
-              className="relative bg-transparent border-none cursor-pointer p-1.5 hover:opacity-80 transition-opacity"
-              aria-label="Notifications"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-              </svg>
-              {unreadOrders.length > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 animate-pulse">
-                  {unreadOrders.length > 99 ? '99+' : unreadOrders.length}
-                </span>
-              )}
-            </button>
-
-            {/* ── Dropdown ── */}
-            {bellOpen && (
-              <div className="absolute right-0 top-full mt-2 w-[320px] bg-white text-black border border-[#eee] shadow-2xl z-[2000] max-h-[420px] flex flex-col"
-                style={{ animation: 'fadeSlideIn 0.15s ease-out' }}>
-                {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-[#eee] bg-[#fafafa]">
-                  <span className="text-[10px] font-bold tracking-[2px] text-[#888]">
-                    NOTIFICATIONS ({unreadOrders.length})
-                  </span>
-                  {unreadOrders.length > 0 && (
-                    <button
-                      onClick={markAllRead}
-                      className="text-[10px] font-bold tracking-wider text-emerald-600 bg-transparent border-none cursor-pointer hover:underline"
-                    >
-                      ✓ MARK ALL READ
-                    </button>
-                  )}
-                </div>
-
-                {/* List */}
-                <div className="flex-1 overflow-y-auto">
-                  {unreadOrders.length === 0 ? (
-                    <div className="py-12 text-center">
-                      <p className="text-[32px] mb-2">🔔</p>
-                      <p className="text-[11px] text-[#aaa] tracking-wider">No new notifications</p>
-                    </div>
-                  ) : (
-                    unreadOrders.slice(0, 20).map(order => (
-                      <div key={order._id} className="flex items-start gap-3 px-4 py-3 border-b border-[#f5f5f5] hover:bg-[#f9f9f9] transition-colors group">
-                        <div className="w-9 h-9 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
-                          <span className="text-sm">🛒</span>
-                        </div>
-                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => { navigate('/admin/order-list'); dismissOrder(order._id); setBellOpen(false); }}>
-                          <div className="flex items-center gap-2">
-                            <p className="text-[11px] font-bold text-emerald-700 tracking-wider m-0">NEW ORDER!</p>
-                            <span className="text-[16px] animate-bounce">🔔</span>
-                          </div>
-                          <p className="text-[12px] font-bold m-0 mt-0.5 truncate">{order.customerName}</p>
-                          <p className="text-[10px] text-[#888] m-0 mt-0.5">
-                            {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''} · {Number(order.totalAmount || 0).toLocaleString()} TK
-                          </p>
-                        </div>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); dismissOrder(order._id); }}
-                          className="text-[#ccc] hover:text-[#888] bg-transparent border-none cursor-pointer text-sm p-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                          title="Dismiss"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {/* Footer */}
-                {unreadOrders.length > 0 && (
-                  <div className="px-4 py-2.5 border-t border-[#eee] bg-[#fafafa]">
-                    <button
-                      onClick={() => { navigate('/admin/order-list'); setBellOpen(false); }}
-                      className="w-full text-center text-[10px] font-bold tracking-wider text-black bg-transparent border-none cursor-pointer hover:underline py-1"
-                    >
-                      VIEW ALL ORDERS →
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <AdminNotifications key={`${adminId}:${location.key}`} adminId={adminId} orders={orders} loading={ordersLoading} error={ordersError} onRefresh={() => { setSidebarOpen(false); setOrdersLoading(true); fetchData(); }} />
 
           <button onClick={handleAdminLogout}
             className="bg-transparent border border-white text-white px-2 md:px-3 py-1 cursor-pointer text-[10px] md:text-xs tracking-wider hover:bg-white hover:text-black transition-colors">
@@ -251,7 +138,7 @@ const Admin = () => {
 
           <nav className="flex-1 overflow-y-auto px-3">
             {LINKS.map(({ to, label, icon }) => (
-              <Link key={to} to={to}
+              <Link key={to} to={to} onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 text-xs font-bold tracking-wider px-3 py-3 no-underline transition-colors rounded mb-0.5 ${isActive(to) ? 'bg-black text-white' : 'text-[#555] hover:text-black hover:bg-[#eee]'
                   }`}>
                 <span className="text-base w-5 text-center">{icon}</span>
@@ -285,7 +172,7 @@ const Admin = () => {
             { to: '/admin/customers', icon: '👥', label: 'Clients' },
             { to: '/admin/costs', icon: '🧮', label: 'Costs' },
           ].map(({ to, icon, label }) => (
-            <Link key={to} to={to}
+            <Link key={to} to={to} onClick={() => setSidebarOpen(false)}
               className={`flex flex-col items-center justify-center gap-0.5 no-underline transition-colors ${isActive(to) ? 'text-white bg-white/10' : 'text-gray-400 hover:text-white'
                 }`}>
               <span className="text-lg leading-none">{icon}</span>
@@ -299,16 +186,7 @@ const Admin = () => {
       <div className="md:hidden h-14" />
 
       {/* ── Notification animations ── */}
-      <style>{`
-        @keyframes fadeSlideIn {
-          from { opacity: 0; transform: translateY(-8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes slideInRight {
-          from { opacity: 0; transform: translateX(100%); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-      `}</style>
+
     </div>
   );
 };
