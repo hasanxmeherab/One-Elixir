@@ -7,6 +7,7 @@ const featureBoxSchema = new mongoose.Schema({
 
 // Singleton document — only one hero-settings record exists at a time.
 const heroSettingsSchema = new mongoose.Schema({
+  heroBannerOpacity: { type: Number, min: 0, max: 100, default: 55 },
   brandLine:   { type: String, default: 'ONEELIXIR' },
   headline1:   { type: String, default: 'Premium' },
   headline2:   { type: String, default: 'Perfume Oils' },

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import adminAxios from '../../utils/adminAxios';
-import { ImagePlus, Save, ChevronDown, ChevronUp, ArrowUpRight, Images, Type, BookOpen, MessageCircle, PanelBottom, Trash2 } from 'lucide-react';
+import { ImagePlus, Save, ChevronDown, ChevronUp, ArrowUpRight, Images, Type, BookOpen, MessageCircle, PanelBottom, Trash2, SlidersHorizontal, Eye, Sun } from 'lucide-react';
 
 import { useToast } from '../../context/ToastContext';
 import { Link } from 'react-router-dom';
@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
    Default hero content (mirrors the server-side defaults)
 ───────────────────────────────────────────────────────── */
 const DEFAULT_HERO = {
+  heroBannerOpacity: 55,
   brandLine:   'ONEELIXIR',
   headline1:   'Premium',
   headline2:   'Perfume Oils',
@@ -51,8 +52,8 @@ const DEFAULT_HERO = {
 /* ─────────────────────────────────────────────────────────
    Shared field styles
 ───────────────────────────────────────────────────────── */
-const inputCls = 'w-full p-3 border border-[#ddd] outline-none text-sm rounded bg-white';
-const labelCls = 'text-xs font-bold tracking-wider text-[#555] mb-1 block';
+const inputCls = 'w-full rounded-lg border border-[#e2e2df] bg-white px-3.5 py-3 text-sm text-[#333] outline-none transition focus:border-[#dc4939] focus:ring-2 focus:ring-[#dc4939]/10';
+const labelCls = 'mb-2 block text-[11px] font-medium tracking-normal text-[#777]';
 
 const BannerManagement = ({ isAdmin }) => {
   const toast = useToast();
@@ -62,6 +63,7 @@ const BannerManagement = ({ isAdmin }) => {
 
   /* ── Banner slides ── */
   const [banners,   setBanners]   = useState([]);
+  const [previewId, setPreviewId] = useState(null);
   const [current,   setCurrent]   = useState(0);
   const [uploading, setUploading] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -72,6 +74,9 @@ const BannerManagement = ({ isAdmin }) => {
   /* ── Hero settings ── */
   const [hero, setHero]         = useState(DEFAULT_HERO);
   const [heroSaving, setHeroSaving] = useState(false);
+  const [heroLoaded, setHeroLoaded] = useState(false);
+  const [heroLoadError, setHeroLoadError] = useState(false);
+  const [visibilitySaving, setVisibilitySaving] = useState(false);
   const [heroOpen,   setHeroOpen]   = useState(true);   // accordion open by default
 
   /* ── Story section ── */
@@ -114,7 +119,9 @@ const BannerManagement = ({ isAdmin }) => {
         contactStoreText: res.data.contactStoreText || localPlaceholder,
         contactStoreUrl: res.data.contactStoreUrl || localUrl,
       });
-    } catch { /* keep defaults */ }
+      setHeroLoadError(false);
+    } catch { setHeroLoadError(true); }
+    finally { setHeroLoaded(true); }
   };
 
   useEffect(() => { fetchBanners(); fetchHero(); }, []);
@@ -128,9 +135,9 @@ const BannerManagement = ({ isAdmin }) => {
   };
 
   useEffect(() => {
-    if (!isAdmin && banners.length > 0) startTimer();
+    if (!isAdmin && heroLoaded && banners.length > 0) startTimer();
     return () => clearInterval(timerRef.current);
-  }, [isAdmin, banners.length]);
+  }, [isAdmin, banners.length, heroLoaded]);
 
   const nextSlide = () => { setCurrent(c => (c === banners.length - 1 ? 0 : c + 1)); if (!isAdmin) startTimer(); };
   const prevSlide = () => { setCurrent(c => (c === 0 ? banners.length - 1 : c - 1)); if (!isAdmin) startTimer(); };
@@ -146,6 +153,7 @@ const BannerManagement = ({ isAdmin }) => {
     try {
       const res = await axios.post(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, fd);
       setBannerForm({ imageUrl: optimizeCloudinaryUrl(res.data.secure_url, 1920) });
+      setPreviewId(null);
       toast.success('Image uploaded!');
     } catch { toast.error('Upload failed.'); }
     finally { setUploading(false); }
@@ -158,7 +166,8 @@ const BannerManagement = ({ isAdmin }) => {
     if (!bannerForm.imageUrl) return toast.warning('Please upload an image first.');
     setPublishing(true);
     try {
-      await adminAxios.post(`${API_URL}/api/banners`, bannerForm);
+      const response = await adminAxios.post(`${API_URL}/api/banners`, bannerForm);
+      setPreviewId(response.data._id || null);
       setBannerForm({ imageUrl: '' });
       fetchBanners();
       toast.success('Banner published!');
@@ -178,6 +187,7 @@ const BannerManagement = ({ isAdmin }) => {
 
   /* ─── Save hero settings ─── */
   const saveHero = async () => {
+    if (visibilitySaving) return;
     setHeroSaving(true);
     try {
       if (hero.contactStoreText) {
@@ -194,6 +204,19 @@ const BannerManagement = ({ isAdmin }) => {
       toast.success('Homepage content saved!');
     } catch { toast.error('Failed to save hero settings.'); }
     finally { setHeroSaving(false); }
+  };
+
+  const saveBannerOpacity = async () => {
+    if (!heroLoaded || heroLoadError || heroSaving || visibilitySaving) return;
+    const next = Number(hero.heroBannerOpacity);
+    setVisibilitySaving(true);
+    try {
+      const response = await adminAxios.put(`${API_URL}/api/hero-settings`, { heroBannerOpacity: next });
+      if (response.data.heroBannerOpacity !== next) throw new Error('Deploy the updated backend to save banner opacity.');
+      setHero(previous => ({ ...previous, heroBannerOpacity: next }));
+      toast.success('Banner image visibility saved.');
+    } catch (err) { toast.error(err.response?.data?.message || err.message || 'Could not update hero visibility.'); }
+    finally { setVisibilitySaving(false); }
   };
 
   /* ─── Feature box helpers ─── */
@@ -262,31 +285,22 @@ const BannerManagement = ({ isAdmin }) => {
   if (isAdmin) {
     return (
       <div className="banner-manager [--bm-accent:#dc4939]! max-w-[1440px]! [margin:0_auto]! pb-[64px]! text-[#242424]! [font-family:'Jost',_sans-serif]! [&_h1]:m-[0]! [&_h2]:m-[0]! [&_h3]:m-[0]! [&_[hidden]]:hidden! [&_button:focus-visible]:[outline:2px_solid_#dc4939]! [&_button:focus-visible]:[outline-offset:3px]! [&_a:focus-visible]:[outline:2px_solid_#dc4939]! [&_a:focus-visible]:[outline-offset:3px]!">
-        <header className="bm-header flex! justify-between! items-center! gap-[24px]! mb-[30px]! [&_h1]:[font-size:clamp(26px,_3vw,_38px)]! [&_h1]:leading-[1.2]! [&_h1]:tracking-[-.7px]! [&_>_div_>_p:last-child]:text-[#777]! [&_>_div_>_p:last-child]:text-[14px]! [&_>_div_>_p:last-child]:[margin:12px_0_0]! max-[600px]:items-start! max-[600px]:flex-col! max-[600px]:gap-[18px]! max-[600px]:[&_h1]:text-[28px]!">
-          <div>
-            <p className="bm-eyebrow text-[#dc4939]! text-[11px]! font-bold! tracking-[2px]! [margin:0_0_10px]!">STOREFRONT / CONTENT</p>
-            <h1>Make a great first impression.</h1>
-            <p>Manage your homepage images, copy, and the details that tell your story.</p>
-          </div>
-          <Link to="/" target="_blank" rel="noopener noreferrer" className="bm-store-link inline-flex! items-center! justify-center! gap-[8px]! [padding:11px_16px]! [border:1px_solid_#e3e3e3]! rounded-[9px]! [text-decoration:none]! text-[#333]! text-[13px]! whitespace-nowrap! [&:hover]:bg-[#f8f8f8]!">View storefront <ArrowUpRight size={16} /></Link>
+        <header className="mb-7 flex flex-wrap items-start justify-between gap-5">
+          <div><p className="mb-2 text-[10px] font-bold tracking-[2px] text-[#dc4939]">STOREFRONT / CONTENT</p><h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Homepage content</h1><p className="mb-0 mt-3 max-w-xl text-sm leading-6 text-[#888]">A place for your images, words, and the finishing touches.</p></div>
+          <Link to="/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-[#e2e2df] bg-white px-4 py-2.5 text-xs font-medium text-[#555] no-underline transition hover:bg-[#f5f5f3]">View storefront<ArrowUpRight size={14} /></Link>
         </header>
-        <nav className="bm-tabs flex! gap-[6px]! p-[6px]! bg-[#f5f5f4]! [border:1px_solid_#ececea]! rounded-[12px]! mb-[28px]! overflow-x-auto! max-[600px]:mb-[22px]!" aria-label="Homepage content sections">
+        <nav className="mb-7 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5" aria-label="Homepage content sections">
           {[
-            { id: 'images', label: 'Banner images', icon: Images },
-            { id: 'hero', label: 'Hero content', icon: Type },
-            { id: 'story', label: 'Our story', icon: BookOpen },
-            { id: 'contact', label: 'Contact', icon: MessageCircle },
-            { id: 'footer', label: 'Footer', icon: PanelBottom },
-          ].map(({ id, label, icon: Icon }) => (
-            <button key={id} type="button" aria-current={activeSection === id ? 'page' : undefined}
-              className={activeSection === id ? "bm-tab inline-flex! items-center! justify-center! gap-[9px]! [padding:12px_16px]! [flex:1_0_auto]! bg-[transparent]! [border:0]! rounded-[8px]! text-[#717171]! [font:inherit]! text-[13px]! cursor-pointer! [transition:background_.2s,_color_.2s]! [&:hover]:text-[#222]! [&:hover]:bg-[#ececea]! [&.bm-tab-active]:bg-[#fff]! [&.bm-tab-active]:text-[#242424]! [&.bm-tab-active]:[box-shadow:0_1px_5px_#0000000d]! [&.bm-tab-active]:font-semibold! [&.bm-tab-active:hover]:bg-[#fff]! [&.bm-tab-active:hover]:text-[#242424]! [&.bm-tab-active:hover]:[box-shadow:0_1px_5px_#0000000d]! [&.bm-tab-active:hover]:font-semibold! [&.bm-tab-active_svg]:text-[#dc4939]! [&_>_span]:rounded-[5px]! [&_>_span]:[padding:1px_6px]! [&_>_span]:bg-[#f0eeeb]! [&_>_span]:text-[11px]! max-[600px]:[padding:10px_12px]! bm-tab-active" : "bm-tab inline-flex! items-center! justify-center! gap-[9px]! [padding:12px_16px]! [flex:1_0_auto]! bg-[transparent]! [border:0]! rounded-[8px]! text-[#717171]! [font:inherit]! text-[13px]! cursor-pointer! [transition:background_.2s,_color_.2s]! [&:hover]:text-[#222]! [&:hover]:bg-[#ececea]! [&.bm-tab-active]:bg-[#fff]! [&.bm-tab-active]:text-[#242424]! [&.bm-tab-active]:[box-shadow:0_1px_5px_#0000000d]! [&.bm-tab-active]:font-semibold! [&.bm-tab-active:hover]:bg-[#fff]! [&.bm-tab-active:hover]:text-[#242424]! [&.bm-tab-active:hover]:[box-shadow:0_1px_5px_#0000000d]! [&.bm-tab-active:hover]:font-semibold! [&.bm-tab-active_svg]:text-[#dc4939]! [&_>_span]:rounded-[5px]! [&_>_span]:[padding:1px_6px]! [&_>_span]:bg-[#f0eeeb]! [&_>_span]:text-[11px]! max-[600px]:[padding:10px_12px]!"}
-              onClick={() => {
-                setActiveSection(id);
-                setHeroOpen(true); setStoryOpen(true); setContactOpen(true); setFooterOpen(true);
-              }}><Icon size={17} />{label}{id === 'images' && <span>{banners.length}</span>}</button>
-          ))}
+            { id: 'images', label: 'Banner images', description: 'Your hero slideshow', icon: Images },
+            { id: 'hero', label: 'Hero content', description: 'Headlines and highlights', icon: Type },
+            { id: 'story', label: 'Our story', description: 'The story behind the brand', icon: BookOpen },
+            { id: 'contact', label: 'Contact', description: 'Help customers reach you', icon: MessageCircle },
+            { id: 'footer', label: 'Footer', description: 'Your closing details', icon: PanelBottom },
+          ].map(({ id, label, description, icon: Icon }) => <button key={id} type="button" aria-pressed={activeSection === id} onClick={() => { setActiveSection(id); setHeroOpen(true); setStoryOpen(true); setContactOpen(true); setFooterOpen(true); }} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 text-left transition sm:p-4 ${activeSection === id ? 'border-[#252525] bg-[#252525] text-white shadow-sm' : 'border-[#e7e7e5] bg-white text-[#777] hover:border-[#c9c9c4] hover:bg-[#fafaf8]'}`}>
+            <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${activeSection === id ? 'bg-white/10 text-[#f2ad9e]' : 'bg-[#f5f4f1] text-[#999]'}`}>{React.createElement(Icon, { size: 16 })}</span><span className="min-w-0"><span className="block text-xs font-semibold">{label}{id === 'images' && <span className={`ml-1.5 rounded px-1.5 py-0.5 text-[9px] ${activeSection === id ? 'bg-white/10 text-white/70' : 'bg-[#eeede9] text-[#999]'}`}>{banners.length}</span>}</span><span className={`mt-1.5 hidden text-[10px] leading-4 sm:block ${activeSection === id ? 'text-white/45' : 'text-[#aaa]'}`}>{description}</span></span>
+          </button>)}
         </nav>
-        <div className="bm-workspace grid! [grid-template-columns:minmax(0,_1.6fr)_minmax(260px,_1fr)]! [align-items:start]! gap-[28px]! max-[1100px]:[grid-template-columns:minmax(0,_1fr)]!">
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,1fr)] xl:gap-8">
         <div className="bm-editor min-w-[0]!">
 
         {/* ── Section 1: Background Banner Images ── */}
@@ -294,11 +308,11 @@ const BannerManagement = ({ isAdmin }) => {
           <div className="bm-section-heading mb-[20px]! [&_h2]:[font:600_19px_'Jost',_sans-serif]! [&_p]:[margin:5px_0_0]! [&_p]:text-[13px]! [&_p]:text-[#777]!"><h2>Banner images</h2><p>Your published images rotate automatically on the homepage.</p></div>
 
           <form onSubmit={handleBannerSubmit} className="bm-upload-form flex! flex-col! items-stretch! gap-[14px]! p-[20px]! bg-[#fff]! [border:1px_solid_#e7e7e5]! rounded-[14px]! max-[600px]:p-[14px]!">
-            <label className="bm-upload-zone relative! flex! flex-col! items-center! justify-center! text-center! gap-[10px]! [padding:32px_18px]! min-h-[200px]! [border:1.5px_dashed_#d6d2ce]! rounded-[10px]! bg-[#faf9f7]! cursor-pointer! [transition:border-color_.2s,_background_.2s]! [&:hover]:[border-color:#dc4939]! [&:hover]:bg-[#fff6f3]! [&:focus-within]:[border-color:#dc4939]! [&:focus-within]:bg-[#fff6f3]!">
+            <label className="bm-upload-zone relative! flex! flex-col! items-center! justify-center! text-center! gap-[10px]! [padding:32px_18px]! min-h-[180px]! [border:1.5px_dashed_#d6d2ce]! rounded-[10px]! bg-[#faf9f7]! cursor-pointer! [transition:border-color_.2s,_background_.2s]! [&:hover]:[border-color:#dc4939]! [&:hover]:bg-[#fff6f3]! [&:focus-within]:[border-color:#dc4939]! [&:focus-within]:bg-[#fff6f3]!">
               {bannerForm.imageUrl && <img src={bannerForm.imageUrl} alt="New banner ready to publish" className="bm-upload-preview w-[100%]! max-h-[180px]! object-cover! rounded-[6px]!" />}
               <ImagePlus size={22} className="text-[#888]" />
               <span className="text-xs font-bold tracking-wider text-black">
-                {uploading ? 'UPLOADING…' : bannerForm.imageUrl ? 'IMAGE READY' : 'CLICK TO UPLOAD HERO IMAGE'}
+                {uploading ? 'UPLOADING…' : bannerForm.imageUrl ? 'Ready to publish' : 'Choose a banner image'}
               </span>
               <span className="text-[10px] text-[#aaa] text-center">
                 {uploading ? 'Please wait…' : bannerForm.imageUrl ? '✓ Uploaded' : 'JPG, PNG, WEBP — recommended 1920×900px (full-screen hero)'}
@@ -318,8 +332,8 @@ const BannerManagement = ({ isAdmin }) => {
           <div className="bm-library-heading flex! items-center! justify-between! [margin:26px_0_13px]! [&_h3]:[font:600_14px_'Jost',_sans-serif]! [&_>_span]:text-[12px]! [&_>_span]:text-[#888]!"><h3>Published banners</h3><span>{banners.length} {banners.length === 1 ? 'image' : 'images'}</span></div>
           <div className="bm-banner-grid grid! [grid-template-columns:repeat(2,_minmax(0,_1fr))]! gap-[14px]! max-[600px]:[grid-template-columns:minmax(0,_1fr)]!">
             {banners.map((b, index) => (
-              <div key={b._id} className="bm-banner-card [border:1px_solid_#e7e7e5]! rounded-[10px]! overflow-hidden! [&_>_img]:block! [&_>_img]:w-[100%]! [&_>_img]:[aspect-ratio:16_/_8]! [&_>_img]:object-cover!">
-                <img src={b.imageUrl} alt={`Published banner ${index + 1}`} />
+              <div key={b._id} className={`overflow-hidden rounded-xl border bg-white transition ${previewId === b._id ? 'border-[#dc4939]/60 ring-2 ring-[#dc4939]/10' : 'border-[#e7e7e5]'}`}>
+                <button type="button" aria-label={`Preview banner ${index + 1}`} aria-pressed={previewId === b._id} onClick={() => setPreviewId(b._id)} className="group relative block w-full cursor-pointer overflow-hidden bg-[#f5f5f2]"><img src={b.imageUrl} alt={`Published banner ${index + 1}`} className="aspect-[16/9] w-full object-cover transition duration-300 group-hover:scale-[1.03]" /><span className="absolute bottom-2 right-2 rounded-md bg-black/60 px-2 py-1 text-[9px] text-white">{previewId === b._id ? 'Previewing' : 'Preview'}</span></button>
                 <div className="bm-banner-meta flex! justify-between! items-center! p-[12px]! gap-[8px]! text-[12px]!"><span>Banner {String(index + 1).padStart(2, '0')}</span>
                 <button onClick={() => deleteBanner(b._id)}
                   className="bm-remove inline-flex! items-center! gap-[5px]! p-[4px]! [border:0]! bg-[transparent]! text-[#bf4538]! cursor-pointer! [font:inherit]! [&:hover]:text-[#88261e]!" aria-label={`Remove banner ${index + 1}`}>
@@ -424,11 +438,11 @@ const BannerManagement = ({ isAdmin }) => {
               {/* Save button */}
               <button
                 onClick={saveHero}
-                disabled={heroSaving}
-                className="flex items-center justify-center gap-2 p-4 bg-black text-white font-bold rounded cursor-pointer hover:bg-gray-800 transition-colors disabled:opacity-50 mt-2"
+                disabled={heroSaving || visibilitySaving}
+                className="mt-2 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#252525] px-4 py-3 text-xs font-medium text-white transition hover:bg-[#444] disabled:opacity-50"
               >
                 <Save size={16} />
-                {heroSaving ? 'SAVING…' : 'SAVE HERO CONTENT'}
+                {heroSaving ? 'SAVING…' : 'Save hero content'}
               </button>
             </div>
           )}
@@ -499,7 +513,7 @@ const BannerManagement = ({ isAdmin }) => {
                       <label className={`flex flex-col items-center justify-center gap-1 border-2 border-dashed rounded cursor-pointer p-4 transition-colors ${hero[slot] ? 'border-black bg-gray-50' : 'border-[#ddd] hover:border-black hover:bg-gray-50'}`}>
                         <ImagePlus size={18} className="text-[#888]" />
                         <span className="text-[10px] font-bold tracking-wider text-black text-center">
-                          {upl ? 'UPLOADING…' : hero[slot] ? 'REPLACE IMAGE' : 'CLICK TO UPLOAD'}
+                          {upl ? 'UPLOADING…' : hero[slot] ? 'Replace image' : 'Choose image'}
                         </span>
                         <input type="file" onChange={e => handleStoryUpload(e, slot)} accept="image/*" className="hidden" />
                       </label>
@@ -519,11 +533,11 @@ const BannerManagement = ({ isAdmin }) => {
               {/* Save button */}
               <button
                 onClick={saveHero}
-                disabled={heroSaving}
-                className="flex items-center justify-center gap-2 p-4 bg-black text-white font-bold rounded cursor-pointer hover:bg-gray-800 transition-colors disabled:opacity-50 mt-2"
+                disabled={heroSaving || visibilitySaving}
+                className="mt-2 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#252525] px-4 py-3 text-xs font-medium text-white transition hover:bg-[#444] disabled:opacity-50"
               >
                 <Save size={16} />
-                {heroSaving ? 'SAVING…' : 'SAVE STORY SECTION'}
+                {heroSaving ? 'SAVING…' : 'Save story'}
               </button>
             </div>
           )}
@@ -643,8 +657,8 @@ const BannerManagement = ({ isAdmin }) => {
               {/* Save */}
               <button
                 onClick={saveHero}
-                disabled={heroSaving}
-                className="flex items-center justify-center gap-2 p-4 bg-black text-white font-bold rounded cursor-pointer hover:bg-gray-800 transition-colors disabled:opacity-50 mt-2"
+                disabled={heroSaving || visibilitySaving}
+                className="mt-2 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#252525] px-4 py-3 text-xs font-medium text-white transition hover:bg-[#444] disabled:opacity-50"
               >
                 <Save size={16} />
                 {heroSaving ? 'SAVING…' : 'SAVE CONNECT SECTION'}
@@ -711,21 +725,21 @@ const BannerManagement = ({ isAdmin }) => {
               {/* Save */}
               <button
                 onClick={saveHero}
-                disabled={heroSaving}
-                className="flex items-center justify-center gap-2 p-4 bg-black text-white font-bold rounded cursor-pointer hover:bg-gray-800 transition-colors disabled:opacity-50 mt-2"
+                disabled={heroSaving || visibilitySaving}
+                className="mt-2 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#252525] px-4 py-3 text-xs font-medium text-white transition hover:bg-[#444] disabled:opacity-50"
               >
                 <Save size={16} />
-                {heroSaving ? 'SAVING…' : 'SAVE FOOTER SECTION'}
+                {heroSaving ? 'SAVING…' : 'Save footer'}
               </button>
             </div>
           )}
         </div>
 
         </div>
-        <aside className="bm-preview-column min-w-[0]! p-[18px]! bg-[#f6f6f4]! [border:1px_solid_#eaeae7]! rounded-[14px]! max-[1100px]:max-w-[600px]!">
-          <div className="bm-preview-heading flex! items-center! justify-between! gap-[10px]! mb-[15px]! text-[13px]! font-semibold!"><span>{({ images: 'Banner & hero', hero: 'Banner & hero', story: 'Our story', contact: 'Contact', footer: 'Footer' })[activeSection]} preview</span><span className="bm-draft-badge bg-[#fff]! [border:1px_solid_#e5e2de]! rounded-[5px]! text-[#888]! [padding:3px_8px]! text-[10px]! font-medium!">Draft</span></div>
+        <aside className="min-w-0 rounded-2xl border border-[#e7e7e5] bg-white p-4 sm:p-5 xl:sticky xl:top-24">
+          <div className="mb-4 flex items-center justify-between gap-3"><div className="flex items-center gap-2 text-xs font-semibold text-[#555]"><Eye size={15} className="text-[#999]" />{({ images: 'Banner & hero', hero: 'Banner & hero', story: 'Our story', contact: 'Contact', footer: 'Footer' })[activeSection]} preview</div><span className="inline-flex items-center gap-1.5 rounded-full bg-[#f1f4ed] px-2.5 py-1 text-[9px] text-[#738267]"><span className="h-1 w-1 rounded-full bg-[#8c9d7d]" />Live preview</span></div>
           {(activeSection === 'images' || activeSection === 'hero') && <>
-          <div className="bm-hero-preview flex! flex-col! items-center! justify-center! gap-[16px]! [padding:40px_20px]! min-h-[330px]! rounded-[9px]! [background-color:#191718]! [background-size:cover]! [background-position:center]! text-center! [overflow-wrap:anywhere]! text-[white]! [&_h2]:[font-family:'Playfair_Display',_serif]! [&_h2]:[font-size:clamp(26px,_2.6vw,_38px)]! [&_h2]:leading-[1.15]! [&_h2_em]:text-[#f17965]! [&_h2_em]:[font-style:normal]! [&_p]:text-[12px]! [&_p]:text-[#ece6e1]! [&_p]:[font-style:italic]! [&_p]:m-[0]! [&_.bm-preview-description]:text-[11px]! [&_.bm-preview-description]:[font-style:normal]! [&_.bm-preview-description]:leading-[1.7]!" style={{ backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.28), rgba(0,0,0,.8)), url("${bannerForm.imageUrl || banners[0]?.imageUrl || '/hero-bg.jpg'}")` }}>
+          <div className="bm-hero-preview flex! flex-col! items-center! justify-center! gap-[16px]! [padding:40px_20px]! min-h-[330px]! rounded-[9px]! [background-color:#191718]! [background-size:cover]! [background-position:center]! text-center! [overflow-wrap:anywhere]! text-[white]! [&_h2]:[font-family:'Playfair_Display',_serif]! [&_h2]:[font-size:clamp(26px,_2.6vw,_38px)]! [&_h2]:leading-[1.15]! [&_h2_em]:text-[#f17965]! [&_h2_em]:[font-style:normal]! [&_p]:text-[12px]! [&_p]:text-[#ece6e1]! [&_p]:[font-style:italic]! [&_p]:m-[0]! [&_.bm-preview-description]:text-[11px]! [&_.bm-preview-description]:[font-style:normal]! [&_.bm-preview-description]:leading-[1.7]!" style={{ backgroundImage: `linear-gradient(rgba(0,0,0,${1 - Number(hero.heroBannerOpacity) / 100}), rgba(0,0,0,${1 - Number(hero.heroBannerOpacity) / 100})), url("${banners.find(banner => banner._id === previewId)?.imageUrl || bannerForm.imageUrl || banners[0]?.imageUrl || '/hero-bg.jpg'}")` }}>
             <span className="bm-preview-brand text-[9px]! tracking-[3px]! text-[#ffb6a9]!">{hero.brandLine}</span>
             <h2>{hero.headline1}<br /><em>{hero.headline2}</em></h2>
             <p>{hero.tagline}</p>
@@ -733,7 +747,14 @@ const BannerManagement = ({ isAdmin }) => {
             <span className="bm-preview-cta [border:1px_solid_#ffffff80]! rounded-[3px]! [padding:10px_15px]! text-[9px]! tracking-[1.4px]!">{hero.ctaText}</span>
             <div className="bm-preview-features grid! [grid-template-columns:repeat(2,_minmax(0,_1fr))]! gap-[8px]! w-[100%]! [&_>_div]:flex! [&_>_div]:flex-col! [&_>_div]:gap-[5px]! [&_>_div]:[padding:12px_8px]! [&_>_div]:[border:1px_solid_#ffffff25]! [&_>_div]:rounded-[6px]! [&_>_div]:bg-[#00000030]! [&_>_div]:text-[10px]! [&_span]:text-[#ffffffa6]! [&_span]:text-[9px]! [&_span]:leading-[1.5]!">{hero.features.map((feature, index) => <div key={index}><strong>{feature.title}</strong><span>{feature.subtitle}</span></div>)}</div>
           </div>
-          <div className="bm-tip flex! items-start! gap-[10px]! [border-top:1px_solid_#e2e2de]! pt-[18px]! mt-[18px]! [&_>_svg]:[flex-shrink:0]! [&_>_svg]:text-[#dc4939]! [&_>_svg]:mt-[2px]! [&_h3]:[font:600_13px_'Jost',_sans-serif]! [&_p]:text-[#888]! [&_p]:text-[12px]! [&_p]:leading-[1.7]! [&_p]:[margin:6px_0_0]!"><ImagePlus size={18} /><div><h3>A little room goes a long way</h3><p>Use a wide image, ideally 1920 × 900 px. Keep the center uncluttered so your headline stays readable on every screen.</p></div></div>
+          <div className="mt-5 border-t border-[#eee] pt-5">
+            <div className="mb-4 flex items-center justify-between gap-3"><div className="flex items-center gap-2"><SlidersHorizontal size={15} className="text-[#999]" /><label htmlFor="hero-banner-opacity" className="text-xs font-semibold text-[#555]">Image visibility</label></div><output htmlFor="hero-banner-opacity" className="min-w-14 rounded-lg bg-[#f4f3ef] px-2.5 py-1.5 text-center text-sm font-semibold tabular-nums text-[#555]">{hero.heroBannerOpacity}%</output></div>
+            <div className="flex items-center gap-3"><Sun size={14} className="shrink-0 text-[#bbb]" /><input id="hero-banner-opacity" aria-label="Banner image visibility" type="range" min="0" max="100" step="1" value={hero.heroBannerOpacity} disabled={!heroLoaded || heroLoadError || heroSaving || visibilitySaving} onChange={event => setHero(previous => ({ ...previous, heroBannerOpacity: Number(event.target.value) }))} className="h-1.5 w-full cursor-pointer accent-[#dc4939] disabled:cursor-wait disabled:opacity-40" /><Sun size={20} className="shrink-0 text-[#777]" /></div>
+            <div className="mb-4 mt-2 flex justify-between pl-6 pr-8 text-[9px] text-[#aaa]"><span>Softer image</span><span>Full image</span></div>
+            <div className="mb-4 flex gap-2">{[25, 55, 80, 100].map(value => <button key={value} type="button" aria-pressed={Number(hero.heroBannerOpacity) === value} disabled={!heroLoaded || heroLoadError || heroSaving || visibilitySaving} onClick={() => setHero(previous => ({ ...previous, heroBannerOpacity: value }))} className={`flex-1 cursor-pointer rounded-md border py-1.5 text-[10px] transition disabled:opacity-40 ${Number(hero.heroBannerOpacity) === value ? 'border-[#dc4939]/30 bg-[#fcf0ed] text-[#b55849]' : 'border-[#eee] bg-white text-[#999] hover:bg-[#fafaf8]'}`}>{value}%</button>)}</div>
+            <div className="flex items-center justify-between gap-4"><p className="m-0 max-w-48 text-[10px] leading-5 text-[#999]">Only the background image changes. Save to update the homepage.</p><button type="button" disabled={!heroLoaded || heroLoadError || heroSaving || visibilitySaving} onClick={saveBannerOpacity} className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-[#252525] px-3 py-2.5 text-[11px] font-medium text-white hover:bg-[#444] disabled:cursor-wait disabled:opacity-40"><Save size={12} />{visibilitySaving ? 'Saving...' : 'Save visibility'}</button></div>
+            {heroLoadError && <p role="alert" className="mb-0 mt-3 text-xs text-red-700">Settings could not load. <button type="button" className="cursor-pointer underline" onClick={fetchHero}>Retry</button></p>}
+          </div>
           </>}
           {activeSection === 'story' && <div className="bm-section-preview [padding:26px_20px]! rounded-[9px]! bg-[#000]! text-[#fff]! [overflow-wrap:anywhere]! [&_h2]:[font:600_26px/1.25_'Playfair_Display',_serif]! [&_h2]:[margin:0_0_16px]! [&_>_p]:text-[#b8b8c8]! [&_>_p]:text-[12px]! [&_>_p]:leading-[1.8]! [&_>_p]:[margin:0_0_14px]! [&_>_p]:whitespace-pre-line! [&_.bm-preview-empty-note]:[margin:14px_0_0]! [&_.bm-preview-empty-note]:text-[11px]! [&_.bm-preview-empty-note]:text-[#aaa]! [&.bm-contact-preview]:bg-[#111219]! [&.bm-contact-preview]:[border:1px_solid_#ffffff0d]! [&.bm-footer-preview]:flex! [&.bm-footer-preview]:flex-col! [&.bm-footer-preview]:items-center! [&.bm-footer-preview]:gap-[24px]! [&.bm-footer-preview]:[padding:36px_20px_24px]! [&.bm-footer-preview]:text-center! [&.bm-footer-preview_>_p]:text-[#ffffff8c]! [&.bm-footer-preview_>_p]:m-[0]! bm-story-preview">
             <span className="bm-section-label block! mb-[12px]! text-[#f04a3a]! text-[9px]! font-semibold! tracking-[1.8px]!">{hero.storyLabel}</span>
@@ -787,10 +808,12 @@ const BannerManagement = ({ isAdmin }) => {
   /* ══════════════════════════════════════════════════════
      CUSTOMER HERO VIEW
   ══════════════════════════════════════════════════════ */
+  if (!heroLoaded) return null;
+
   return (
     <div
       className="relative w-full overflow-hidden flex flex-col"
-      style={{ minHeight: 'calc(100vh - 64px)' }}
+      style={{ minHeight: 'calc(100vh - 64px)', backgroundColor: '#000' }}
     >
       {/* ── Background images ── */}
       {banners.length > 0
@@ -798,7 +821,7 @@ const BannerManagement = ({ isAdmin }) => {
             <div key={slide._id}
               className="absolute inset-0 transition-opacity duration-700 ease-in-out"
               style={{
-                opacity: i === current ? 1 : 0,
+                opacity: i === current ? Math.min(100, Math.max(0, Number(hero.heroBannerOpacity))) / 100 : 0,
                 backgroundImage: `url(${slide.imageUrl})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
@@ -807,15 +830,13 @@ const BannerManagement = ({ isAdmin }) => {
           ))
         : (
           <div className="absolute inset-0"
-            style={{ backgroundImage: 'url(/hero-bg.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}
+            style={{ opacity: Math.min(100, Math.max(0, Number(hero.heroBannerOpacity))) / 100, backgroundImage: 'url(/hero-bg.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}
           />
         )
       }
 
       {/* ── Gradient overlay ── */}
-      <div className="absolute inset-0"
-        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0.72) 100%)' }}
-      />
+
 
       {/* ── Main content + feature boxes — shifted slightly below center ── */}
       <div className="relative z-10 flex flex-col items-center justify-center w-full text-center text-white px-4 sm:px-8 select-none"

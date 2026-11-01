@@ -6,6 +6,7 @@ const { verifyAdmin } = require('../middleware/authMiddleware');
 /* Defaults mirrored here so the GET always returns a complete object
    even if the stored document predates a schema addition. */
 const SCHEMA_DEFAULTS = {
+  heroBannerOpacity: 55,
   brandLine:   'ONEELIXIR',
   headline1:   'Premium',
   headline2:   'Perfume Oils',
@@ -65,7 +66,11 @@ router.get('/', async (req, res) => {
 // ── PUT — admin only (save / update) ─────────────────────────────────────
 router.put('/', verifyAdmin, async (req, res) => {
   try {
+    if (req.body.heroBannerOpacity !== undefined && (typeof req.body.heroBannerOpacity !== 'number' || !Number.isFinite(req.body.heroBannerOpacity) || req.body.heroBannerOpacity < 0 || req.body.heroBannerOpacity > 100)) {
+      return res.status(400).json({ message: 'Banner image visibility must be a number between 0 and 100.' });
+    }
     const allowed = [
+      'heroBannerOpacity',
       'brandLine', 'headline1', 'headline2', 'tagline', 'description',
       'ctaText', 'ctaLink', 'features',
       'storyLabel', 'storyHeading', 'storyPara1', 'storyPara2',
