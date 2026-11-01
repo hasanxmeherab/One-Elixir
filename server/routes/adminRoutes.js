@@ -41,7 +41,7 @@ router.post('/login', validate(adminLoginSchema), async (req, res) => {
     const isMatch = await bcrypt.compare(password, admin.password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
-    const payload = { id: admin._id, role: admin.role, name: admin.name };
+    const payload = { id: admin._id, role: admin.role, name: admin.name, sessionVersion: admin.sessionVersion || 0 };
 
     const accessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '15m' });
     const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
@@ -75,11 +75,12 @@ router.post('/refresh', async (req, res) => {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     const admin = await Admin.findById(decoded.id);
     if (!admin || !admin.refreshToken) return res.status(403).json({ message: 'Invalid refresh token' });
+    if ((decoded.sessionVersion ?? 0) !== (admin.sessionVersion || 0)) return res.status(403).json({ message: 'Admin session ended. Please sign in again.' });
 
     const valid = await bcrypt.compare(refreshToken, admin.refreshToken);
     if (!valid) return res.status(403).json({ message: 'Refresh token mismatch' });
 
-    const payload = { id: admin._id, role: admin.role, name: admin.name };
+    const payload = { id: admin._id, role: admin.role, name: admin.name, sessionVersion: admin.sessionVersion || 0 };
     const newAccessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '15m' });
     res.json({ accessToken: newAccessToken });
   } catch {
@@ -90,7 +91,7 @@ router.post('/refresh', async (req, res) => {
 // ── 4. LOGOUT — clear stored refresh token
 router.post('/logout', verifyAdmin, async (req, res) => {
   try {
-    await Admin.findByIdAndUpdate(req.admin.id, { refreshToken: null });
+    await Admin.findByIdAndUpdate(req.admin.id, { $set: { refreshToken: null }, $inc: { sessionVersion: 1 } });
     res.json({ message: 'Logged out' });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -114,6 +115,8 @@ router.post('/change-password', verifyAdmin, async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     admin.password = await bcrypt.hash(newPassword, salt);
     admin.mustChangePassword = false;
+    admin.sessionVersion = (admin.sessionVersion || 0) + 1;
+    admin.refreshToken = null;
     await admin.save();
 
     await writeLog(req, 'CHANGE_PASSWORD', 'Admin', `${admin.name} changed their password`);

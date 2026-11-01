@@ -7,6 +7,7 @@ const adminSchema = new mongoose.Schema({
   role:               { type: String, enum: ['admin', 'superadmin'], default: 'admin' },
   mustChangePassword: { type: Boolean, default: true },
   refreshToken:       { type: String, default: null }, // hashed refresh token
+  sessionVersion:     { type: Number, default: 0 },
   createdAt:          { type: Date, default: Date.now }
 });
 

@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ProductDetailsSkeleton, ReviewsSkeleton } from '../components/Skeleton';
 import axios from 'axios';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
+import { useUser } from '../context/UserContext';
+import { postCustomerJson } from '../utils/postCustomerJson';
 import { Heart, Star, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { optimizeImage } from '../utils/optimizeImage';
 import { getCountdown } from '../utils/countdown';
@@ -75,12 +77,13 @@ const addToRecentlyViewed = (product) => {
       ...existing
     ].slice(0, MAX_RECENT + 1);
     localStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(updated));
-  } catch {}
+  } catch { /* Recently viewed is optional if browser storage is unavailable. */ }
 };
 
 const ProductDetails = ({ openCart }) => { 
   const { slug } = useParams();
   const navigate = useNavigate();
+  const { user, authFetch } = useUser();
   const [product, setProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -145,7 +148,7 @@ const ProductDetails = ({ openCart }) => {
       });
       const sorted = scored.sort((a, b) => b.score - a.score).slice(0, 4);
       setRelated(sorted);
-    } catch (err) {
+    } catch {
       console.error('Could not fetch related products');
     }
   };
@@ -154,7 +157,7 @@ const ProductDetails = ({ openCart }) => {
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
-  const [reviewForm, setReviewForm] = useState({ userName: '', rating: 0, comment: '' });
+  const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '' });
   const [hoverRating, setHoverRating] = useState(0);
   const [reviewImages, setReviewImages] = useState([]);
   const [uploadingReview, setUploadingReview] = useState(false);
@@ -166,7 +169,7 @@ const ProductDetails = ({ openCart }) => {
       setReviewsLoading(true);
       const res = await axios.get(`${API_URL}/api/reviews/${productId}`);
       setReviews(res.data);
-    } catch (err) {
+    } catch {
       console.error('Could not fetch reviews');
     } finally {
       setReviewsLoading(false);
@@ -188,7 +191,8 @@ const ProductDetails = ({ openCart }) => {
     setReviewError('');
     if (!reviewForm.rating) { setReviewError('Please select a star rating.'); return; }
     if (!reviewForm.comment.trim()) { setReviewError('Please write a review.'); return; }
-    if (!reviewForm.userName.trim()) { setReviewError('Please enter your name.'); return; }
+    if (!user) { navigate('/signin', { state: { from: `/product/${slug}` } }); return; }
+    if (submitLoading) return;
     try {
       setSubmitLoading(true);
       setUploadingReview(reviewImages.length > 0);
@@ -204,16 +208,13 @@ const ProductDetails = ({ openCart }) => {
           return res.data.secure_url;
         })
       );
-      const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-      await axios.post(`${API_URL}/api/reviews`, {
+      await postCustomerJson(authFetch, `${API_URL}/api/reviews`, {
         perfumeId: product._id,
-        userId: userData._id || null,
-        userName: reviewForm.userName,
         rating: reviewForm.rating,
         comment: reviewForm.comment,
         images: imageUrls,
       });
-      setReviewForm({ userName: '', rating: 0, comment: '' });
+      setReviewForm({ rating: 0, comment: '' });
       setReviewImages([]);
       setReviewSuccess(true);
       fetchReviews(product._id);
@@ -246,7 +247,7 @@ const ProductDetails = ({ openCart }) => {
         fetchReviews(res.data._id);
         addToRecentlyViewed(res.data);
         setRecentlyViewed(getRecentlyViewed().filter(p => p._id !== res.data._id).slice(0, MAX_RECENT));
-      } catch (err) {
+      } catch {
         console.error("Product not found");
       }
     };
@@ -614,12 +615,9 @@ const ProductDetails = ({ openCart }) => {
             <div>
               <p className="text-[10px] tracking-[3px] font-bold text-[#888] mb-8">WRITE A REVIEW</p>
               <form onSubmit={handleReviewSubmit} className="flex flex-col gap-5">
-                <input
-                  type="text" placeholder="Your Name" required
-                  value={reviewForm.userName}
-                  onChange={e => setReviewForm({ ...reviewForm, userName: e.target.value })}
-                  className="p-3 border border-[#ddd] outline-none text-sm"
-                />
+                <p className="m-0 text-xs leading-6 text-[#888]">{user ? <>Reviewing as <strong className="font-medium text-[#444]">{user.name}</strong></> : <><Link to="/signin" state={{ from: `/product/${slug}` }} className="font-medium text-[#a47760] underline underline-offset-4">Sign in</Link> to write a review with your account.</>}</p>
+                <fieldset className="contents" disabled={!user || submitLoading}>
+
                 <div>
                   <p className="text-[10px] tracking-wider text-[#888] mb-3">YOUR RATING</p>
                   <div className="flex gap-2">
@@ -676,6 +674,7 @@ const ProductDetails = ({ openCart }) => {
                 >
                   {uploadingReview ? 'UPLOADING PHOTOS...' : submitLoading ? 'SUBMITTING...' : 'SUBMIT REVIEW'}
                 </button>
+                </fieldset>
               </form>
             </div>
           </div>

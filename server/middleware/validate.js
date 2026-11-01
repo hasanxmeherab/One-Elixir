@@ -160,11 +160,9 @@ const updateOrderSchema = z.object({
 
 // ── Review ────────────────────────────────────────────────────
 const createReviewSchema = z.object({
-  perfumeId: z.string().min(1),
-  userId: z.string().optional().nullable(),
-  userName: z.string().min(1).max(100),
+  perfumeId: z.string().regex(/^[a-f\d]{24}$/i),
   rating: z.number().int().min(1).max(5),
-  comment: z.string().min(1).max(2000),
+  comment: z.string().trim().min(1).max(2000),
   images: z.array(z.string().url()).max(3).optional(),
 });
 

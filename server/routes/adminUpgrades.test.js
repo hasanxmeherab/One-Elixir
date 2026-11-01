@@ -1,4 +1,4 @@
-const { test } = require('node:test');
+const { test, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
@@ -15,7 +15,12 @@ const couponRouter = require('./couponRoutes');
 const logRouter = require('./logRoutes');
 const settlementRouter = require('./settlementRoutes');
 const id = '507f1f77bcf86cd799439011';
+let databaseRole = 'superadmin';
+beforeEach(t => {
+  t.mock.method(Admin, 'findById', accountId => ({ select() { return this; }, lean: async () => ({ _id: accountId, name: 'Staff', role: databaseRole, sessionVersion: 0 }) }));
+});
 function invoke(router, path, method, role = 'superadmin', body = {}, query = {}) {
+  databaseRole = role;
   const route = router.stack.find(layer => layer.route?.path === path && layer.route.methods[method]).route;
   const secret = process.env.JWT_SECRET || 'local-test-secret';
   process.env.JWT_SECRET = secret;

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useCart } from '../context/CartContext';
 import { useUser } from '../context/UserContext';
+import { postCustomerJson } from '../utils/postCustomerJson';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Select from 'react-select'; 
@@ -14,7 +15,7 @@ const Checkout = () => {
 
   const toast = useToast();
   const { cart, cartTotal, clearCart } = useCart();
-  const { user } = useUser();
+  const { user, authFetch } = useUser();
   const navigate = useNavigate();
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -166,7 +167,7 @@ const Checkout = () => {
   const handleDirectOrderSubmit = async () => {
     setLoading(true);
     try {
-      const res = await axios.post(`${API_URL}/api/orders`, buildOrderData({}));
+      const res = await postCustomerJson(authFetch, `${API_URL}/api/orders`, buildOrderData({}));
       clearCart();
       navigate('/thank-you', { state: { order: res.data } });
     } catch (err) {
@@ -189,7 +190,7 @@ const Checkout = () => {
         data.append("upload_preset", import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
         const res = await axios.post(`https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`, data);
         screenshotUrl = res.data.secure_url;
-      } catch (err) {
+      } catch {
         setLoading(false);
         return toast.error("Screenshot upload failed. Please try again.");
       }
@@ -201,7 +202,7 @@ const Checkout = () => {
       screenshot: screenshotUrl,
     });
     try {
-      const res = await axios.post(`${API_URL}/api/orders`, orderData);
+      const res = await postCustomerJson(authFetch, `${API_URL}/api/orders`, orderData);
       clearCart();
       navigate('/thank-you', { state: { order: res.data } });
     } catch (err) {
@@ -344,7 +345,7 @@ const Checkout = () => {
               <input
                 type="radio" name="pay" value="Full Payment"
                 checked={paymentMethod === 'Full Payment'}
-                onChange={e => setPaymentMethod('Full Payment')}
+                onChange={() => setPaymentMethod('Full Payment')}
               />
               <div className="ml-2.5">
                 <div className="font-bold">Full Payment</div>

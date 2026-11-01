@@ -69,7 +69,9 @@ const Admin = () => {
     return () => { cancelFetch(); clearInterval(interval); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
   }, [fetchData, cancelFetch]);
 
-  const handleAdminLogout = () => {
+  const handleAdminLogout = async () => {
+    try { await adminAxios.post('/api/admins/logout'); }
+    catch { toast.warning('Could not end the server session. Signing out on this device.'); }
     localStorage.removeItem('isAdminAuthenticated');
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminRefreshToken');

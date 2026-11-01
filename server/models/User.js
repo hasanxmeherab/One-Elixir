@@ -14,6 +14,7 @@ const userSchema = new mongoose.Schema({
   email:    { type: String, required: true, unique: true },
   password: { type: String, required: true },
   role:     { type: String, default: 'customer' },
+  reviewWriteVersion: { type: Number, default: 0 }, // Serializes concurrent review submissions per account.
   avatar:   { type: String, default: '' },      // profile picture URL
   googleId: { type: String, default: null },    // for Google sign in
   resetPasswordToken:   String,

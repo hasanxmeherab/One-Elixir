@@ -1,19 +1,7 @@
 const express = require('express');
 const router  = express.Router();
 const User    = require('../models/User');
-const jwt     = require('jsonwebtoken');
-
-// Auth middleware — extract user from token
-const authUser = (req, res, next) => {
-  try {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ message: 'Unauthorized' });
-    req.userId = jwt.verify(token, process.env.JWT_SECRET).id;
-    next();
-  } catch {
-    res.status(401).json({ message: 'Invalid token' });
-  }
-};
+const { verifyUser: authUser } = require('../middleware/authMiddleware');
 
 // GET /api/addresses — get all addresses for logged-in user
 router.get('/', authUser, async (req, res) => {

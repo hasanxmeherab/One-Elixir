@@ -81,7 +81,7 @@ router.get('/customer/:email', verifyUser, asyncHandler(async (req, res) => {
     return res.status(403).json({ message: 'You can only view your own orders.' });
   }
   const orders = await Order.find({
-    customerEmail: { $regex: new RegExp(`^${escapeRegex(userEmail)}$`, 'i') },
+    $or: [{ customerId: req.userId }, { customerId: null, customerEmail: { $regex: new RegExp(`^${escapeRegex(userEmail)}$`, 'i') } }],
     isManual: false
   }).sort({ createdAt: -1 });
   res.json(orders);
@@ -113,7 +113,11 @@ router.post('/quote', validate(quoteOrderSchema), asyncHandler(async (req, res) 
 }));
 
 // 3. POST standard website order (✅ SERVER-SIDE PRICING + ATOMIC STOCK DECREMENT)
-router.post('/', validate(createWebOrderSchema), asyncHandler(async (req, res) => {
+router.post('/', verifyUser, (req, res, next) => {
+  // Account identity always comes from the authenticated database record.
+  req.body = { ...req.body, customerEmail: req.user.email };
+  next();
+}, validate(createWebOrderSchema), asyncHandler(async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   
@@ -145,6 +149,7 @@ router.post('/', validate(createWebOrderSchema), asyncHandler(async (req, res) =
     }
 
     const order = new Order({
+      customerId: req.userId,
       customerName,
       customerEmail: customerEmail ? customerEmail.toLowerCase() : undefined,
       phone,
@@ -386,7 +391,7 @@ router.put('/:id/cancel', verifyUser, asyncHandler(async (req, res) => {
       return res.status(404).json({ message: 'Order not found' });
     }
     // 🔒 Only the customer who placed the order may cancel it
-    if ((order.customerEmail || '').toLowerCase() !== userEmail) {
+    if (order.customerId ? String(order.customerId) !== req.userId : (order.customerEmail || '').toLowerCase() !== userEmail) {
       await session.abortTransaction();
       return res.status(403).json({ message: 'You can only cancel your own orders.' });
     }

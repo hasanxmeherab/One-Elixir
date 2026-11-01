@@ -1,11 +1,13 @@
 ﻿import { useState, useEffect } from 'react';
 import { Plus, KeyRound, Trash2, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import adminAxios from '../../utils/adminAxios';
+import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
 import { PageHeading, Stats, Empty, ErrorNotice, Modal } from '../../components/admin/AdminUi';
 import { panel, field, button, primary } from '../../utils/adminPresentation';
 export default function AdminManagement() {
   const toast = useToast();
+  const navigate = useNavigate();
   const me = JSON.parse(localStorage.getItem('adminData') || '{}');
   const superadmin = me.role === 'superadmin';
   const myId = me.id || me._id;
@@ -38,7 +40,12 @@ export default function AdminManagement() {
     if (pass.next !== pass.confirm) return toast.warning('Passwords do not match.');
     if (pass.current === pass.next) return toast.warning('Choose a different password.');
     setSaving(true);
-    try { await adminAxios.post('/api/admins/change-password', { currentPassword: pass.current, newPassword: pass.next }); toast.success('Password changed.'); setShowPassword(false); setPass({ current: '', next: '', confirm: '' }); }
+    try {
+      await adminAxios.post('/api/admins/change-password', { currentPassword: pass.current, newPassword: pass.next });
+      ['adminToken', 'adminRefreshToken', 'adminData', 'adminRole', 'isAdminAuthenticated'].forEach(key => localStorage.removeItem(key));
+      toast.success('Password changed. Sign in again with your new password.');
+      navigate('/admin-login', { replace: true });
+    }
     catch (err) { toast.error(err.response?.data?.message || 'Could not change password.'); }
     finally { setSaving(false); }
   };
