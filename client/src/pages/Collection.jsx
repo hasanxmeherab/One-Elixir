@@ -1,92 +1,71 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Star } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Heart, Star, SlidersHorizontal, ChevronDown } from 'lucide-react';
+import { useWishlist } from '../context/WishlistContext';
+import { ProductGridSkeleton } from '../components/Skeleton';
 import { optimizeImage } from '../utils/optimizeImage';
 import { useDebounce } from '../hooks/useDebounce';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { getCountdown } from '../utils/countdown';
+import { filterCollection, getCollectionPrice } from '../utils/collectionProducts';
+import { SCENT_FAMILIES } from '../utils/fragranceDiscovery';
 
 const PAGE_SIZE = 12;
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const focusStyle = 'focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-black';
 
 const Collection = () => {
   usePageMeta('The Collection | OneElixir Perfumes', 'Browse our complete catalog of luxury perfumes, signature scents, and handcrafted elixirs.');
-
-  const [perfumes, setPerfumes]     = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const debouncedSearch = useDebounce(searchTerm, 350); // ⚡ only recomputes after user pauses
-  const [sortBy, setSortBy]         = useState('default');
-  const [priceRange, setPriceRange] = useState([0, 10000]);
-  const [maxPrice, setMaxPrice]     = useState(10000);
-  const [page, setPage]             = useState(1);
-  // ── Scent filter ─────────────────────────────────────────
-  const [selectedScents, setSelectedScents] = useState([]);
-  const [now, setNow] = useState(new Date());
+  const [perfumes, setPerfumes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [request, setRequest] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchTerm = searchParams.get('search') || '';
+  const debouncedSearch = useDebounce(searchTerm, 350);
+  const sortBy = ['newest', 'price-asc', 'price-desc', 'rating'].includes(searchParams.get('sort')) ? searchParams.get('sort') : 'default';
+  const [priceSelection, setPriceSelection] = useState(null);
+  const selectedScents = useMemo(() => searchParams.getAll('scent'), [searchParams]);
+  const family = SCENT_FAMILIES.find(item => item.id === searchParams.get('family'));
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [pagination, setPagination] = useState({ key: '', page: 1 });
+  const filterKey = `${searchParams.toString()}|${JSON.stringify(priceSelection)}`;
+  const page = pagination.key === filterKey ? pagination.page : 1;
+  const setPage = value => setPagination({ key: filterKey, page: value });
+  const [now, setNow] = useState(() => new Date());
   const [ratings, setRatings] = useState({});
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-
-  // Pre-fill search from URL query param (?search=...)
-  useEffect(() => {
-    const q = searchParams.get('search');
-    if (q) setSearchTerm(q);
-  }, [searchParams]);
+  const [ratingsStatus, setRatingsStatus] = useState('loading');
+  const { isWishlisted, toggleWishlist } = useWishlist();
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/api/perfumes`);
-        const data = res.data;
-        setPerfumes(data);
-        if (data.length > 0) {
-          const max = Math.ceil(Math.max(...data.map(p => p.price)) / 100) * 100;
-          setMaxPrice(max);
-          setPriceRange([0, max]);
-        }
-      } catch (err) { console.error('Collection unavailable', err); }
-    };
-    fetchProducts();
-  }, []);
+    const controller = new AbortController();
+    axios.get(`${API_URL}/api/perfumes`, { signal: controller.signal })
+      .then(res => { setPerfumes(res.data); setLoading(false); })
+      .catch(() => {
+        if (!controller.signal.aborted) { setError(true); setLoading(false); }
+      });
+    return () => controller.abort();
+  }, [request]);
 
-  // ── Fetch aggregated ratings ──────────────────────────────
   useEffect(() => {
-    axios.get(`${API_URL}/api/perfumes/ratings`)
-      .then(res => setRatings(res.data))
-      .catch(() => {});
-  }, [API_URL]);
+    const controller = new AbortController();
+    axios.get(`${API_URL}/api/perfumes/ratings`, { signal: controller.signal })
+      .then(res => { setRatings(res.data); setRatingsStatus('ready'); })
+      .catch(() => { if (!controller.signal.aborted) setRatingsStatus('error'); });
+    return () => controller.abort();
+  }, [request]);
 
-  // ── All unique scent notes across all products ────────────
-  const allScents = useMemo(() => {
-    const set = new Set();
-    perfumes.forEach(p => p.scentProfile?.forEach(s => set.add(s)));
-    return Array.from(set).sort();
-  }, [perfumes]);
+  const maxPrice = useMemo(() => Math.max(100, ...perfumes.map(p => {
+    const { basePrice } = getCollectionPrice(p);
+    return Math.ceil(Math.max(basePrice, Number(p.flashSale?.salePrice) || 0) / 100) * 100;
+  })), [perfumes]);
+  const priceRange = useMemo(() => priceSelection || [0, maxPrice], [priceSelection, maxPrice]);
+  const allScents = useMemo(() => [...new Set(perfumes.flatMap(p => p.scentProfile || []))].sort(), [perfumes]);
+  const filtered = useMemo(() => filterCollection(perfumes, {
+    search: debouncedSearch, priceRange, scents: selectedScents, family: family?.id, sortBy, ratings, now,
+  }), [perfumes, debouncedSearch, priceRange, selectedScents, family, sortBy, ratings, now]);
 
-  const toggleScent = useCallback((scent) => {
-    setSelectedScents(prev =>
-      prev.includes(scent) ? prev.filter(s => s !== scent) : [...prev, scent]
-    );
-  }, []);
-
-  // ── Filter + Sort ─────────────────────────────────────────
-  const filtered = useMemo(() => {
-    let result = perfumes.filter(p =>
-      p.name.toLowerCase().includes(debouncedSearch.toLowerCase()) &&
-      p.price >= priceRange[0] && p.price <= priceRange[1] &&
-      (selectedScents.length === 0 || selectedScents.every(s => p.scentProfile?.includes(s)))
-    );
-    if (sortBy === 'price-asc')  result = [...result].sort((a, b) => a.price - b.price);
-    if (sortBy === 'price-desc') result = [...result].sort((a, b) => b.price - a.price);
-    if (sortBy === 'newest')     result = [...result].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    if (sortBy === 'rating')     result = [...result].sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
-    return result;
-  }, [perfumes, debouncedSearch, priceRange, sortBy, selectedScents]);
-
-  // Reset to page 1 on filter change (use debouncedSearch to avoid resetting mid-keystroke)
-  useEffect(() => { setPage(1); }, [debouncedSearch, priceRange, sortBy, selectedScents]);
-
-  // ── Live clock for flash sale countdowns (only if sales exist) ─
   const hasFlashSales = perfumes.some(p => p.flashSale?.active && p.flashSale?.endsAt);
   useEffect(() => {
     if (!hasFlashSales) return;
@@ -94,223 +73,170 @@ const Collection = () => {
     return () => clearInterval(id);
   }, [hasFlashSales]);
 
-  // ── Pagination ────────────────────────────────────────────
-  const totalPages   = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated    = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  // ── Flash sale helpers ────────────────────────────────────
-  const getActivePrice = (p) => {
-    if (p.flashSale?.active && p.flashSale?.salePrice && new Date(p.flashSale.endsAt) > now)
-      return p.flashSale.salePrice;
-    return null;
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const currentPage = Math.min(page, Math.max(1, totalPages));
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const activeFilterCount = selectedScents.length + (priceSelection ? 1 : 0) + (family ? 1 : 0);
+  const hasFilters = Boolean(searchTerm || activeFilterCount);
+  const updateSearch = value => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set('search', value); else next.delete('search');
+    setSearchParams(next, { replace: true });
+    setPage(1);
+  };
+  const clearFilters = () => {
+    const next = new URLSearchParams(searchParams);
+    ['search', 'scent', 'family'].forEach(key => next.delete(key));
+    setSearchParams(next, { replace: true }); setPriceSelection(null); setPage(1);
+  };
+  const toggleScent = scent => {
+    const scents = selectedScents.includes(scent) ? selectedScents.filter(s => s !== scent) : [...selectedScents, scent];
+    const next = new URLSearchParams(searchParams);
+    next.delete('scent'); scents.forEach(note => next.append('scent', note));
+    setSearchParams(next, { replace: true });
+    setPage(1);
   };
 
   return (
     <div className="px-[5%] pt-24 pb-20 max-w-[1300px] mx-auto min-h-screen">
-
-      {/* ── JSON-LD BreadcrumbList ──────────────────────────── */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        "itemListElement": [
-          { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.oneelixir.live/" },
-          { "@type": "ListItem", "position": 2, "name": "Collection", "item": "https://www.oneelixir.live/collection" },
+        '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://www.oneelixir.live/' },
+          { '@type': 'ListItem', position: 2, name: 'Collection', item: 'https://www.oneelixir.live/collection' },
         ],
       }) }} />
-
-      {/* Header */}
-      <div className="text-center mb-14">
-        <h1 className="text-4xl font-light tracking-[10px] mb-4">OUR ELIXIRS</h1>
-        <p className="text-[11px] text-[#888] tracking-[2px] uppercase mb-8">Bespoke fragrances, crafted in small batches.</p>
-        <input type="text" placeholder="Search for a scent..."
-          className="px-5 py-3 border border-[#eee] w-full max-w-[400px] text-center outline-none text-[13px] tracking-wider"
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)} />
-      </div>
-
-      {/* ── Filter Bar ── */}
-      <div className="flex flex-wrap gap-4 items-end justify-between mb-6 pb-6 border-b border-[#eee]">
-
-        {/* Price Range */}
-        <div className="flex flex-col gap-2 min-w-[220px] flex-1">
-          <div className="flex justify-between text-[10px] text-[#888] font-bold tracking-wider">
-            <span>PRICE RANGE</span>
-            <span>{priceRange[0].toLocaleString()} — {priceRange[1].toLocaleString()} TK</span>
-          </div>
-          <div className="relative h-5 flex items-center">
-            {/* Track */}
-            <div className="absolute left-0 right-0 h-0.5 bg-[#eee]" />
-            {/* Filled track */}
-            <div className="absolute h-0.5 bg-black"
-              style={{
-                left:  `${(priceRange[0] / maxPrice) * 100}%`,
-                right: `${100 - (priceRange[1] / maxPrice) * 100}%`,
-              }} />
-            {/* Min thumb */}
-            <input type="range" min={0} max={maxPrice} step={100}
-              value={priceRange[0]}
-              onChange={e => { const v = Number(e.target.value); if (v < priceRange[1]) setPriceRange([v, priceRange[1]]); }}
-              className="absolute w-full appearance-none bg-transparent cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-black [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow"
-              style={{ zIndex: priceRange[0] > maxPrice * 0.8 ? 5 : 3 }}
-            />
-            {/* Max thumb */}
-            <input type="range" min={0} max={maxPrice} step={100}
-              value={priceRange[1]}
-              onChange={e => { const v = Number(e.target.value); if (v > priceRange[0]) setPriceRange([priceRange[0], v]); }}
-              className="absolute w-full appearance-none bg-transparent cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-black [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow"
-              style={{ zIndex: 4 }}
-            />
-          </div>
+      <header className="text-center mb-8 sm:mb-12">
+        <h1 className="text-3xl sm:text-4xl font-light tracking-[5px] sm:tracking-[10px] mb-4">{family ? family.name : sortBy === 'newest' ? 'NEW ARRIVALS' : sortBy === 'rating' ? 'BEST RATED' : 'OUR ELIXIRS'}</h1>
+        <p className="text-[11px] text-[#666] tracking-[2px] uppercase mb-6">Bespoke fragrances, crafted in small batches.</p>
+        <input type="search" aria-label="Search fragrances" placeholder="Search for a scent..."
+          className={`px-5 py-3 border border-[#ddd] w-full max-w-[400px] text-center text-[13px] tracking-wider ${focusStyle}`}
+          value={searchTerm} onChange={e => updateSearch(e.target.value)} />
+      </header>
+      <div className="flex flex-wrap gap-4 items-center justify-between border-b border-[#eee] pb-5 mb-5">
+        <div className="flex items-center gap-3">
+          <button type="button" aria-expanded={filtersOpen} aria-controls="collection-filters" onClick={() => setFiltersOpen(open => !open)}
+            className={`md:hidden flex items-center gap-2 border border-[#ddd] px-3 min-h-11 text-xs ${focusStyle}`}>
+            <SlidersHorizontal size={14} aria-hidden="true" /> Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+            <ChevronDown size={14} className={filtersOpen ? 'rotate-180' : ''} aria-hidden="true" />
+          </button>
+          <span role="status" className="text-[11px] text-[#666] tracking-wider">
+            {loading ? 'Loading fragrances…' : error ? 'Collection unavailable' : `${filtered.length} PRODUCT${filtered.length !== 1 ? 'S' : ''}`}
+          </span>
         </div>
-
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Sort */}
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] text-[#888] font-bold tracking-wider">SORT BY</span>
-            <select value={sortBy} onChange={e => setSortBy(e.target.value)}
-              className="px-3 py-2 border border-[#eee] text-xs outline-none tracking-wider cursor-pointer bg-white">
-              <option value="default">DEFAULT</option>
-              <option value="newest">NEWEST</option>
-              <option value="price-asc">PRICE: LOW → HIGH</option>
-              <option value="price-desc">PRICE: HIGH → LOW</option>
-              <option value="rating">BEST RATED</option>
-            </select>
-          </div>
-
-          {/* Result count */}
-          <div className="text-[10px] text-[#aaa] tracking-wider self-end pb-2">
-            {filtered.length} PRODUCT{filtered.length !== 1 ? 'S' : ''}
-          </div>
-        </div>
+        <label className="flex items-center gap-2 text-[10px] text-[#666] font-bold tracking-wider">
+          SORT BY
+          <select value={sortBy} onChange={e => { const next = new URLSearchParams(searchParams); next.set('sort', e.target.value); setSearchParams(next, { replace: true }); setPage(1); }}
+            className={`px-2 py-3 border border-[#ddd] text-[11px] text-black cursor-pointer bg-white max-w-[180px] ${focusStyle}`}>
+            <option value="default">DEFAULT</option>
+            <option value="newest">NEWEST</option>
+            <option value="price-asc">PRICE: LOW TO HIGH</option>
+            <option value="price-desc">PRICE: HIGH TO LOW</option>
+            <option value="rating" disabled={ratingsStatus !== 'ready'}>BEST RATED{ratingsStatus === 'loading' ? ' (LOADING)' : ratingsStatus === 'error' ? ' (UNAVAILABLE)' : ''}</option>
+          </select>
+        </label>
       </div>
-
-      {/* ── Scent Profile Filter ── */}
-      {allScents.length > 0 && (
-        <div className="mb-10">
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-[10px] text-[#888] font-bold tracking-wider shrink-0">SCENT:</span>
-            {allScents.map(scent => (
-              <button key={scent} onClick={() => toggleScent(scent)}
-                className={`px-3 py-1.5 text-[10px] font-bold tracking-wider border transition-colors cursor-pointer ${
-                  selectedScents.includes(scent)
-                    ? 'bg-black text-white border-black'
-                    : 'bg-white text-[#555] border-[#ddd] hover:border-black'
-                }`}>
-                {scent}
-              </button>
+      <div className="flex flex-wrap gap-2 items-center mb-4">
+        {family && <span className="text-[11px] text-[#555]">Scent family: {family.name}</span>}
+        {selectedScents.map(scent => <button type="button" key={scent} onClick={() => toggleScent(scent)} aria-label={`Remove ${scent} filter`}
+          className={`border border-[#ddd] px-3 min-h-10 text-[11px] ${focusStyle}`}>{scent} ×</button>)}
+        {priceSelection && <span className="text-[11px] text-[#555]">{priceRange[0].toLocaleString()} – {priceRange[1].toLocaleString()} TK</span>}
+        {hasFilters && <button type="button" onClick={clearFilters} className={`text-[11px] underline underline-offset-4 min-h-11 ml-auto ${focusStyle}`}>Clear all filters</button>}
+      </div>
+      <div id="collection-filters" className={`${filtersOpen ? 'block' : 'hidden'} md:block mb-8 border-b border-[#eee] pb-6`}>
+        <fieldset className="w-full max-w-[400px] mb-5" disabled={loading || error}>
+          <legend className="text-[10px] text-[#666] font-bold tracking-wider mb-3">PRICE RANGE · {priceRange[0].toLocaleString()} – {priceRange[1].toLocaleString()} TK</legend>
+          <div className="grid grid-cols-2 gap-5">
+            {['Minimum', 'Maximum'].map((label, index) => (
+              <label key={label} className="text-[11px] text-[#666]">
+                {label} price
+                <input type="range" min={0} max={maxPrice} step={100} value={priceRange[index]}
+                  onChange={e => {
+                    const value = Number(e.target.value);
+                    setPriceSelection(index === 0 ? [Math.min(value, priceRange[1]), priceRange[1]] : [priceRange[0], Math.max(value, priceRange[0])]);
+                    setPage(1);
+                  }} className={`block w-full h-8 accent-black cursor-pointer ${focusStyle}`} />
+              </label>
             ))}
-            {selectedScents.length > 0 && (
-              <button onClick={() => setSelectedScents([])}
-                className="text-[10px] text-[#aaa] hover:text-black transition-colors cursor-pointer bg-transparent border-none underline">
-                CLEAR
-              </button>
-            )}
           </div>
+        </fieldset>
+        {allScents.length > 0 && <fieldset>
+          <legend className="text-[10px] text-[#666] font-bold tracking-wider mb-3">SCENT NOTES</legend>
+          <div className="flex flex-wrap gap-2">
+            {allScents.map(scent => <button type="button" key={scent} onClick={() => toggleScent(scent)} aria-pressed={selectedScents.includes(scent)}
+              className={`px-3 min-h-10 text-[10px] font-bold tracking-wider border transition-colors cursor-pointer ${focusStyle} ${selectedScents.includes(scent) ? 'bg-black text-white border-black' : 'bg-white text-[#555] border-[#ddd] hover:border-black'}`}>{scent}</button>)}
+          </div>
+          {selectedScents.length > 1 && <p className="text-[11px] text-[#666] mt-3">Showing fragrances with all selected notes.</p>}
+        </fieldset>}
+      </div>
+      {loading ? <div aria-busy="true" aria-label="Loading collection"><ProductGridSkeleton count={8} /></div> : error ? (
+        <div role="alert" className="text-center py-20">
+          <h2 className="text-xl mb-3">We couldn’t load the collection.</h2>
+          <p className="text-sm text-[#666] mb-6">Please try again in a moment.</p>
+          <button type="button" onClick={() => { setError(false); setLoading(true); setRatingsStatus('loading'); setRequest(n => n + 1); }}
+            className={`border border-black px-8 py-3 text-xs hover:bg-black hover:text-white ${focusStyle}`}>Try again</button>
         </div>
-      )}
-
-      {/* ── Product Grid ── */}
-      {paginated.length === 0 ? (
-        <div className="text-center py-24 text-[#bbb] tracking-[3px] text-sm">NO PRODUCTS FOUND.</div>
+      ) : paginated.length === 0 ? (
+        <div className="text-center py-20">
+          <h2 className="text-xl mb-3">{hasFilters ? 'No fragrances match your filters.' : 'Our collection is coming soon.'}</h2>
+          {hasFilters && <><p className="text-sm text-[#666] mb-6">Try another scent or widen your price range.</p><button type="button" onClick={clearFilters} className={`border border-black px-8 py-3 text-xs ${focusStyle}`}>Clear all filters</button></>}
+        </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-12">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-8 sm:gap-x-6 sm:gap-y-12">
           {paginated.map(p => {
-            const salePrice = getActivePrice(p);
+            const { price, salePrice, basePrice } = getCollectionPrice(p, now);
+            const countdown = salePrice !== null ? getCountdown(p.flashSale.endsAt, now) : null;
+            const image = p.images?.[0] || p.image || p.variants?.[0]?.image;
+            const url = `/product/${p.slug || p._id}`;
+            const saved = isWishlisted(p._id);
+            const rating = ratings[p._id];
             return (
-              <div key={p._id} className="cursor-pointer group text-center transition-shadow duration-300 hover:shadow-lg"
-                onClick={() => navigate(`/product/${p.slug || p._id}`)}>
-                <div className="relative w-full h-[380px] bg-[#fcfcfc] mb-5 overflow-hidden">
-                  {(p.images?.[0] || p.image || p.variants?.[0]?.image) && <img src={optimizeImage(p.images?.[0] || p.image || p.variants?.[0]?.image, 400)} alt={p.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" />}
-                  {p.stock === 0 && (
-                    <div className="absolute top-4 right-4 bg-black text-white px-3 py-1 text-[9px] font-bold tracking-[2px]">SOLD OUT</div>
-                  )}
-                  {p.stock > 0 && p.stock <= 5 && !salePrice && (
-                    <div className="absolute top-4 right-4 bg-[#f39c12] text-white px-3 py-1 text-[9px] font-bold tracking-[2px]">LIMITED</div>
-                  )}
-                  {salePrice && (
-                    <div className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 text-[9px] font-bold tracking-[2px]">🔥 SALE</div>
-                  )}
-                  {salePrice && getCountdown(p.flashSale?.endsAt, now) && (() => {
-                    const cd = getCountdown(p.flashSale.endsAt, now);
-                    return (
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-3 py-2.5 flex items-center justify-center gap-1.5">
-                        <span className="text-[9px] text-white/70 font-bold tracking-wider">ENDS IN</span>
-                        {[cd.h, cd.m, cd.s].map((v, i) => (
-                          <span key={i} className="bg-white/20 text-white text-[11px] font-bold px-1.5 py-0.5 rounded-sm min-w-[24px] text-center">{v}</span>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                </div>
-                <div className="px-2">
-                  <h3 className="text-[15px] tracking-[3px] mb-2 font-bold">{p.name.toUpperCase()}</h3>
-                  {ratings[p._id] && (
-                    <div className="flex items-center justify-center gap-1.5 mb-2">
-                      <div className="flex gap-0.5">
-                        {[1,2,3,4,5].map(i => (
-                          <Star key={i} size={12}
-                            fill={i <= Math.round(ratings[p._id].avgRating) ? '#000' : 'none'}
-                            className="text-black" />
-                        ))}
-                      </div>
-                      <span className="text-[10px] text-[#999] tracking-wider">
-                        {ratings[p._id].avgRating} ({ratings[p._id].count})
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-center gap-2 mb-3">
-                    {salePrice ? (
-                      <>
-                        <span className="text-red-600 font-bold text-base">{salePrice.toLocaleString()} TK</span>
-                        <span className="text-[#aaa] line-through text-sm">{p.price.toLocaleString()} TK</span>
-                      </>
-                    ) : p.variants?.length > 0 ? (
-                      <span className="text-[14px] text-[#333]">
-                        From {Math.min(...p.variants.map(v => v.price)).toLocaleString()} TK
-                      </span>
-                    ) : (
-                      <span className="text-[14px] text-[#333]">{p.price.toLocaleString()} TK</span>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-[#999] mb-5 italic tracking-wider">{p.scentProfile?.join(' • ')}</p>
-                  {p.variants?.length > 0 && (
-                    <div className="flex items-center justify-center gap-1.5 mb-3">
-                      {p.variants.map((v, vi) => (
-                        <span key={vi} className="text-[9px] font-bold tracking-wider border border-[#ddd] px-2 py-0.5 text-[#666]">{v.label}</span>
-                      ))}
-                    </div>
-                  )}
-                  <button className="btn-press w-full border border-black py-3 text-[10px] font-bold tracking-[2px] bg-white hover:bg-black hover:text-white transition-colors">
-                    {p.stock > 0 ? 'VIEW ELIXIR' : 'OUT OF STOCK'}
+              <article key={p._id} className="group min-w-0 flex flex-col text-center">
+                <div className="relative aspect-[3/4] bg-[#fcfcfc] mb-4 overflow-hidden">
+                  <Link to={url} aria-label={`View ${p.name}`} className={`block w-full h-full ${focusStyle} focus-visible:-outline-offset-4`}>
+                    {image ? <img src={optimizeImage(image, 400)} alt={p.name} className="w-full h-full object-cover transition-transform duration-700 motion-safe:group-hover:scale-105" loading="lazy" /> : <span className="flex h-full items-center justify-center text-xs text-[#666]">{p.name}</span>}
+                  </Link>
+                  <button type="button" onClick={() => toggleWishlist({ ...p, image })} aria-pressed={saved}
+                    aria-label={`${saved ? 'Remove' : 'Save'} ${p.name} ${saved ? 'from' : 'to'} wishlist`}
+                    className={`absolute top-2 right-2 w-11 h-11 flex items-center justify-center bg-white/95 rounded-full cursor-pointer ${focusStyle}`}>
+                    <Heart size={18} fill={saved ? 'currentColor' : 'none'} aria-hidden="true" />
                   </button>
+                  {(p.stock === 0 || salePrice !== null || (p.stock > 0 && p.stock <= 5)) && <span className={`absolute top-3 left-2 px-2 py-1 text-[8px] sm:text-[9px] font-bold tracking-wider text-white ${p.stock === 0 ? 'bg-black' : salePrice !== null ? 'bg-red-600' : 'bg-[#805b18]'}`}>
+                    {p.stock === 0 ? 'SOLD OUT' : salePrice !== null ? 'SALE' : 'LIMITED'}
+                  </span>}
+                  {countdown && <div className="pointer-events-none absolute bottom-0 inset-x-0 bg-black/75 text-white px-2 py-2 text-[9px] sm:text-[10px] tracking-wider">ENDS IN {countdown.h}:{countdown.m}:{countdown.s}</div>}
                 </div>
-              </div>
+                <div className="flex flex-col flex-1 px-1 sm:px-2">
+                  <h2 className="text-[12px] sm:text-[15px] tracking-[1px] sm:tracking-[3px] mb-2 font-bold break-words"><Link to={url} className={`hover:underline ${focusStyle}`}>{p.name.toUpperCase()}</Link></h2>
+                  <div className="min-h-5 mb-2">
+                    {rating && <div className="flex flex-wrap items-center justify-center gap-1" aria-label={`${rating.avgRating} out of 5 stars, ${rating.count} reviews`}>
+                      <div className="flex gap-0.5" aria-hidden="true">{[1, 2, 3, 4, 5].map(i => <Star key={i} size={10} fill={i <= Math.round(rating.avgRating) ? '#000' : 'none'} />)}</div>
+                      <span className="text-[10px] text-[#666]">{rating.avgRating} ({rating.count})</span>
+                    </div>}
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-2 mb-3 text-[12px] sm:text-sm">
+                    <span className={salePrice !== null ? 'text-red-600 font-bold' : 'text-[#333]'}>{salePrice === null && p.variants?.length > 0 ? 'From ' : ''}{price.toLocaleString()} TK</span>
+                    {salePrice !== null && basePrice > price && <span className="text-[#666] line-through text-xs">{basePrice.toLocaleString()} TK</span>}
+                  </div>
+                  <p className="text-[10px] sm:text-[11px] text-[#666] mb-3 italic tracking-wide">{p.scentProfile?.join(' · ')}</p>
+                  {p.variants?.length > 0 && <div className="flex flex-wrap justify-center gap-1 mb-4">{p.variants.map((v, i) => <span key={i} className="text-[9px] tracking-wide border border-[#ddd] px-1.5 py-1 text-[#666]">{v.label}</span>)}</div>}
+                  <Link to={url} className={`btn-press mt-auto block w-full border border-black py-3 text-[9px] sm:text-[10px] font-bold tracking-[1px] sm:tracking-[2px] bg-white hover:bg-black hover:text-white transition-colors ${focusStyle}`}>
+                    {p.stock === 0 ? 'VIEW DETAILS' : 'VIEW ELIXIR'}
+                  </Link>
+                </div>
+              </article>
             );
           })}
         </div>
       )}
-
-      {/* ── Pagination ── */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-16">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-            className="px-4 py-2 border border-[#ddd] text-xs font-bold tracking-wider disabled:opacity-30 hover:border-black transition-colors cursor-pointer bg-white">
-            ← PREV
-          </button>
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
-            <button key={n} onClick={() => setPage(n)}
-              className={`w-9 h-9 text-xs font-bold tracking-wider border transition-colors cursor-pointer ${
-                n === page ? 'bg-black text-white border-black' : 'bg-white border-[#ddd] hover:border-black'
-              }`}>
-              {n}
-            </button>
-          ))}
-          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-            className="px-4 py-2 border border-[#ddd] text-xs font-bold tracking-wider disabled:opacity-30 hover:border-black transition-colors cursor-pointer bg-white">
-            NEXT →
-          </button>
-        </div>
-      )}
+      {!loading && !error && totalPages > 1 && <nav aria-label="Collection pages" className="flex flex-wrap justify-center items-center gap-2 mt-12">
+        <button type="button" onClick={() => setPage(currentPage - 1)} disabled={currentPage === 1} className={`px-3 h-11 border border-[#ddd] text-xs disabled:opacity-30 ${focusStyle}`}>Previous</button>
+        {Array.from({ length: totalPages }, (_, i) => i + 1).filter(n => n === 1 || n === totalPages || Math.abs(n - currentPage) <= 1).map((n, index, pages) => <span key={n} className="flex items-center gap-2">
+          {index > 0 && n - pages[index - 1] > 1 && <span aria-hidden="true">…</span>}
+          <button type="button" aria-label={`Page ${n}`} aria-current={n === currentPage ? 'page' : undefined} onClick={() => setPage(n)} className={`w-11 h-11 text-xs border ${focusStyle} ${n === currentPage ? 'bg-black text-white border-black' : 'bg-white border-[#ddd] hover:border-black'}`}>{n}</button>
+        </span>)}
+        <button type="button" onClick={() => setPage(currentPage + 1)} disabled={currentPage === totalPages} className={`px-3 h-11 border border-[#ddd] text-xs disabled:opacity-30 ${focusStyle}`}>Next</button>
+      </nav>}
     </div>
   );
 };

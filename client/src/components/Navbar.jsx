@@ -133,6 +133,9 @@ const Navbar = memo(() => {
           {/* MENU ICON — always visible */}
           <button
             aria-label="Open menu"
+            aria-expanded={isSidebarOpen}
+            aria-controls="storefront-menu"
+            aria-haspopup="dialog"
             className="bg-transparent border-none cursor-pointer text-white p-0 shrink-0"
             onClick={() => setIsSidebarOpen(true)}
           >

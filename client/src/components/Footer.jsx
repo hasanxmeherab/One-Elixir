@@ -3,6 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const NAV_LINKS = [
+  { label: 'OUR STORY', to: '/our-story' },
+  { label: 'SCENT GUIDE', to: '/scent-guide' },
+  { label: 'FIND YOUR FRAGRANCE', to: '/fragrance-quiz' },
+  { label: 'DELIVERY & RETURNS', to: '/delivery-returns' },
+  { label: 'FAQ', to: '/faq' },
   { label: 'OVERVIEW', action: 'top' },
   { label: 'CORE VALUES', hash: 'values' },
   { label: 'COLLECTIONS', hash: 'collections' },

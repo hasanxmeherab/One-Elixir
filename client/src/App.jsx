@@ -46,6 +46,11 @@ const CostCalculator = lazy(() => import('./pages/admin/CostCalculator'));
 const ActivityLogs = lazy(() => import('./pages/admin/ActivityLogs'));
 const AdminBundles = lazy(() => import('./pages/admin/AdminBundles'));
 const SettlementDashboard = lazy(() => import('./pages/admin/SettlementDashboard'));
+const ScentGuide = lazy(() => import('./pages/ScentGuide'));
+const FragranceQuiz = lazy(() => import('./pages/FragranceQuiz'));
+const OurStory = lazy(() => import('./pages/OurStory'));
+const DeliveryReturns = lazy(() => import('./pages/StorefrontHelp').then(module => ({ default: module.DeliveryReturns })));
+const StorefrontFaq = lazy(() => import('./pages/StorefrontHelp').then(module => ({ default: module.StorefrontFaq })));
 
 // --- CONTEXT ---
 import { WishlistProvider } from './context/WishlistContext';
@@ -77,6 +82,11 @@ const AppContent = () => {
           <Route path="/signin" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/collection" element={<Collection />} />
+          <Route path="/scent-guide" element={<ScentGuide />} />
+          <Route path="/fragrance-quiz" element={<FragranceQuiz />} />
+          <Route path="/delivery-returns" element={<DeliveryReturns />} />
+          <Route path="/faq" element={<StorefrontFaq />} />
+          <Route path="/our-story" element={<OurStory />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
