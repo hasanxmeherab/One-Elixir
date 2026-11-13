@@ -5,7 +5,7 @@ export const orderMoney = value => `${Number(value || 0).toLocaleString('en-BD',
 export const orderDate = value => new Date(value).toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka', day: '2-digit', month: 'short', year: 'numeric' });
 export const statusTone = status => ({ Paid: 'green', Delivered: 'green', Processing: 'blue', Shipped: 'purple', Pending: 'amber', Partial: 'amber', 'Pending Verification': 'amber', Unpaid: 'red', Canceled: 'gray' })[status] || 'gray';
 
-export default function OrderTable({ orders, selectedIds, allSelected, onSelect, onSelectAll, onView, onEdit, onReceipt, onNotes }) {
+export default function OrderTable({ orders, selectedIds, allSelected, onSelect, onSelectAll, onView, onEdit, onReceipt, onNotes, onCancel, statusUpdatingId }) {
   const checkbox = useRef(null);
   useEffect(() => {
     if (checkbox.current) checkbox.current.indeterminate = !allSelected && orders.some(order => selectedIds.has(order._id));
@@ -26,6 +26,11 @@ export default function OrderTable({ orders, selectedIds, allSelected, onSelect,
         <button onClick={event => { event.currentTarget.closest('details').open = false; onEdit(order); }}>Edit order</button>
         <button onClick={event => { event.currentTarget.closest('details').open = false; onNotes(order); }}>Notes ({order.adminNotes?.length || 0})</button>
         <button onClick={event => { event.currentTarget.closest('details').open = false; onReceipt(order); }}>Download receipt</button>
+        {!['canceled', 'cancelled'].includes(String(order.status).toLowerCase()) && <button
+          className="text-red-600! disabled:opacity-50! disabled:cursor-wait!"
+          disabled={Boolean(statusUpdatingId)}
+          onClick={event => { event.currentTarget.closest('details').open = false; onCancel(order); }}
+        >{statusUpdatingId === order._id ? 'Canceling order...' : 'Cancel order'}</button>}
       </div></details></div></td>
   </tr>)}{!orders.length && <tr><td colSpan={8} className="ol-empty [&_>_svg]:[margin:0_auto_12px]! [&_h3]:[font:500_17px_'Jost',_sans-serif]! [&_h3]:text-[#555]! [&_h3]:m-[0]! [&_p]:[margin:8px_0_0]!"><Package size={28} /><h3>No orders found</h3><p>Try another search, status, or date range.</p></td></tr>}</tbody></table></div>;
 }

@@ -40,6 +40,7 @@ const OrderList = () => {
   const [page, setPage] = useState(1);
   const [viewOrderId, setViewOrderId] = useState(null);
   const [paymentUpdatingId, setPaymentUpdatingId] = useState(null);
+  const [statusUpdatingId, setStatusUpdatingId] = useState(null);
   const viewOrder = orders.find(order => order._id === viewOrderId);
   useEffect(() => {
     setOrderStatusFilter(['Pending', 'Processing', 'Shipped', 'Delivered', 'Canceled'].includes(query.get('status')) ? query.get('status') : 'ALL');
@@ -150,8 +151,15 @@ const OrderList = () => {
   };
 
   const updateStatus = async (id, status) => {
-    try { await adminAxios.put(`${API_URL}/api/orders/${id}`, { status }); fetchData(); toast.success(`Order updated to ${status}`); }
-    catch { toast.error('Failed to update order status'); }
+    if (statusUpdatingId) return;
+    setStatusUpdatingId(id);
+    try {
+      await adminAxios.put(`${API_URL}/api/orders/${id}`, { status });
+      await fetchData();
+      toast.success(`Order updated to ${status}`);
+    }
+    catch (err) { toast.error(err.response?.data?.message || 'Failed to update order status'); }
+    finally { setStatusUpdatingId(null); }
   };
 
   const openEditPayment = (order) => {
@@ -776,7 +784,7 @@ const OrderList = () => {
       )}
 
       {dueOnly && <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800"><span>Showing orders with a remaining customer balance.</span><button className="cursor-pointer border-0 bg-transparent underline" onClick={() => setDueOnly(false)}>Show all balances</button></div>}
-      <OrderTable orders={displayedOrders} selectedIds={selectedIds} allSelected={isPageSelected(selectedIds, displayedOrders)} onSelect={toggleSelect} onSelectAll={toggleSelectAll} onView={setViewOrderId} onEdit={openEditOrder} onReceipt={downloadReceipt} onNotes={setNotesOrder} />
+      <OrderTable orders={displayedOrders} selectedIds={selectedIds} allSelected={isPageSelected(selectedIds, displayedOrders)} onSelect={toggleSelect} onSelectAll={toggleSelectAll} onView={setViewOrderId} onEdit={openEditOrder} onReceipt={downloadReceipt} onNotes={setNotesOrder} onCancel={order => updateStatus(order._id, 'Canceled')} statusUpdatingId={statusUpdatingId} />
       <OrderDetailsDrawer order={viewOrder} paymentBusy={paymentUpdatingId === viewOrder?._id} onCorrectUnpaid={id => updatePaymentStatus(id, 'Unpaid', undefined, true)} onClose={() => setViewOrderId(null)} onStatus={updateStatus}
         onPaymentStatus={(id, status) => { if (status === 'Paid') setViewOrderId(null); updatePaymentStatus(id, status); }}
         onAction={(action, order) => {
