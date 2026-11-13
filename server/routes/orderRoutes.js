@@ -40,21 +40,34 @@ const asyncHandler = (fn) => (req, res, next) => {
 
 // ✅ Atomic stock decrement with transaction support — uses bulkWrite (single query)
 const decrementStockAtomic = async (items, session = null) => {
-  const bulkOps = items
-    .filter(item => item.perfumeId)
-    .map(item => ({
-      updateOne: {
-        filter: { _id: item.perfumeId },
-        update: { $inc: { stock: -item.quantity } },
-      },
-    }));
-  if (bulkOps.length === 0) return;
+  const quantities = new Map();
+  for (const item of items) {
+    if (!Number.isSafeInteger(item.quantity) || item.quantity < 1) {
+      throw new Error('Item quantities must be positive whole numbers.');
+    }
+    if (!item.perfumeId) continue;
+    const id = item.perfumeId.toString();
+    quantities.set(id, (quantities.get(id) || 0) + item.quantity);
+  }
+  if (quantities.size === 0) return;
+  const products = await Perfume.find({ _id: { $in: [...quantities.keys()] } }).session(session);
+  const productMap = new Map(products.map(product => [product._id.toString(), product]));
+  for (const [id, quantity] of quantities) {
+    const product = productMap.get(id);
+    if (!product) throw new Error('An ordered product no longer exists. Please select an available product.');
+    if (product.stock < quantity) {
+      throw new Error(`"${product.name}" only has ${product.stock} units available (you requested ${quantity}).`);
+    }
+  }
+  const bulkOps = [...quantities].map(([id, quantity]) => ({
+    updateOne: {
+      filter: { _id: id, stock: { $gte: quantity } },
+      update: { $inc: { stock: -quantity } },
+    },
+  }));
   const result = await Perfume.bulkWrite(bulkOps, { session });
-  // Verify no stock went negative after the bulk write
-  const updatedIds = items.filter(i => i.perfumeId).map(i => i.perfumeId);
-  const updated = await Perfume.find({ _id: { $in: updatedIds }, stock: { $lt: 0 } }).session(session);
-  if (updated.length > 0) {
-    throw new Error(`Insufficient stock for "${updated[0].name}". Transaction rolled back.`);
+  if (result.matchedCount !== bulkOps.length) {
+    throw new Error('Stock changed while saving. Please refresh and check the available quantities.');
   }
   return result;
 };
@@ -211,6 +224,7 @@ router.post('/', verifyUser, (req, res, next) => {
 
     // Commit transaction
     await session.commitTransaction();
+    req.app?.cacheDel?.('perfumes:');
 
     // Send confirmation email (outside transaction)
     if (newOrder.customerEmail) {
@@ -295,6 +309,7 @@ router.post('/manual', verifyAdmin, validate(createOrderSchema), asyncHandler(as
     }
     // Commit transaction
     await session.commitTransaction();
+    req.app?.cacheDel?.('perfumes:');
 
     await writeLog(req, 'CREATE_ORDER', 'Order',
       `Manual order created for ${newOrder.customerName} — ${newOrder.totalAmount} TK`);
@@ -410,6 +425,7 @@ router.put('/:id/cancel', verifyUser, asyncHandler(async (req, res) => {
     await restoreFifoBatches(order.batchDeductions, session);
     
     await session.commitTransaction();
+    req.app?.cacheDel?.('perfumes:');
     
     res.json({ message: 'Order cancelled and stock restored', order: savedOrder });
   } catch (err) {
@@ -440,51 +456,35 @@ router.put('/:id', verifyAdmin, asyncHandler(async (req, res) => {
     const oldPaymentStatus = order.paymentStatus?.toLowerCase(); // capture BEFORE any updates
     let collectionCorrection;
 
-    // ── Handle item changes (stock recalculation) ──────────────
-    if (items && JSON.stringify(items) !== JSON.stringify(order.items)) {
-      const wasCancelled = oldStatus === 'canceled' || oldStatus === 'cancelled';
-      
-      // Restore stock for OLD items (unless order was already cancelled)
+    // Reconcile item and cancellation changes together so stock moves exactly once.
+    const wasCancelled = ['canceled', 'cancelled'].includes(oldStatus);
+    const willBeCancelled = ['canceled', 'cancelled'].includes(newStatus || oldStatus);
+    if (items !== undefined && (!Array.isArray(items) || items.length === 0)) {
+      throw new Error('At least one order item is required.');
+    }
+    const nextItems = items === undefined ? order.items : items;
+    for (const item of nextItems || []) {
+      if (!Number.isSafeInteger(item.quantity) || item.quantity < 1) {
+        throw new Error('Item quantities must be positive whole numbers.');
+      }
+    }
+    if (items !== undefined || wasCancelled !== willBeCancelled) {
       if (!wasCancelled) {
         await restoreStockAtomic(order.items, session);
         await restoreFifoBatches(order.batchDeductions, session);
       }
-      
-      // Decrement stock for NEW items (unless we're keeping it cancelled)
-      const keepingCancelled = (newStatus === 'canceled' || newStatus === 'cancelled') ||
-                               (!status && wasCancelled);
-      if (!keepingCancelled) {
-        await decrementStockAtomic(items, session);
-        const itemChangedDeductions = await deductFifoBatches(items, session);
-        order.batchDeductions = itemChangedDeductions;
-      } else {
-        order.batchDeductions = [];
+      order.batchDeductions = [];
+      if (!willBeCancelled) {
+        await decrementStockAtomic(nextItems, session);
+        order.batchDeductions = await deductFifoBatches(nextItems, session);
       }
       order.markModified('batchDeductions');
-
-      order.items = items;
-      order.markModified('items');
-    }
-
-    // ── Handle status change (stock restore/decrement) ─────────
-    if (status && !items) {
-      // Cancel → restore stock + restore FIFO batches
-      if ((newStatus === 'canceled' || newStatus === 'cancelled') &&
-          oldStatus !== 'canceled' && oldStatus !== 'cancelled') {
-        await restoreStockAtomic(order.items, session);
-        await restoreFifoBatches(order.batchDeductions, session);
-      }
-      // Un-cancel → decrement stock + re-deduct FIFO batches
-      else if ((oldStatus === 'canceled' || oldStatus === 'cancelled') &&
-               newStatus && newStatus !== 'canceled' && newStatus !== 'cancelled') {
-        await decrementStockAtomic(order.items, session);
-        const reDeductions = await deductFifoBatches(order.items, session);
-        order.batchDeductions = reDeductions;
-        order.markModified('batchDeductions');
+      if (items !== undefined) {
+        order.items = items;
+        order.markModified('items');
       }
     }
 
-    // ── Update all provided fields ─────────────────────────────
     if (status)           order.status           = status;
     if (paymentStatus)    order.paymentStatus    = paymentStatus;
     if (customerName)     order.customerName     = customerName;
@@ -556,6 +556,7 @@ router.put('/:id', verifyAdmin, asyncHandler(async (req, res) => {
 
     const updatedOrder = await order.save({ session });
     await session.commitTransaction();
+    req.app?.cacheDel?.('perfumes:');
 
     // Log what changed (outside transaction)
     const changes = [];

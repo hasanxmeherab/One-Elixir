@@ -1,3 +1,5 @@
+import { editStockAvailable, editStockError, isCancelledOrder } from '../../../utils/editOrderStock';
+
 const EditOrderModal = ({
   editOrder,
   editForm,
@@ -12,6 +14,7 @@ const EditOrderModal = ({
   onClose,
 }) => {
   if (!editOrder || !editForm) return null;
+  const stockError = editStockError(editOrder, perfumes, editForm.items);
 
   return (
     <div
@@ -146,10 +149,13 @@ const EditOrderModal = ({
                     <option value="">— Custom —</option>
                     {perfumes.map(p => (
                       <option key={p._id} value={p._id}>
-                        {p.name} ({p.price} TK)
+                        {p.name} ({p.price} TK) - {editStockAvailable(editOrder, perfumes, p._id)} available
                       </option>
                     ))}
                   </select>
+                  {!item.perfumeId && (
+                    <p className="text-[10px] text-amber-700">Custom items do not deduct inventory. Select a product above to track stock.</p>
+                  )}
                   {!item.perfumeId && (
                     <input
                       value={item.name}
@@ -175,6 +181,8 @@ const EditOrderModal = ({
                     <input
                       type="number"
                       min="1"
+                      step="1"
+                      max={item.perfumeId && !isCancelledOrder(editOrder) ? Math.max(0, editStockAvailable(editOrder, perfumes, item.perfumeId) - editForm.items.reduce((sum, other, i) => i !== idx && other.perfumeId === item.perfumeId ? sum + other.quantity : sum, 0)) : undefined}
                       value={item.quantity}
                       onChange={e => updateEditItem(idx, 'quantity', Number(e.target.value) || 1)}
                       className="w-full p-1.5 border border-[#ddd] text-[11px] outline-none box-border"
@@ -244,9 +252,10 @@ const EditOrderModal = ({
           </div>
         </div>
 
+        {stockError && <p role="alert" className="text-[12px] text-red-600 mt-3">{stockError}</p>}
         <button
           onClick={onSave}
-          disabled={editSaving}
+          disabled={editSaving || Boolean(stockError)}
           className="w-full bg-black text-white border-none p-3 cursor-pointer font-bold tracking-wider mt-5 hover:bg-gray-800 transition-colors disabled:opacity-60"
         >
           {editSaving ? 'SAVING ORDER...' : 'SAVE CHANGES'}

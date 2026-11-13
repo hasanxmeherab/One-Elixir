@@ -18,6 +18,7 @@ import PartialPaymentModal from './order-modals/PartialPaymentModal';
 import OrderTable from './order-modals/OrderTable';
 import OrderDetailsDrawer from './order-modals/OrderDetailsDrawer';
 import { togglePageSelection, isPageSelected } from '../../utils/orderSelection';
+import { editStockError } from '../../utils/editOrderStock';
 
 
 const PAGE_SIZE = 15;
@@ -229,8 +230,11 @@ const OrderList = () => {
   };
 
   const saveEditOrder = async () => {
+    if (editSaving) return;
     if (!editForm.customerName || !editForm.phone) return toast.warning('Customer name and phone required.');
     if (editForm.items.length === 0) return toast.warning('At least one item required.');
+    const stockError = editStockError(editOrder, perfumes, editForm.items);
+    if (stockError) return toast.warning(stockError);
     setEditSaving(true);
     try {
       const totalAmount = calcEditTotal(editForm);
@@ -238,7 +242,7 @@ const OrderList = () => {
         let finalPrice = item.price;
         if (item.discountType === 'percentage') finalPrice = item.price - (item.price * item.discountValue / 100);
         else if (item.discountType === 'fixed') finalPrice = item.price - (item.discountValue || 0);
-        return { ...item, finalItemPrice: Math.max(0, finalPrice) };
+        return { ...item, perfumeId: item.perfumeId || null, finalItemPrice: Math.max(0, finalPrice) };
       });
       await adminAxios.put(`${API_URL}/api/orders/${editOrder._id}`, {
         customerName: editForm.customerName,

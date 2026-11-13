@@ -81,7 +81,7 @@ test('checkout ignores forged customer email, account ID and payment status', as
   const session = { startTransaction() {}, commitTransaction: async () => {}, abortTransaction: async () => {}, inTransaction: () => true, endSession() {} };
   t.mock.method(mongoose, 'startSession', async () => session);
   t.mock.method(Perfume, 'find', filter => ({ session: async () => filter.stock ? [] : [{ _id: new mongoose.Types.ObjectId(productId), name: 'Oil', price: 300, stock: 5, variants: [] }] }));
-  t.mock.method(Perfume, 'bulkWrite', async () => ({}));
+  t.mock.method(Perfume, 'bulkWrite', async ops => ({ matchedCount: ops.length }));
   t.mock.method(CostRecord, 'find', () => ({ sort: async () => [] }));
   t.mock.method(Order.prototype, 'save', async function () { return this; });
   let email;
