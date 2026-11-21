@@ -18,7 +18,7 @@ import PartialPaymentModal from './order-modals/PartialPaymentModal';
 import OrderTable from './order-modals/OrderTable';
 import OrderDetailsDrawer from './order-modals/OrderDetailsDrawer';
 import { togglePageSelection, isPageSelected } from '../../utils/orderSelection';
-import { editStockError } from '../../utils/editOrderStock';
+import { editItemStockLimit, editStockError } from '../../utils/editOrderStock';
 
 
 const PAGE_SIZE = 15;
@@ -26,7 +26,7 @@ const PAGE_SIZE = 15;
 const OrderList = () => {
   const [query] = useSearchParams();
   const [dueOnly, setDueOnly] = useState(query.get('due') === '1');
-  const { orders = [], perfumes = [], fetchData } = useOutletContext();
+  const { orders = [], fetchData } = useOutletContext();
   const toast = useToast();
   const [showArchived, setShowArchived] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -63,6 +63,10 @@ const OrderList = () => {
   const [editOrder, setEditOrder] = useState(null);
   const [editForm, setEditForm] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
+  const [editPerfumes, setEditPerfumes] = useState([]);
+  const [editStockLoading, setEditStockLoading] = useState(false);
+  const [editStockLoadError, setEditStockLoadError] = useState('');
+  const [editStockRefresh, setEditStockRefresh] = useState(0);
 
   // ── NEW: Order notes ──
   const [notesOrder, setNotesOrder] = useState(null);
@@ -85,6 +89,20 @@ const OrderList = () => {
   const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const adminData = JSON.parse(localStorage.getItem('adminData') || '{}');
+
+  useEffect(() => {
+    if (!editOrder) return;
+    let active = true;
+    setEditStockLoading(true);
+    setEditStockLoadError('');
+    adminAxios.get(`${API_URL}/api/perfumes/edit-stock`, { timeout: 15000 })
+      .then(({ data }) => { if (active) setEditPerfumes(data); })
+      .catch(() => {
+        if (active) setEditStockLoadError('Unable to load current stock. Retry before saving.');
+      })
+      .finally(() => { if (active) setEditStockLoading(false); });
+    return () => { active = false; };
+  }, [editOrder, editStockRefresh, API_URL]);
 
 
 
@@ -203,6 +221,9 @@ const OrderList = () => {
 
   // ── NEW: Full order edit ──
   const openEditOrder = (order) => {
+    setEditPerfumes([]);
+    setEditStockLoading(true);
+    setEditStockLoadError('');
     setEditForm({
       customerName: order.customerName,
       phone: order.phone,
@@ -238,10 +259,10 @@ const OrderList = () => {
   };
 
   const saveEditOrder = async () => {
-    if (editSaving) return;
+    if (editSaving || editStockLoading || editStockLoadError) return;
     if (!editForm.customerName || !editForm.phone) return toast.warning('Customer name and phone required.');
     if (editForm.items.length === 0) return toast.warning('At least one item required.');
-    const stockError = editStockError(editOrder, perfumes, editForm.items);
+    const stockError = editStockError(editOrder, editPerfumes, editForm.items);
     if (stockError) return toast.warning(stockError);
     setEditSaving(true);
     try {
@@ -270,6 +291,8 @@ const OrderList = () => {
       fetchData();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update order.');
+      setEditStockLoading(true);
+      setEditStockRefresh(value => value + 1);
     } finally {
       setEditSaving(false);
     }
@@ -292,10 +315,16 @@ const OrderList = () => {
       items[idx] = { ...items[idx], [field]: value };
       // If selecting a perfume from dropdown, auto-fill name/price
       if (field === 'perfumeId' && value) {
-        const p = perfumes.find(p => p._id === value);
+        const p = editPerfumes.find(p => p._id === value);
         if (p) {
           items[idx].name = p.name;
           items[idx].price = p.price;
+        }
+      }
+      if (field === 'quantity' || field === 'perfumeId') {
+        const limit = editItemStockLimit(editOrder, editPerfumes, items, idx);
+        if (limit !== undefined && items[idx].quantity > limit) {
+          items[idx].quantity = Math.max(1, limit);
         }
       }
       return { ...f, items };
@@ -819,7 +848,10 @@ const OrderList = () => {
         editOrder={editOrder}
         editForm={editForm}
         setEditForm={setEditForm}
-        perfumes={perfumes}
+        perfumes={editPerfumes}
+        stockLoading={editStockLoading}
+        stockLoadError={editStockLoadError}
+        onRefreshStock={() => { setEditStockLoading(true); setEditStockRefresh(value => value + 1); }}
         addEditItem={addEditItem}
         removeEditItem={removeEditItem}
         updateEditItem={updateEditItem}

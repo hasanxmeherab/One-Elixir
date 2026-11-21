@@ -26,6 +26,18 @@ const cleanupExpiredFlashSales = async () => {
   }
 };
 
+// Order editing must read current inventory rather than the public catalog cache.
+router.get('/edit-stock', verifyAdmin, async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    const perfumes = await Perfume.find({ isDeleted: { $ne: true } })
+      .select('name price stock').lean();
+    res.json(perfumes);
+  } catch {
+    res.status(500).json({ message: 'Failed to fetch current stock. Please try again.' });
+  }
+});
+
 // GET all perfumes with search support (public) — #19 server-side pagination, #20 cache
 router.get('/', async (req, res) => {
   try {

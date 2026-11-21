@@ -6,7 +6,15 @@ export function editStockAvailable(order, perfumes, perfumeId) {
   const reserved = isCancelledOrder(order) ? 0 : (order.items || [])
     .filter(item => item.perfumeId === perfumeId)
     .reduce((sum, item) => sum + item.quantity, 0);
-  return Number(product.stock) + reserved;
+  const stock = Number(product.stock);
+  return (Number.isSafeInteger(stock) && stock >= 0 ? stock : 0) + reserved;
+}
+
+export function editItemStockLimit(order, perfumes, items, index, perfumeId = items[index].perfumeId) {
+  if (!perfumeId || isCancelledOrder(order)) return undefined;
+  const otherQuantity = items.reduce((sum, other, i) =>
+    i !== index && other.perfumeId === perfumeId ? sum + other.quantity : sum, 0);
+  return Math.max(0, editStockAvailable(order, perfumes, perfumeId) - otherQuantity);
 }
 
 export function editStockError(order, perfumes, items) {

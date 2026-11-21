@@ -1,10 +1,13 @@
-import { editStockAvailable, editStockError, isCancelledOrder } from '../../../utils/editOrderStock';
+import { editItemStockLimit, editStockAvailable, editStockError } from '../../../utils/editOrderStock';
 
 const EditOrderModal = ({
   editOrder,
   editForm,
   setEditForm,
   perfumes,
+  stockLoading,
+  stockLoadError,
+  onRefreshStock,
   addEditItem,
   removeEditItem,
   updateEditItem,
@@ -14,7 +17,7 @@ const EditOrderModal = ({
   onClose,
 }) => {
   if (!editOrder || !editForm) return null;
-  const stockError = editStockError(editOrder, perfumes, editForm.items);
+  const stockError = !stockLoading && !stockLoadError ? editStockError(editOrder, perfumes, editForm.items) : null;
 
   return (
     <div
@@ -109,6 +112,15 @@ const EditOrderModal = ({
         </div>
 
         {/* Items */}
+        <div className="mb-3 text-[12px]">
+          {stockLoading ? <p role="status">Loading current stock...</p> : stockLoadError ? (
+            <p role="alert" className="text-red-600">{stockLoadError}</p>
+          ) : <p>Stock includes units already reserved for this order.</p>}
+          <button onClick={onRefreshStock} disabled={stockLoading || editSaving} className="underline disabled:opacity-60">
+            {stockLoadError ? 'Retry loading stock' : 'Refresh stock'}
+          </button>
+        </div>
+        <fieldset disabled={stockLoading || Boolean(stockLoadError) || editSaving} className="border-0 p-0 m-0 min-w-0">
         <div className="mb-4">
           <div className="flex justify-between items-center mb-2">
             <label className="text-[10px] font-bold tracking-wider text-[#888]">ORDER ITEMS</label>
@@ -148,7 +160,7 @@ const EditOrderModal = ({
                   >
                     <option value="">— Custom —</option>
                     {perfumes.map(p => (
-                      <option key={p._id} value={p._id}>
+                      <option key={p._id} value={p._id} disabled={editItemStockLimit(editOrder, perfumes, editForm.items, idx, p._id) === 0}>
                         {p.name} ({p.price} TK) - {editStockAvailable(editOrder, perfumes, p._id)} available
                       </option>
                     ))}
@@ -182,7 +194,7 @@ const EditOrderModal = ({
                       type="number"
                       min="1"
                       step="1"
-                      max={item.perfumeId && !isCancelledOrder(editOrder) ? Math.max(0, editStockAvailable(editOrder, perfumes, item.perfumeId) - editForm.items.reduce((sum, other, i) => i !== idx && other.perfumeId === item.perfumeId ? sum + other.quantity : sum, 0)) : undefined}
+                      max={editItemStockLimit(editOrder, perfumes, editForm.items, idx)}
                       value={item.quantity}
                       onChange={e => updateEditItem(idx, 'quantity', Number(e.target.value) || 1)}
                       className="w-full p-1.5 border border-[#ddd] text-[11px] outline-none box-border"
@@ -220,6 +232,8 @@ const EditOrderModal = ({
           })}
         </div>
 
+        </fieldset>
+
         {/* Shipping + Discount + Total */}
         <div className="flex flex-wrap items-center gap-4 border-t border-[#eee] pt-4">
           <div>
@@ -255,7 +269,7 @@ const EditOrderModal = ({
         {stockError && <p role="alert" className="text-[12px] text-red-600 mt-3">{stockError}</p>}
         <button
           onClick={onSave}
-          disabled={editSaving || Boolean(stockError)}
+          disabled={editSaving || stockLoading || Boolean(stockLoadError) || Boolean(stockError)}
           className="w-full bg-black text-white border-none p-3 cursor-pointer font-bold tracking-wider mt-5 hover:bg-gray-800 transition-colors disabled:opacity-60"
         >
           {editSaving ? 'SAVING ORDER...' : 'SAVE CHANGES'}
